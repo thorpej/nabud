@@ -31,9 +31,11 @@
  * but eventually also be over a socket to support NABU emulators.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -44,6 +46,46 @@
 
 #include "conn.h"
 #include "log.h"
+
+static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+static struct nabu_connection *conn_list;
+unsigned int conn_count;
+
+static void
+conn_insert(struct nabu_connection *conn)
+{
+	assert(! conn->on_list);
+
+	pthread_mutex_lock(&conn_list_mutex);
+	conn->next = conn_list;
+	conn_list = conn;
+	conn->on_list = true;
+	conn_count++;
+	pthread_mutex_unlock(&conn_list_mutex);
+}
+
+static void
+conn_remove(struct nabu_connection *conn)
+{
+	if (conn->on_list) {
+		struct nabu_connection *cur, **prev_nextp;
+
+		pthread_mutex_lock(&conn_list_mutex);
+		for (cur = conn_list, prev_nextp = &conn_list;
+		     cur != NULL;
+		     prev_nextp = &cur->next, cur = cur->next) {
+			if (cur == conn) {
+				*prev_nextp = cur->next;
+				cur->next = NULL;
+				conn->on_list = false;
+				conn_count--;
+				break;
+			}
+		}
+		pthread_mutex_unlock(&conn_list_mutex);
+		assert(cur != NULL);
+	}
+}
 
 static bool
 conn_set_nbio(struct nabu_connection *conn, const char *which, int fd)
@@ -110,6 +152,7 @@ conn_create_common(const char *name, int fd)
 		goto bad;
 	}
 
+	conn_insert(conn);
 	return conn;
 
  bad:
@@ -184,6 +227,8 @@ conn_create_serial(const char *path)
 void
 conn_destroy(struct nabu_connection *conn)
 {
+	conn_remove(conn);
+
 	/* close the writer first because SIGPIPE is super annoying. */
 	if (conn->cancel_fds[1] != -1) {
 		close(conn->cancel_fds[1]);

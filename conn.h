@@ -33,6 +33,10 @@
 #include "nabu_proto.h"
 
 struct nabu_connection {
+	/* Next on the list of connections. */
+	struct nabu_connection *next;
+	bool		on_list;
+
 	/* Display name for this connection. */
 	char		*name;
 
@@ -65,6 +69,8 @@ struct nabu_connection {
 	uint8_t		pktbuf[NABU_MAXPACKETSIZE * 2];
 	size_t		pktlen;
 };
+
+extern unsigned int conn_count;
 
 struct nabu_connection *conn_create_serial(const char *);
 void	conn_destroy(struct nabu_connection *);
