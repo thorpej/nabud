@@ -40,6 +40,7 @@ struct nabu_segment {
 
 struct nabu_connection;
 
+bool	segment_init(const char *);
 const struct nabu_segment *segment_load(struct nabu_connection *, uint32_t);
 
 #endif /* segment_h_included */

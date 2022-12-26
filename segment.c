@@ -28,6 +28,7 @@
  * Segment management.
  */
 
+#include <sys/stat.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -38,6 +39,33 @@
 #include "conn.h"
 #include "log.h"
 #include "segment.h"
+
+static const char *segments_directory;
+
+/*
+ * segment_init --
+ *	Initialize the segment repository.
+ */
+bool
+segment_init(const char *segdir)
+{
+	struct stat sb;
+
+	if (stat(segdir, &sb) < 0) {
+		log_error("stat() on segments directory %s failed: %s",
+		    segdir, strerror(errno));
+		return false;
+	}
+	if (!S_ISDIR(sb.st_mode)) {
+		log_error("Segments directory %s is not a directory.",
+		    segdir);
+		return false;
+	}
+
+	segments_directory = segdir;
+
+	return true;
+}
 
 /*
  * segment_load --
