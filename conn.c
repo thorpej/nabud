@@ -92,7 +92,7 @@ conn_create_common(const char *name, int fd)
 	 * drain it if the connection is restarted.
 	 */
 	if (pipe(conn->cancel_fds) < 0) {
-		log_error("[%s] pipe() failed: %s", name, sterror(errno));
+		log_error("[%s] pipe() failed: %s", name, strerror(errno));
 		goto bad;
 	}
 	if (! conn_set_nbio(conn, "cancel pipe", conn->cancel_fds[0])) {
@@ -201,7 +201,7 @@ conn_io_deadline(const struct nabu_connection *conn, struct timespec *deadline)
  *	the current deadline.
  */
 static int
-conn_io_polltimo(const struct timespec *deadline)
+conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
 {
 	struct timespec now, timo;
 
@@ -258,7 +258,7 @@ conn_io_wait(struct nabu_connection *conn, bool is_recv)
 	short pollwhich = is_recv ? POLLRDNORM : POLLWRNORM;
 	const char *which = is_recv ? "recv" : "send";
 
-	pollret = poll(fds, 2, conn_io_polltimo(&deadline));
+	pollret = poll(fds, 2, conn_io_polltimo(conn, &deadline));
 	if (pollret < 0) {
 		log_error("[%s] poll() for %s failed: %s", conn->name,
 		    which, strerror(errno));
@@ -303,6 +303,7 @@ conn_io_wait(struct nabu_connection *conn, bool is_recv)
 void
 conn_send(struct nabu_connection *conn, const uint8_t *buf, size_t len)
 {
+	struct timespec deadline;
 	const uint8_t *curptr;
 	size_t resid;
 	ssize_t actual;
@@ -351,10 +352,14 @@ conn_send_byte(struct nabu_connection *conn, uint8_t val)
  *	Receive data on the connection.  Will wait indefinitely for
  *	all data to be received unless the connection watchdog is
  *	enabled.
+ *
+ *	N.B. We wait for ALL of the expected data to arrive.  There
+ *	are no partial reads!
  */
-ssize_t
+bool
 conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 {
+	struct timespec deadline;
 	uint8_t *curptr;
 	size_t resid;
 	ssize_t actual;
@@ -370,19 +375,19 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 			log_error("[%s] read() failed: %s", conn->name,
 			    strerror(errno));
 			conn->aborted = true;
-			return;
+			return false;
 		}
 
 		resid -= actual;
 		curptr += actual;
 		if (resid == 0) {
-			return;
+			return true;
 		}
 
 		/* Wait for the connection to be ready for reads again. */
 		if (! conn_io_wait(conn, true)) {
 			/* Error already logged. */
-			return;
+			return false;
 		}
 	}
 }

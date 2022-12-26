@@ -32,8 +32,7 @@
 #include <unistd.h>
 
 int
-main(argc, const char *argv[])
+main(int argc, char *argv[])
 {
-
 	exit(0);
 }

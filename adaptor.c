@@ -64,20 +64,25 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #include "conn.h"
+#include "log.h"
+#include "segment.h"
 
 static const uint8_t nabu_msg_request_channel_code[] =
     NABU_MSGSEQ_REQUEST_CHANNEL_CODE;
 static const uint8_t nabu_msg_confirm_channel_code[] =
     NABU_MSGSEQ_CONFIRM_CHANNEL_CODE;
-static const uint8_t nabu_msg_ack = NABU_MSGSEQ_ACK;
-static const uint8_t nabu_msg_initialized = NABU_MSGSEQ_INITIALIZED;
-static const uint8_t nabu_msg_end = NABU_MSGSEQ_END;
+static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;
+static const uint8_t nabu_msg_initialized[] = NABU_MSGSEQ_INITIALIZED;
+static const uint8_t nabu_msg_end[] = NABU_MSGSEQ_END;
 
 /*
  * adaptor_get_int16 --
@@ -182,12 +187,10 @@ static bool
 adaptor_expect(struct nabu_connection *conn, const uint8_t *msg, size_t msglen)
 {
 	uint8_t buf[8];		/* We expect these to be small. */
-	ssize_t actual;
 
 	assert(msglen <= sizeof(buf));
 
-	actual = conn_recv(conn, buf, msglen);
-	if (actual <= 0) {
+	if (! conn_recv(conn, buf, msglen)) {
 		log_error("[%s] Receive error.", conn->name);
 		return false;
 	}
@@ -254,14 +257,14 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t packet,
 		return;
 	}
 
-	if (off + len >= pak->length) {
-		len = seg->length - offset;
+	if (off + len >= seg->length) {
+		len = seg->length - off;
 	}
 
 	if (len < NABU_HEADERSIZE + NABU_FOOTERSIZE) {
 		log_error(
 		    "[%s] PAK %s: offset %zu length %zu is nonsensical",
-		    conn->naname, seg->name, off, len);
+		    conn->name, seg->name, off, len);
 		adaptor_send_abort(conn);
 		return;
 	}
@@ -279,7 +282,7 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t packet,
 	pktbuf[len - 2] = (uint8_t)(crc >> 8) ^ 0xff;	/* CRC MSB */
 	pktbuf[len - 1] = (uint8_t)(crc)      ^ 0xff;	/* CRC LSB */
 
-	adaptor_send_packet(pktbuf, pktlen);
+	adaptor_send_packet(conn, pktbuf, len);
 }
 
 /*
@@ -309,7 +312,7 @@ adaptor_send_segment(struct nabu_connection *conn, uint16_t packet,
 	if (off >= seg->length) {
 		log_error(
 		    "segment %u: packet %u offset %zu exceeds segment size %zu",
-		    seg->segment, packet, offset, seg->length);
+		    seg->segment, packet, off, seg->length);
 		adaptor_send_abort(conn);
 		return;
 	}
@@ -331,9 +334,9 @@ adaptor_send_segment(struct nabu_connection *conn, uint16_t packet,
 	}
 
 	/* 16 bytes of header */
-	pktbuf[i++] = (uint8_t)(segment >> 16);		/* segment MSB */
-	pktbuf[i++] = (uint8_t)(segment >> 8);
-	pktbuf[i++] = (uint8_t)(segment);		/* segment LSB */
+	pktbuf[i++] = (uint8_t)(seg->segment >> 16);	/* segment MSB */
+	pktbuf[i++] = (uint8_t)(seg->segment >> 8);
+	pktbuf[i++] = (uint8_t)(seg->segment);		/* segment LSB */
 	pktbuf[i++] = (uint8_t)(packet);		/* packet LSB */
 	pktbuf[i++] = 0x01;				/* owner */
 	pktbuf[i++] = 0x7f;				/* tier MSB */
@@ -343,11 +346,11 @@ adaptor_send_segment(struct nabu_connection *conn, uint16_t packet,
 	pktbuf[i++] = 0x7f;				/* mystery byte */
 	pktbuf[i++] = 0x80;				/* mystery byte */
 	pktbuf[i++] = (packet == 0 ? 0xa1 : 0x20) |	/* packet type */
-	              (last        ? 0x10 : 0x00)	/* end of segment */
+	              (last        ? 0x10 : 0x00);	/* end of segment */
 	pktbuf[i++] = (uint8_t)(packet);		/* packet LSB */
 	pktbuf[i++] = (uint8_t)(packet >> 8);		/* packet MSB */
-	pktbuf[i++] = (uint8_t)(offset >> 8);		/* offset MSB */
-	pktbuf[i++] = (uint8_t)(offset);		/* offset LSB */
+	pktbuf[i++] = (uint8_t)(off >> 8);		/* offset MSB */
+	pktbuf[i++] = (uint8_t)(off);			/* offset LSB */
 
 	memcpy(&pktbuf[i], seg->data + off, len);	/* payload */
 	i += len;
@@ -359,7 +362,7 @@ adaptor_send_segment(struct nabu_connection *conn, uint16_t packet,
 		log_fatal("internal packet length error");
 	}
 
-	adaptor_send_packet(pktbuf, pktlen);
+	adaptor_send_packet(conn, pktbuf, pktlen);
 }
 
 /*
@@ -408,7 +411,7 @@ adaptor_send_time(struct nabu_connection *conn)
  *	Handle the CHANNEL_STATUS message.
  */
 static void
-adaptor_msg_channel_status(conn)
+adaptor_msg_channel_status(struct nabu_connection *conn)
 {
 	if (conn->channel_valid) {
 		log_info("[%s] Confirm channel code: 0x%04x.",
@@ -427,7 +430,7 @@ adaptor_msg_channel_status(conn)
  *	Handle the READY message.
  */
 static void
-adaptor_msg_ready(conn)
+adaptor_msg_ready(struct nabu_connection *conn)
 {
 	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn->name);
 	conn_send_byte(conn, NABU_MSG_CONFIRMED);
@@ -438,7 +441,7 @@ adaptor_msg_ready(conn)
  *	Handle the slightly mysterious 0x1e message.
  */
 static void
-adaptor_msg_1e(conn)
+adaptor_msg_1e(struct nabu_connection *conn)
 {
 	log_debug("[%s] Sending NABU_MSGSEQ_END.", conn->name);
 	conn_send(conn, nabu_msg_end, sizeof(nabu_msg_end));
@@ -449,7 +452,7 @@ adaptor_msg_1e(conn)
  *	Handle the WAIT message.
  */
 static void
-adaptor_msg_wait(conn)
+adaptor_msg_wait(struct nabu_connection *conn)
 {
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn->name);
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
@@ -460,7 +463,7 @@ adaptor_msg_wait(conn)
  *	Handle the STARTING_UP message.
  */
 static void
-adaptor_msg_starting_up(conn)
+adaptor_msg_starting_up(struct nabu_connection *conn)
 {
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn->name);
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
@@ -471,7 +474,7 @@ adaptor_msg_starting_up(conn)
  *	Handle the INITIALIZE message.
  */
 static void
-adaptor_msg_initialize(conn)
+adaptor_msg_initialize(struct nabu_connection *conn)
 {
 	log_debug("[%s] Sending NABU_MSGSEQ_INITIALIZED.", conn->name);
 	conn_send(conn, nabu_msg_initialized, sizeof(nabu_msg_initialized));
@@ -482,17 +485,15 @@ adaptor_msg_initialize(conn)
  *	Handle the PACKET_REQUEST message.
  */
 static void
-adaptor_msg_packet_request(conn)
+adaptor_msg_packet_request(struct nabu_connection *conn)
 {
 	static const unsigned int recv_timo = 5;
 	uint8_t msg[4];
-	ssize_t msglen;
 
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn->name);
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
 
-	msglen = conn_recv(conn, msg, sizeof(msg));
-	if (msglen != sizeof(msg)) {
+	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send packet/segment message.",
 		    conn->name);
 		conn->aborted = true;
@@ -530,7 +531,7 @@ adaptor_msg_packet_request(conn)
 
 	log_debug("[%s] Sending packet %u of %ssegment 0x%08x.",
 	    conn->name, packet, segment);
-	adaptor_send_segment(conn, packet, seg->is_pak ? "PAK " : "", seg);
+	adaptor_send_segment(conn, packet, seg);
 }
 
 /*
@@ -538,14 +539,12 @@ adaptor_msg_packet_request(conn)
  *	Handle the CHANGE_CHANNEL message.
  */
 static void
-adaptor_msg_change_channel(conn)
+adaptor_msg_change_channel(struct nabu_connection *conn)
 {
 	static const unsigned int recv_timo = 5;
 	uint8_t msg[2];
-	ssize_t msglen;
 
-	msglen = conn_recv(conn, msg, sizeof(msg));
-	if (msglen != sizeof(msg)) {
+	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send channel code.",
 		    conn->name);
 		conn->aborted = true;
@@ -575,7 +574,6 @@ void
 adaptor_event_loop(struct nabu_connection *conn)
 {
 	uint8_t msg;
-	ssize_t msglen;
 
 	log_info("[%s] Connection starting.", conn->name);
 
@@ -583,10 +581,9 @@ adaptor_event_loop(struct nabu_connection *conn)
 		/* We want to block "forever" waiting for requests. */
 		conn_stop_watchdog(conn);
 
-		msglen = conn_recv(conn, &msg, 1);
-		if (msglen <= 0) {
-			log_error("[%s] conn_recv() returned %zd, "
-			    "exiting event loop.", conn->name, msglen);
+		if (! conn_recv(conn, &msg, 1)) {
+			log_error("[%s] conn_recv() failed, "
+			    "exiting event loop.", conn->name);
 			break;
 			if (conn->cancelled) {
 				log_info("[%s] Received cancellation request.",

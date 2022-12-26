@@ -67,12 +67,13 @@ struct nabu_connection {
 };
 
 struct nabu_connection *conn_create_serial(const char *);
+void	conn_destroy(struct nabu_connection *);
 
 void	conn_cancel(struct nabu_connection *);
 
 void	conn_send(struct nabu_connection *, const uint8_t *, size_t);
 void	conn_send_byte(struct nabu_connection *, uint8_t);
-ssize_t	conn_recv(struct nabu_connection *, uint8_t *, size_t);
+bool	conn_recv(struct nabu_connection *, uint8_t *, size_t);
 
 void	conn_start_watchdog(struct nabu_connection *, unsigned int);
 void	conn_stop_watchdog(struct nabu_connection *);
