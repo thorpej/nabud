@@ -38,6 +38,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -55,11 +56,13 @@ conn_set_nbio(struct nabu_connection *conn, const char *which, int fd)
 		    conn->name, which, strerror(errno));
 		return false;
 	}
-	flags |= O_NONBLOCK;
-	if (fcntl(fd, F_SETFL) < 0) {
-		log_error("[%s] fcntl(F_SETFL) on %s failed: %s",
-		    conn->name, which, strerror(errno));
-		return false;
+	if ((flags & O_NONBLOCK) == 0) {
+		flags |= O_NONBLOCK;
+		if (fcntl(fd, F_SETFL) < 0) {
+			log_error("[%s] fcntl(F_SETFL) on %s failed: %s",
+			    conn->name, which, strerror(errno));
+			return false;
+		}
 	}
 	return true;
 }
@@ -114,10 +117,64 @@ conn_create_common(const char *name, int fd)
 	return NULL;
 }
 
+#define	NABU_NATIVE_BPS		111000
+#define	NABU_FALLBACK_BPS	115200
+
 struct nabu_connection *
 conn_create_serial(const char *path)
 {
-	return conn_create_common(path, -1);	/* XXX */
+	struct termios t;
+	int fd;
+
+	fd = open(path, O_RDWR | O_NONBLOCK | O_NOCTTY);
+	if (fd < 0) {
+		log_error("Unable to open %s: %s", path, strerror(errno));
+		return NULL;
+	}
+
+	if (tcgetattr(fd, &t) < 0) {
+		log_error("tcgetattr() failed on %s: %s", path,
+		    strerror(errno));
+		goto bad;
+	}
+
+	/* 8N1, 111000 baud natively. */
+	cfmakeraw(&t);
+	t.c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD);
+	t.c_cflag |= CLOCAL | CS8;
+	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
+		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
+		    path);
+		goto bad;
+	}
+
+	if (tcsetattr(fd, TCSANOW, &t) < 0) {
+		/*
+		 * If we failed to set the native NABU baud rate
+		 * (it's a little of an odd-ball after all), then
+		 * try the fall back.  But add an extra stop bit
+		 * so that the NABU's UART has a better chance of
+		 * re-synchronizing with the next start bit.
+		 */
+		log_info("Failed to 8N1-%d on %s; falling back to 8N2-%d.",
+		    NABU_NATIVE_BPS, path, NABU_FALLBACK_BPS);
+		t.c_cflag |= CSTOPB;
+		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
+			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
+			    path);
+			goto bad;
+		}
+		if (tcsetattr(fd, TCSANOW, &t) < 0) {
+			log_error("Failed to set 8N2-%d on %s.",
+			    NABU_FALLBACK_BPS, path);
+			goto bad;
+		}
+	}
+
+	return conn_create_common(path, fd);
+ bad:
+	close(fd);
+	return NULL;
 }
 
 /*
