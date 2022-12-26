@@ -63,6 +63,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * (AdaptorEmulator.cs) by Nick Daniels.
  */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -117,6 +118,7 @@ adaptor_crc(const uint8_t *buf, size_t len)
 		crc <<= 8;
 		crc ^= crctab[c];
 	}
+	return crc;
 }
 
 /*
@@ -152,6 +154,61 @@ adaptor_send_abort(struct nabu_connection *conn)
 }
 
 /*
+ * adaptor_msg_to_string --
+ *	This is just a silly little helper function so I can log
+ *	a decent message in adaptor_expect().
+ */
+static char *
+adaptor_msg_to_string(const uint8_t *msg, size_t msglen)
+{
+	char *cp0, *cp;
+	size_t i;
+
+	cp0 = cp = malloc(msglen * 5);
+	assert(cp0 != NULL);		/* &shrug; */
+
+	for (i = 0; i < msglen; i++) {
+		cp += sprintf(cp, "0x%02x%s", msg[i],
+		    i == msglen - 1 ? "" : " ");
+	}
+	return cp0;
+}
+
+/*
+ * adaptor_expect --
+ *	Wait for an expected message from the NABU.
+ */
+static bool
+adaptor_expect(struct nabu_connection *conn, const uint8_t *msg, size_t msglen)
+{
+	uint8_t buf[8];		/* We expect these to be small. */
+	ssize_t actual;
+
+	assert(msglen <= sizeof(buf));
+
+	actual = conn_recv(conn, buf, msglen);
+	if (actual <= 0) {
+		log_error("[%s] Receive error.", conn->name);
+		return false;
+	}
+
+	if (memcmp(msg, buf, msglen) == 0) {
+		/* Got expected message! */
+		return true;
+	}
+
+	/*
+	 * Log what we got vs what we expected.
+	 */
+	char *expected = adaptor_msg_to_string(msg, msglen);
+	char *received = adaptor_msg_to_string(buf, msglen);
+	log_error("[%s] Expected %s, received %s", conn->name,
+	    expected, received);
+	free(expected);
+	free(received);
+}
+
+/*
  * adaptor_send_packet --
  *	Send a packet to the NABU.  The buffer will be freed once the
  *	packet has been sent.
@@ -166,9 +223,12 @@ adaptor_send_packet(struct nabu_connection *conn, uint8_t *buf, size_t len)
 	} else {
 		adaptor_escape_packet(conn, buf, len);
 		conn_send_byte(conn, NABU_MSG_AUTHORIZED);
-		conn_expect(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
-		conn_send(conn, conn->pktbuf, conn->pktlen);
-		conn_send(conn, nabu_msg_end, sizeof(nabu_msg_end));
+		if (adaptor_expect(conn, nabu_msg_ack, sizeof(nabu_msg_ack))) {
+			conn_send(conn, conn->pktbuf, conn->pktlen);
+			conn_send(conn, nabu_msg_end, sizeof(nabu_msg_end));
+		} else {
+			log_error("[%s] Protocol error.", conn->name);
+		}
 	}
 	free(buf);
 }
@@ -431,9 +491,7 @@ adaptor_msg_packet_request(conn)
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn->name);
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
 
-	conn_start_watchdog(conn, recv_timo);
 	msglen = conn_recv(conn, msg, sizeof(msg));
-	conn_stop_watchdog(conn);
 	if (msglen != sizeof(msg)) {
 		log_error("[%s] NABU failed to send packet/segment message.",
 		    conn->name);
@@ -486,9 +544,7 @@ adaptor_msg_change_channel(conn)
 	uint8_t msg[2];
 	ssize_t msglen;
 
-	conn_start_watchdog(conn, recv_timo);
 	msglen = conn_recv(conn, msg, sizeof(msg));
-	conn_stop_watchdog(conn);
 	if (msglen != sizeof(msg)) {
 		log_error("[%s] NABU failed to send channel code.",
 		    conn->name);
@@ -524,21 +580,31 @@ adaptor_event_loop(struct nabu_connection *conn)
 	log_info("[%s] Connection starting.", conn->name);
 
 	for (;;) {
-		if (conn->cancelled) {
-			log_info("[%s] Received cancellation request.",
-			    conn->name);
-			break;
-		}
-		if (conn->aborted) {
-			log_error("[%s] Connection aborted.", conn->name);
-			break;
-		}
+		/* We want to block "forever" waiting for requests. */
+		conn_stop_watchdog(conn);
+
 		msglen = conn_recv(conn, &msg, 1);
 		if (msglen <= 0) {
 			log_error("[%s] conn_recv() returned %zd, "
 			    "exiting event loop.", conn->name, msglen);
 			break;
+			if (conn->cancelled) {
+				log_info("[%s] Received cancellation request.",
+				    conn->name);
+				break;
+			}
+			if (conn->aborted) {
+				log_error("[%s] Connection aborted.",
+				    conn->name);
+				break;
+			}
 		}
+
+		/*
+		 * Now that we've got a request, we don't want any given
+		 * I/O to take longer than 10 seconds.
+		 */
+		conn_start_watchdog(conn, 10);
 
 		switch (msg) {
 		case 0:
