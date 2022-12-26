@@ -24,22 +24,27 @@
  * SUCH DAMAGE.
  */
 
-#ifndef segment_h_included
-#define	segment_h_included
+/*
+ * Segment management.
+ */
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-struct nabu_segment {
-	const char	*name;
-	const uint8_t	*data;
-	size_t		length;
-	uint32_t	segment;
-	bool		is_pak;
-};
+#include "conn.h"
+#include "log.h"
+#include "segment.h"
 
-struct nabu_connection;
-
-const struct nabu_segment *segment_load(struct nabu_connection *, uint32_t);
-
-#endif /* segment_h_included */
+/*
+ * segment_load --
+ *	Load the specified segment.
+ */
+const struct nabu_segment *
+segment_load(struct nabu_connection *conn, uint32_t segment)
+{
+	return NULL;	/* XXX */
+}
