@@ -118,6 +118,7 @@ conn_create_common(const char *name, int fd)
 struct nabu_connection *
 conn_create_serial(const char *path)
 {
+	return NULL;		/* XXX */
 }
 
 /*
