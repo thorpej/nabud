@@ -24,24 +24,44 @@
  * SUCH DAMAGE.
  */
 
-#ifndef log_h_included
-#define	log_h_included
+/*
+ * Logging functions.
+ */
 
-typedef enum {
-	LOG_TYPE_INFO	= 0,
-	LOG_TYPE_DEBUG	= 1,
-	LOG_TYPE_ERROR	= 2,
-	LOG_TYPE_FATAL	= 3,
-} log_type;
+#include <assert.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-void	log_message(log_type, const char *, const char *, ...)
-	    __attribute__((__format__(__printf__, 3, 4)));
+#include "log.h"
 
-#define	log_info(...)	log_message(LOG_TYPE_INFO, __func__, __VA_ARGS__)
-#define	log_debug(...)	log_message(LOG_TYPE_DEBUG, __func__, __VA_ARGS__)
-#define	log_error(...)	log_message(LOG_TYPE_ERROR, __func__, __VA_ARGS__)
-#define	log_fatal(...)	\
-	/* This one doesn't return; trick the compiler */		\
-	for (log_message(LOG_TYPE_FATAL, __func__, __VA_ARGS__);;)
+static const char *log_typenames[] = {
+	[LOG_TYPE_INFO]		=	"INFO",
+	[LOG_TYPE_DEBUG]	=	"DEBUG",
+	[LOG_TYPE_ERROR]	=	"ERROR",
+	[LOG_TYPE_FATAL]	=	"FATAL",
+};
 
-#endif /* log_h_included */
+#define	log_type_is_valid(t)	((t) >= LOG_TYPE_INFO && (t) <= LOG_TYPE_FATAL)
+
+void
+log_message(log_type type, const char *func, const char *fmt, ...)
+{
+	va_list ap;
+	char *caller_string = NULL;
+
+	assert(log_type_is_valid(type));
+
+	va_start(ap, fmt);
+	vasprintf(&caller_string, fmt, ap);
+	va_end(ap);
+
+	/* XXX Add support for sending to syslog. */
+
+	printf("%s: %s: %s\n", log_typenames[type], func, caller_string);
+	free(caller_string);
+
+	if (type == LOG_TYPE_FATAL) {
+		abort();
+	}
+}
