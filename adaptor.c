@@ -72,6 +72,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <time.h>
 
+#include "adaptor.h"
 #include "conn.h"
 #include "log.h"
 #include "segment.h"
@@ -209,6 +210,8 @@ adaptor_expect(struct nabu_connection *conn, const uint8_t *msg, size_t msglen)
 	    expected, received);
 	free(expected);
 	free(received);
+
+	return false;
 }
 
 /*
@@ -487,7 +490,6 @@ adaptor_msg_initialize(struct nabu_connection *conn)
 static void
 adaptor_msg_packet_request(struct nabu_connection *conn)
 {
-	static const unsigned int recv_timo = 5;
 	uint8_t msg[4];
 
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn->name);
@@ -529,7 +531,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 		return;
 	}
 
-	log_debug("[%s] Sending packet %u of %ssegment 0x%08x.",
+	log_debug("[%s] Sending packet %u of segment 0x%08x.",
 	    conn->name, packet, segment);
 	adaptor_send_segment(conn, packet, seg);
 }
@@ -541,7 +543,6 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 static void
 adaptor_msg_change_channel(struct nabu_connection *conn)
 {
-	static const unsigned int recv_timo = 5;
 	uint8_t msg[2];
 
 	if (! conn_recv(conn, msg, sizeof(msg))) {

@@ -64,11 +64,10 @@ conn_set_nbio(struct nabu_connection *conn, const char *which, int fd)
 	return true;
 }
 
-static const struct nabu_connection *
+static struct nabu_connection *
 conn_create_common(const char *name, int fd)
 {
 	struct nabu_connection *conn;
-	int flags;
 
 	conn = calloc(1, sizeof(*conn));
 	if (conn == NULL) {
@@ -118,7 +117,7 @@ conn_create_common(const char *name, int fd)
 struct nabu_connection *
 conn_create_serial(const char *path)
 {
-	return NULL;		/* XXX */
+	return conn_create_common(path, -1);	/* XXX */
 }
 
 /*
@@ -241,9 +240,9 @@ conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
  *	Wait to be able to do I/O on a connection.
  */
 static bool
-conn_io_wait(struct nabu_connection *conn, bool is_recv)
+conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
+    bool is_recv)
 {
-	struct timespec deadline;
 	struct pollfd fds[2] = {
 		[0] = {
 			.fd = conn->fd,
@@ -258,7 +257,7 @@ conn_io_wait(struct nabu_connection *conn, bool is_recv)
 	short pollwhich = is_recv ? POLLRDNORM : POLLWRNORM;
 	const char *which = is_recv ? "recv" : "send";
 
-	pollret = poll(fds, 2, conn_io_polltimo(conn, &deadline));
+	pollret = poll(fds, 2, conn_io_polltimo(conn, deadline));
 	if (pollret < 0) {
 		log_error("[%s] poll() for %s failed: %s", conn->name,
 		    which, strerror(errno));
@@ -329,7 +328,7 @@ conn_send(struct nabu_connection *conn, const uint8_t *buf, size_t len)
 		}
 
 		/* Wait for the connection to accept writes again. */
-		if (! conn_io_wait(conn, false)) {
+		if (! conn_io_wait(conn, &deadline, false)) {
 			/* Error already logged. */
 			return;
 		}
@@ -385,7 +384,7 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 		}
 
 		/* Wait for the connection to be ready for reads again. */
-		if (! conn_io_wait(conn, true)) {
+		if (! conn_io_wait(conn, &deadline, true)) {
 			/* Error already logged. */
 			return false;
 		}

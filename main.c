@@ -31,6 +31,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "adaptor.h"
+#include "conn.h"
+#include "log.h"
+#include "segment.h"
+
 int
 main(int argc, char *argv[])
 {
