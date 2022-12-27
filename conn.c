@@ -48,6 +48,7 @@
 #include "log.h"
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t conn_list_cv = PTHREAD_COND_INITIALIZER;
 static struct nabu_connection *conn_list;
 unsigned int conn_count;
 
@@ -61,6 +62,7 @@ conn_insert(struct nabu_connection *conn)
 	conn_list = conn;
 	conn->on_list = true;
 	conn_count++;
+	pthread_cond_signal(&conn_list_cv);
 	pthread_mutex_unlock(&conn_list_mutex);
 }
 
@@ -79,12 +81,32 @@ conn_remove(struct nabu_connection *conn)
 				cur->next = NULL;
 				conn->on_list = false;
 				conn_count--;
+				pthread_cond_signal(&conn_list_cv);
 				break;
 			}
 		}
 		pthread_mutex_unlock(&conn_list_mutex);
 		assert(cur != NULL);
 	}
+}
+
+/*
+ * conn_shutdown --
+ *	Cancel down all active connections.
+ */
+void
+conn_shutdown(void)
+{
+	struct nabu_connection *conn;
+
+	pthread_mutex_lock(&conn_list_mutex);
+	for (conn = conn_list; conn != NULL; conn = conn->next) {
+		conn_cancel(conn);
+	}
+	while (conn_count) {
+		pthread_cond_wait(&conn_list_cv, &conn_list_mutex);
+	}
+	pthread_mutex_unlock(&conn_list_mutex);
 }
 
 static bool

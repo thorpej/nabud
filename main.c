@@ -64,6 +64,15 @@ connection_thread(void *arg)
 	 * Just run the Adaptor event loop until it returns.
 	 */
 	adaptor_event_loop(conn);
+
+	/*
+	 * If the connection was cancelled, go ahead and destroy it
+	 * now.
+	 */
+	if (conn->cancelled) {
+		conn_destroy(conn);
+	}
+
 	return NULL;
 }
 
@@ -151,7 +160,8 @@ main(int argc, char *argv[])
 		/* NOTREACHED */
 	}
 
-	log_info("Exiting on signal %d.", sig);
-	/* XXX Shut down all connections. */
+	log_info("Received signal %d, shutting down...", sig);
+	conn_shutdown();
+
 	exit(0);
 }

@@ -583,9 +583,6 @@ adaptor_event_loop(struct nabu_connection *conn)
 		conn_stop_watchdog(conn);
 
 		if (! conn_recv(conn, &msg, 1)) {
-			log_error("[%s] conn_recv() failed, "
-			    "exiting event loop.", conn->name);
-			break;
 			if (conn->cancelled) {
 				log_info("[%s] Received cancellation request.",
 				    conn->name);
@@ -596,6 +593,9 @@ adaptor_event_loop(struct nabu_connection *conn)
 				    conn->name);
 				break;
 			}
+			log_error("[%s] conn_recv() failed, "
+			    "exiting event loop.", conn->name);
+			break;
 		}
 
 		/*

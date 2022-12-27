@@ -76,6 +76,7 @@ struct nabu_connection *conn_create_serial(const char *);
 void	conn_destroy(struct nabu_connection *);
 
 void	conn_cancel(struct nabu_connection *);
+void	conn_shutdown(void);
 
 void	conn_send(struct nabu_connection *, const uint8_t *, size_t);
 void	conn_send_byte(struct nabu_connection *, uint8_t);
