@@ -61,8 +61,7 @@ struct nabu_connection {
 	bool		aborted;
 
 	/* Selected channel. */
-	uint16_t	channel;
-	bool		channel_valid;
+	int16_t		channel;
 
 	/*
 	 * The packet being sent is buffered here.  We double the

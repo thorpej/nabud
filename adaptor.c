@@ -104,6 +104,16 @@ adaptor_get_int24(const uint8_t *buf)
 }
 
 /*
+ * adaptor_channel_valid --
+ *	Returns true if a the channel number is a valid channel.
+ */
+bool
+adaptor_channel_valid(int16_t channel)
+{
+	return channel > 0 && channel < 0x100;
+}
+
+/*
  * adaptor_crc --
  *	Compute the CRC of the provided data buffer.
  */
@@ -461,7 +471,7 @@ adaptor_msg_get_status(struct nabu_connection *conn)
 		case NABU_MSG_SIGNAL:
 			log_debug("[%s] Signal status requestsed.",
 			    conn->name);
-			if (conn->channel_valid) {
+			if (adaptor_channel_valid(conn->channel)) {
 				log_debug("[%s] Sending SIGNAL_LOCK.",
 				    conn->name);
 				conn_send_byte(conn, NABU_MSG_SIGNAL_LOCK);
@@ -578,8 +588,7 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	int16_t channel = (int16_t)adaptor_get_int16(msg);
 	log_info("[%s] NABU selected channel 0x%04x.", conn->name, channel);
 
-	if (channel > 0 && channel < 0x100) {
-		conn->channel_valid = true;
+	if (adaptor_channel_valid(channel)) {
 		conn->channel = channel;
 	} else {
 		conn->channel = 0;
