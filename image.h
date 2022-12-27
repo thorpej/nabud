@@ -31,8 +31,8 @@
 #include <stdint.h>
 
 struct nabu_image {
-	const char	*name;
-	const uint8_t	*data;
+	char		*name;
+	uint8_t		*data;
 	size_t		length;
 	uint32_t	number;
 	uint32_t	refcnt;
