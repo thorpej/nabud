@@ -25,6 +25,15 @@
  */
 
 /*
+ * NABU Adaptor emulation.  This handles the communication with the
+ * NABU PC.
+ *
+ * Protocol information and message details gleaned from NabuNetworkEmulator
+ * (AdaptorEmulator.cs) by Nick Daniels, so the following notice from that
+ * repository is included:
+ */
+
+/*
 BSD 3-Clause License
 
 Copyright (c) 2022, Nick Daniels
@@ -54,14 +63,6 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-/*
- * NABU Adaptor emulation.  This handles the communication with the
- * NABU PC.
- *
- * Protocol information and message details gleaned from NabuNetworkEmulator
- * (AdaptorEmulator.cs) by Nick Daniels.
- */
 
 #include <assert.h>
 #include <errno.h>
