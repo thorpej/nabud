@@ -45,8 +45,8 @@
 #include <unistd.h>
 
 #include "conn.h"
+#include "image.h"
 #include "log.h"
-#include "segment.h"
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t conn_list_cv = PTHREAD_COND_INITIALIZER;
@@ -250,13 +250,13 @@ conn_create_serial(const char *path)
 void
 conn_destroy(struct nabu_connection *conn)
 {
-	struct nabu_segment *seg;
+	struct nabu_image *img;
 
 	conn_remove(conn);
 
-	if ((seg = conn->last_segment) != NULL) {
-		conn->last_segment = NULL;
-		segment_release(seg);
+	if ((img = conn->last_image) != NULL) {
+		conn->last_image = NULL;
+		image_release(img);
 	}
 
 	/* close the writer first because SIGPIPE is super annoying. */

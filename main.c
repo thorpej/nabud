@@ -38,11 +38,11 @@
 
 #include "adaptor.h"
 #include "conn.h"
+#include "image.h"
 #include "log.h"
-#include "segment.h"
 
-#ifndef DEFAULT_NABU_SEGMENTS_DIR
-#define	DEFAULT_NABU_SEGMENTS_DIR	"./nabu_segments"
+#ifndef DEFAULT_NABU_IMAGES_DIR
+#define	DEFAULT_NABU_IMAGES_DIR		"./nabu_images"
 #endif
 
 static int	debug = true;
@@ -50,7 +50,7 @@ static int	debug = true;
 static void __attribute__((__noreturn__))
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-d] [-s segments_dir] [tty_path [...]]\n",
+	fprintf(stderr, "usage: %s [-d] [-i images_dir] [tty_path [...]]\n",
 	    getprogname());
 	exit(EXIT_FAILURE);
 }
@@ -79,19 +79,19 @@ connection_thread(void *arg)
 int
 main(int argc, char *argv[])
 {
-	const char *segdir = DEFAULT_NABU_SEGMENTS_DIR;
+	const char *images_dir = DEFAULT_NABU_IMAGES_DIR;
 	int ch;
 
 	setprogname(argv[0]);
 
-	while ((ch = getopt(argc, argv, "ds:")) != -1) {
+	while ((ch = getopt(argc, argv, "di:")) != -1) {
 		switch (ch) {
 		case 'd':
 			debug = true;
 			break;
 
 		case 's':
-			segdir = optarg;
+			images_dir = optarg;
 			break;
 
 		default:
@@ -102,7 +102,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (! segment_init(segdir)) {
+	if (! image_init(images_dir)) {
 		/* Error already logged. */
 		exit(EXIT_FAILURE);
 	}

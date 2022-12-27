@@ -70,8 +70,8 @@ struct nabu_connection {
 	uint8_t		pktbuf[NABU_MAXPACKETSIZE * 2];
 	size_t		pktlen;
 
-	/* Last segment used. */
-	struct nabu_segment *last_segment;
+	/* Last image used. */
+	struct nabu_image *last_image;
 };
 
 extern unsigned int conn_count;

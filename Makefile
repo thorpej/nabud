@@ -1,5 +1,5 @@
 PROG=	nabud
-SRCS=	adaptor.c conn.c log.c main.c segment.c
+SRCS=	adaptor.c conn.c log.c main.c image.c
 
 CFLAGS+= -pthread
 LDFLAGS+= -pthread

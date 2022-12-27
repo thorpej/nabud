@@ -24,74 +24,25 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Segment management.
- */
+#ifndef image_h_included
+#define	image_h_included
 
-#include <sys/stat.h>
-#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
-#include "conn.h"
-#include "log.h"
-#include "segment.h"
+struct nabu_image {
+	const char	*name;
+	const uint8_t	*data;
+	size_t		length;
+	uint32_t	number;
+	uint32_t	refcnt;
+	bool		is_pak;
+};
 
-static const char *segments_directory;
+struct nabu_connection;
 
-/*
- * segment_init --
- *	Initialize the segment repository.
- */
-bool
-segment_init(const char *segdir)
-{
-	struct stat sb;
+bool	image_init(const char *);
+struct nabu_image *image_load(struct nabu_connection *, uint32_t);
+void	image_release(struct nabu_image *);
 
-	if (stat(segdir, &sb) < 0) {
-		log_error("stat() on segments directory %s failed: %s",
-		    segdir, strerror(errno));
-		return false;
-	}
-	if (!S_ISDIR(sb.st_mode)) {
-		log_error("Segments directory %s is not a directory.",
-		    segdir);
-		return false;
-	}
-
-	segments_directory = segdir;
-
-	return true;
-}
-
-/*
- * segment_load --
- *	Load the specified segment.
- */
-struct nabu_segment *
-segment_load(struct nabu_connection *conn, uint32_t segment)
-{
-	struct nabu_segment *seg;
-
-	if ((seg = conn->last_segment) != NULL && seg->segment == segment) {
-		/* Cache hit! */
-		log_debug("[%s] Cache hit for segment 0x%08x", conn->name,
-		    segment);
-		return seg;
-	}
-
-	return NULL;	/* XXX */
-}
-
-/*
- * segment_release --
- *	Release the specified segment.
- */
-void
-segment_release(struct nabu_segment *seg)
-{
-	/* XXX */
-}
+#endif /* image_h_included */

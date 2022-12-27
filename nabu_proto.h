@@ -119,7 +119,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	NABU_MSGSEQ_FINISHED						\
 	{ NABU_MSG_ESCAPE, NABU_MSG_DONE }
 
-/* Magic segment number used when sending time packets. */
-#define	NABU_SEGMENT_TIME	0x007fffff
+/* Magic image number used when sending time packets. */
+#define	NABU_IMAGE_TIME		0x007fffff
 
 #endif /* nabu_proto_h_included */
