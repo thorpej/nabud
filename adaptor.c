@@ -553,15 +553,13 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 		return;
 	}
 
-	uint16_t channel = adaptor_get_int16(msg);
+	int16_t channel = (int16_t)adaptor_get_int16(msg);
 	log_info("[%s] NABU selected channel 0x%04x.", conn->name, channel);
 
-	if (channel < 0x100) {
+	if (channel > 0 && channel < 0x100) {
 		conn->channel = channel;
-		conn->channel_valid = true;
 	} else {
 		conn->channel = 0;
-		conn->channel_valid = false;
 	}
 
 	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn->name);
