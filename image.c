@@ -148,6 +148,10 @@ image_load_pak_from_path(uint32_t image, const char *path)
 		log_error("fstat(%s): %s", path, strerror(errno));
 		goto bad;
 	}
+	if (!S_ISREG(sb.st_mode)) {
+		log_error("%s is not a regular file.", path);
+		goto bad;
+	}
 
 	paklen = (size_t)sb.st_size;
 	pakbuf = malloc(paklen);
