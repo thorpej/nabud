@@ -292,7 +292,7 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t packet,
  */
 static void
 adaptor_send_segment(struct nabu_connection *conn, uint16_t packet,
-    const struct nabu_segment *seg)
+    struct nabu_segment *seg)
 {
 	size_t off = packet * NABU_MAXPAYLOADSIZE;
 	size_t len = NABU_MAXPAYLOADSIZE;
@@ -363,6 +363,11 @@ adaptor_send_segment(struct nabu_connection *conn, uint16_t packet,
 	}
 
 	adaptor_send_packet(conn, pktbuf, pktlen);
+
+	if (last && seg == conn->last_segment) {
+		conn->last_segment = NULL;
+		segment_release(seg);
+	}
 }
 
 /*
@@ -541,7 +546,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 		return;
 	}
 
-	const struct nabu_segment *seg = segment_load(conn, segment);
+	struct nabu_segment *seg = segment_load(conn, segment);
 	if (seg == NULL) {
 		log_error("[%s] Unable to load segment 0x%08x.",
 		    conn->name, segment);

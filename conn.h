@@ -32,6 +32,8 @@
 
 #include "nabu_proto.h"
 
+struct nabu_segment;
+
 struct nabu_connection {
 	/* Next on the list of connections. */
 	struct nabu_connection *next;
@@ -68,6 +70,9 @@ struct nabu_connection {
 	 */
 	uint8_t		pktbuf[NABU_MAXPACKETSIZE * 2];
 	size_t		pktlen;
+
+	/* Last segment used. */
+	struct nabu_segment *last_segment;
 };
 
 extern unsigned int conn_count;

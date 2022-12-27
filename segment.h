@@ -35,12 +35,14 @@ struct nabu_segment {
 	const uint8_t	*data;
 	size_t		length;
 	uint32_t	segment;
+	uint32_t	refcnt;
 	bool		is_pak;
 };
 
 struct nabu_connection;
 
 bool	segment_init(const char *);
-const struct nabu_segment *segment_load(struct nabu_connection *, uint32_t);
+struct nabu_segment *segment_load(struct nabu_connection *, uint32_t);
+void	segment_release(struct nabu_segment *);
 
 #endif /* segment_h_included */

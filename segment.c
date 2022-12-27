@@ -71,8 +71,27 @@ segment_init(const char *segdir)
  * segment_load --
  *	Load the specified segment.
  */
-const struct nabu_segment *
+struct nabu_segment *
 segment_load(struct nabu_connection *conn, uint32_t segment)
 {
+	struct nabu_segment *seg;
+
+	if ((seg = conn->last_segment) != NULL && seg->segment == segment) {
+		/* Cache hit! */
+		log_debug("[%s] Cache hit for segment 0x%08x", conn->name,
+		    segment);
+		return seg;
+	}
+
 	return NULL;	/* XXX */
+}
+
+/*
+ * segment_release --
+ *	Release the specified segment.
+ */
+void
+segment_release(struct nabu_segment *seg)
+{
+	/* XXX */
 }
