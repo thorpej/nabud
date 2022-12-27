@@ -1,4 +1,4 @@
-PROG=	NaturalAccess
+PROG=	nabud
 SRCS=	adaptor.c conn.c log.c main.c segment.c
 
 CFLAGS+= -pthread
