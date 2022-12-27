@@ -101,8 +101,6 @@ main(int argc, char *argv[])
 	/* Set up our signal state. */
 	(void) signal(SIGHUP, SIG_IGN);
 	(void) signal(SIGPIPE, SIG_IGN);
-	(void) signal(SIGINT, SIG_IGN);
-	(void) signal(SIGTERM, SIG_IGN);
 
 	/*
 	 * For each tty_path, create a serial connection and create a
