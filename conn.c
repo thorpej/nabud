@@ -307,6 +307,7 @@ conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
 	struct timespec now, timo;
 
 	if (deadline->tv_sec == 0 && deadline->tv_nsec == 0) {
+		log_debug("[%s] No deadline, returning INFTIM.", conn->name);
 		return INFTIM;
 	}
 
@@ -320,6 +321,8 @@ conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
 	if (timo.tv_sec < 0 ||
 	    (timo.tv_sec == 0 && timo.tv_nsec <= 0)) {
 		/* Deadline has passed. */
+		log_debug("[%s] Deadline has passed, returning 0 ms.",
+		    conn->name);
 		return 0;
 	}
 
@@ -334,6 +337,7 @@ conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
 	} else if (millis == 0) {
 		millis = 1;
 	}
+	log_debug("[%s] next timeout: %d ms", conn->name, (int)millis);
 	return (int)millis;
 }
 
@@ -345,10 +349,11 @@ static bool
 conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
     bool is_recv)
 {
+	short pollwhich = is_recv ? POLLRDNORM : POLLWRNORM;
 	struct pollfd fds[2] = {
 		[0] = {
 			.fd = conn->fd,
-			.events = POLLWRNORM | POLLERR | POLLHUP | POLLNVAL,
+			.events = pollwhich | POLLERR | POLLHUP | POLLNVAL,
 		},
 		[1] = {
 			.fd = conn->cancel_fds[0],
@@ -356,7 +361,6 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 		},
 	};
 	int pollret;
-	short pollwhich = is_recv ? POLLRDNORM : POLLWRNORM;
 	const char *which = is_recv ? "recv" : "send";
 
 	pollret = poll(fds, 2, conn_io_polltimo(conn, deadline));
@@ -390,7 +394,8 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 		/* We can do I/O, woo! */
 		return true;
 	}
-	log_error("[%s] Connection failure in %s.", conn->name, which);
+	log_error("[%s] Connection failure in %s: fds[0].revents = 0x%04x.",
+	    conn->name, which, fds[0].revents);
 	conn->aborted = true;
 	return false;
 }
@@ -416,17 +421,19 @@ conn_send(struct nabu_connection *conn, const uint8_t *buf, size_t len)
 
 	for (;;) {
 		actual = write(conn->fd, curptr, resid);
-		if (actual < 0) {
+		if (actual < 0 && errno != EAGAIN) {
 			log_error("[%s] write() failed: %s", conn->name,
 			    strerror(errno));
 			conn->aborted = true;
 			return;
 		}
 
-		resid -= actual;
-		curptr += actual;
-		if (resid == 0) {
-			return;
+		if (actual > 0) {
+			resid -= actual;
+			curptr += actual;
+			if (resid == 0) {
+				return;
+			}
 		}
 
 		/* Wait for the connection to accept writes again. */
@@ -472,17 +479,19 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 
 	for (;;) {
 		actual = read(conn->fd, curptr, resid);
-		if (actual < 0) {
+		if (actual < 0 && errno != EAGAIN) {
 			log_error("[%s] read() failed: %s", conn->name,
 			    strerror(errno));
 			conn->aborted = true;
 			return false;
 		}
 
-		resid -= actual;
-		curptr += actual;
-		if (resid == 0) {
-			return true;
+		if (actual > 0) {
+			resid -= actual;
+			curptr += actual;
+			if (resid == 0) {
+				return true;
+			}
 		}
 
 		/* Wait for the connection to be ready for reads again. */
