@@ -78,13 +78,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "log.h"
 #include "segment.h"
 
-static const uint8_t nabu_msg_request_channel_code[] =
-    NABU_MSGSEQ_REQUEST_CHANNEL_CODE;
-static const uint8_t nabu_msg_confirm_channel_code[] =
-    NABU_MSGSEQ_CONFIRM_CHANNEL_CODE;
 static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;
-static const uint8_t nabu_msg_initialized[] = NABU_MSGSEQ_INITIALIZED;
-static const uint8_t nabu_msg_end[] = NABU_MSGSEQ_END;
+static const uint8_t nabu_msg_finished[] = NABU_MSGSEQ_FINISHED;
 
 /*
  * adaptor_get_int16 --
@@ -232,7 +227,8 @@ adaptor_send_packet(struct nabu_connection *conn, uint8_t *buf, size_t len)
 		conn_send_byte(conn, NABU_MSG_AUTHORIZED);
 		if (adaptor_expect(conn, nabu_msg_ack, sizeof(nabu_msg_ack))) {
 			conn_send(conn, conn->pktbuf, conn->pktlen);
-			conn_send(conn, nabu_msg_end, sizeof(nabu_msg_end));
+			conn_send(conn, nabu_msg_finished,
+			    sizeof(nabu_msg_finished));
 		} else {
 			log_error("[%s] Protocol error.", conn->name);
 		}
@@ -411,77 +407,98 @@ adaptor_send_time(struct nabu_connection *conn)
 }
 
 /*
- * adaptor_msg_channel_status --
- *	Handle the CHANNEL_STATUS message.
+ * adaptor_msg_reset --
+ *	Handle the RESET message.
  */
 static void
-adaptor_msg_channel_status(struct nabu_connection *conn)
+adaptor_msg_reset(struct nabu_connection *conn)
 {
-	if (conn->channel_valid) {
-		log_info("[%s] Confirm channel code: 0x%04x.",
-		    conn->name, conn->channel);
-		conn_send(conn, nabu_msg_confirm_channel_code,
-		    sizeof(nabu_msg_confirm_channel_code));
-	} else {
-		log_info("[%s] Requesting channel code.", conn->name);
-		conn_send(conn, nabu_msg_request_channel_code,
-		    sizeof(nabu_msg_request_channel_code));
-	}
+	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_MSG_CONFIRMED.",
+	    conn->name);
+	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
+	conn_send_byte(conn, NABU_MSG_CONFIRMED);
 }
 
 /*
- * adaptor_msg_ready --
- *	Handle the READY message.
+ * adaptor_msg_mystery --
+ *	Handle the mystery message.
  */
 static void
-adaptor_msg_ready(struct nabu_connection *conn)
+adaptor_msg_mystery(struct nabu_connection *conn)
 {
+	uint8_t msg[2];
+
+	log_debug("[%s] Expecting the NABU to send 2 bytes.", conn->name);
+	if (! conn_recv(conn, msg, sizeof(msg))) {
+		log_error("[%s] Those two bytes never arrived.", conn->name);
+	} else {
+		log_debug("[%s] msg[0] = 0x%02x msg[1] = 0x%02x", conn->name,
+		    msg[0], msg[1]);
+	}
 	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn->name);
 	conn_send_byte(conn, NABU_MSG_CONFIRMED);
 }
 
 /*
- * adaptor_msg_1e --
- *	Handle the slightly mysterious 0x1e message.
+ * adaptor_msg_get_status --
+ *	Handle the GET_STATUS message.
  */
 static void
-adaptor_msg_1e(struct nabu_connection *conn)
+adaptor_msg_get_status(struct nabu_connection *conn)
 {
-	log_debug("[%s] Sending NABU_MSGSEQ_END.", conn->name);
-	conn_send(conn, nabu_msg_end, sizeof(nabu_msg_end));
+	uint8_t msg;
+
+	log_debug("[%s] Expecting the NABU to send status type.", conn->name);
+	if (! conn_recv(conn, &msg, sizeof(&msg))) {
+		log_error("[%s] Status type never arrived.", conn->name);
+	} else {
+		switch (msg) {
+		case NABU_MSG_SIGNAL:
+			log_debug("[%s] Signal status requestsed.",
+			    conn->name);
+			if (conn->channel_valid) {
+				log_debug("[%s] Sending SIGNAL_LOCK.",
+				    conn->name);
+				conn_send_byte(conn, NABU_MSG_SIGNAL_LOCK);
+				conn_send(conn, nabu_msg_finished,
+				    sizeof(nabu_msg_finished));
+			} else {
+				log_debug("[%s] Sending NO_SIGNAL.",
+				    conn->name);
+				conn_send_byte(conn, NABU_MSG_NO_SIGNAL);
+				conn_send(conn, nabu_msg_finished,
+				    sizeof(nabu_msg_finished));
+			}
+			break;
+
+		case NABU_MSG_TRANSMIT:
+			log_debug("[%s] Transmit status requested.",
+			    conn->name);
+			log_debug("[%s] Sending NABU_MSGSEQ_FINISHED.",
+			    conn->name);
+			conn_send(conn, nabu_msg_finished,
+			    sizeof(nabu_msg_finished));
+			break;
+
+		default:
+			log_error("[%s] Unsupported status requested: 0x%02x.",
+			    conn->name, msg);
+			break;
+		}
+	}
 }
 
 /*
- * adaptor_msg_wait --
- *	Handle the WAIT message.
+ * adaptor_msg_start_up --
+ *	Handle the START_UP message.
  */
 static void
-adaptor_msg_wait(struct nabu_connection *conn)
+adaptor_msg_start_up(struct nabu_connection *conn)
 {
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn->name);
+	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_MSG_CONFIRMED.",
+	    conn->name);
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
-}
-
-/*
- * adaptor_msg_starting_up --
- *	Handle the STARTING_UP message.
- */
-static void
-adaptor_msg_starting_up(struct nabu_connection *conn)
-{
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn->name);
-	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
-}
-
-/*
- * adaptor_msg_initialize --
- *	Handle the INITIALIZE message.
- */
-static void
-adaptor_msg_initialize(struct nabu_connection *conn)
-{
-	log_debug("[%s] Sending NABU_MSGSEQ_INITIALIZED.", conn->name);
-	conn_send(conn, nabu_msg_initialized, sizeof(nabu_msg_initialized));
+	conn_send_byte(conn, NABU_MSG_CONFIRMED);
 }
 
 /*
@@ -557,6 +574,7 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	log_info("[%s] NABU selected channel 0x%04x.", conn->name, channel);
 
 	if (channel > 0 && channel < 0x100) {
+		conn->channel_valid = true;
 		conn->channel = channel;
 	} else {
 		conn->channel = 0;
@@ -605,11 +623,6 @@ adaptor_event_loop(struct nabu_connection *conn)
 
 		switch (msg) {
 		case 0:
-		case 0x0f:
-		case 0x1c:
-		case 0x8f:
-		case 0xef:
-		case 0xff:
 			log_debug("[%s] Got mystery message 0x%02x.",
 			    conn->name, msg);
 			continue;
@@ -619,36 +632,27 @@ adaptor_event_loop(struct nabu_connection *conn)
 			    conn->name, msg);
 			continue;
 
-		case NABU_MSG_CHANNEL_STATUS:
-			log_debug("[%s] Got NABU_MSG_CHANNEL_STATUS.",
+		case NABU_MSG_RESET:
+			log_debug("[%s] Got NABU_MSG_RESET.",
 			    conn->name);
-			adaptor_msg_channel_status(conn);
+			adaptor_msg_reset(conn);
 			continue;
 
-		case NABU_MSG_READY:
-			log_debug("[%s] Got NABU_MSG_READY.", conn->name);
-			adaptor_msg_ready(conn);
+		case NABU_MSG_MYSTERY:
+			log_debug("[%s] Got NABU_MSG_MYSTERY.",
+			    conn->name);
+			adaptor_msg_mystery(conn);
 			continue;
 
-		case 0x1e:
-			log_debug("[%s] Got message 0x%02x.",
-			    conn->name, msg);
-			adaptor_msg_1e(conn);
+		case NABU_MSG_GET_STATUS:
+			log_debug("[%s] Got NABU_MSG_GET_STATUS.",
+			    conn->name);
+			adaptor_msg_get_status(conn);
 			continue;
 
-		case NABU_MSG_WAIT:
-			log_debug("[%s] Got NABU_MSG_WAIT.", conn->name);
-			adaptor_msg_wait(conn);
-			continue;
-
-		case NABU_MSG_STARTING_UP:
-			log_debug("[%s] Got NABU_MSG_STARTING_UP.", conn->name);
-			adaptor_msg_starting_up(conn);
-			continue;
-
-		case NABU_MSG_INITIALIZE:
-			log_debug("[%s] Got NABU_MSG_INITIALIZE.", conn->name);
-			adaptor_msg_initialize(conn);
+		case NABU_MSG_START_UP:
+			log_debug("[%s] Got NABU_MSG_START_UP.", conn->name);
+			adaptor_msg_start_up(conn);
 			continue;
 
 		case NABU_MSG_PACKET_REQUEST:
