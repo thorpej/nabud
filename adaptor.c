@@ -248,15 +248,15 @@ adaptor_send_packet(struct nabu_connection *conn, uint8_t *buf, size_t len)
 
 /*
  * adaptor_send_pak --
- *	Extract the specified packet from a pre-prepared image pak
+ *	Extract the specified segment from a pre-prepared image pak
  *	and send it to the NABU.
  */
 static void
-adaptor_send_pak(struct nabu_connection *conn, uint16_t packet,
+adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
     const struct nabu_image *img)
 {
 	size_t len = NABU_TOTALPAYLOADSIZE;
-	size_t off = (packet * len) + ((2 * packet) + 2);
+	size_t off = (segment * len) + ((2 * segment) + 2);
 	uint8_t *pktbuf;
 
 	if (off >= img->length) {
@@ -297,14 +297,14 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t packet,
 
 /*
  * adaptor_send_image --
- *	Wrap the region specified by packet in the provided image
+ *	Wrap the region specified by segment in the provided image
  *	buffer in a properly structured packet and send it to the NABU.
  */
 static void
-adaptor_send_image(struct nabu_connection *conn, uint16_t packet,
+adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
     struct nabu_image *img)
 {
-	size_t off = packet * NABU_MAXPAYLOADSIZE;
+	size_t off = segment * NABU_MAXPAYLOADSIZE;
 	size_t len = NABU_MAXPAYLOADSIZE;
 	size_t pktlen, i;
 	uint8_t *pktbuf;
@@ -315,14 +315,14 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t packet,
 	 * differently.
 	 */
 	if (img->is_pak) {
-		adaptor_send_pak(conn, packet, img);
+		adaptor_send_pak(conn, segment, img);
 		return;
 	}
 
 	if (off >= img->length) {
 		log_error(
-		    "image %u: packet %u offset %zu exceeds images size %zu",
-		    img->number, packet, off, img->length);
+		    "image %u: segment %u offset %zu exceeds images size %zu",
+		    img->number, segment, off, img->length);
 		adaptor_send_abort(conn);
 		return;
 	}
@@ -347,7 +347,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t packet,
 	pktbuf[i++] = (uint8_t)(img->number >> 16);	/* image MSB */
 	pktbuf[i++] = (uint8_t)(img->number >> 8);
 	pktbuf[i++] = (uint8_t)(img->number);		/* image LSB */
-	pktbuf[i++] = (uint8_t)(packet);		/* packet LSB */
+	pktbuf[i++] = (uint8_t)(segment);		/* segment LSB */
 	pktbuf[i++] = 0x01;				/* owner */
 	pktbuf[i++] = 0x7f;				/* tier MSB */
 	pktbuf[i++] = 0xff;
@@ -355,10 +355,10 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t packet,
 	pktbuf[i++] = 0xff;				/* tier LSB */
 	pktbuf[i++] = 0x7f;				/* mystery byte */
 	pktbuf[i++] = 0x80;				/* mystery byte */
-	pktbuf[i++] = (packet == 0 ? 0xa1 : 0x20) |	/* packet type */
+	pktbuf[i++] = (segment == 0 ? 0xa1 : 0x20) |	/* segment type */
 	              (last        ? 0x10 : 0x00);	/* end of image */
-	pktbuf[i++] = (uint8_t)(packet);		/* packet LSB */
-	pktbuf[i++] = (uint8_t)(packet >> 8);		/* packet MSB */
+	pktbuf[i++] = (uint8_t)(segment);		/* segment LSB */
+	pktbuf[i++] = (uint8_t)(segment >> 8);		/* segment MSB */
 	pktbuf[i++] = (uint8_t)(off >> 8);		/* offset MSB */
 	pktbuf[i++] = (uint8_t)(off);			/* offset LSB */
 
@@ -529,29 +529,29 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
 
 	if (! conn_recv(conn, msg, sizeof(msg))) {
-		log_error("[%s] NABU failed to send packet/image message.",
+		log_error("[%s] NABU failed to send segment/image message.",
 		    conn->name);
 		conn->aborted = true;
 		return;
 	}
 
-	uint16_t packet = msg[0];
+	uint16_t segment = msg[0];
 	uint32_t image = adaptor_get_int24(&msg[1]);
-	log_debug("[%s] NABU requested packet %u of image 0x%08x.",
-	    conn->name, packet, image);
+	log_debug("[%s] NABU requested segment %u of image 0x%08x.",
+	    conn->name, segment, image);
 
 	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn->name);
 	conn_send_byte(conn, NABU_MSG_CONFIRMED);
 
 	if (image == NABU_IMAGE_TIME) {
-		if (packet == 0) {
+		if (segment == 0) {
 			log_debug("[%s] Sending time packet.", conn->name);
 			adaptor_send_time(conn);
 			return;
 		}
 		log_error(
-		    "[%s] Unexpected request for packet %u of time image.",
-		    conn->name, packet);
+		    "[%s] Unexpected request for segment %u of time image.",
+		    conn->name, segment);
 		adaptor_send_abort(conn);
 		return;
 	}
@@ -564,9 +564,9 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 		return;
 	}
 
-	log_debug("[%s] Sending packet %u of image 0x%08x.",
-	    conn->name, packet, image);
-	adaptor_send_image(conn, packet, img);
+	log_debug("[%s] Sending segment %u of image 0x%08x.",
+	    conn->name, segment, image);
+	adaptor_send_image(conn, segment, img);
 }
 
 /*
