@@ -50,7 +50,7 @@
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t conn_list_cv = PTHREAD_COND_INITIALIZER;
-static struct nabu_connection *conn_list;
+static LIST_HEAD(, nabu_connection) conn_list;
 unsigned int conn_count;
 
 static void
@@ -59,8 +59,7 @@ conn_insert(struct nabu_connection *conn)
 	assert(! conn->on_list);
 
 	pthread_mutex_lock(&conn_list_mutex);
-	conn->next = conn_list;
-	conn_list = conn;
+	LIST_INSERT_HEAD(&conn_list, conn, link);
 	conn->on_list = true;
 	conn_count++;
 	pthread_cond_signal(&conn_list_cv);
@@ -71,23 +70,12 @@ static void
 conn_remove(struct nabu_connection *conn)
 {
 	if (conn->on_list) {
-		struct nabu_connection *cur, **prev_nextp;
-
 		pthread_mutex_lock(&conn_list_mutex);
-		for (cur = conn_list, prev_nextp = &conn_list;
-		     cur != NULL;
-		     prev_nextp = &cur->next, cur = cur->next) {
-			if (cur == conn) {
-				*prev_nextp = cur->next;
-				cur->next = NULL;
-				conn->on_list = false;
-				conn_count--;
-				pthread_cond_signal(&conn_list_cv);
-				break;
-			}
-		}
+		LIST_REMOVE(conn, link);
+		conn->on_list = false;
+		conn_count--;
+		pthread_cond_signal(&conn_list_cv);
 		pthread_mutex_unlock(&conn_list_mutex);
-		assert(cur != NULL);
 	}
 }
 
@@ -98,10 +86,10 @@ conn_remove(struct nabu_connection *conn)
 void
 conn_shutdown(void)
 {
-	struct nabu_connection *conn;
+	struct nabu_connection *conn, *nconn;
 
 	pthread_mutex_lock(&conn_list_mutex);
-	for (conn = conn_list; conn != NULL; conn = conn->next) {
+	LIST_FOREACH_SAFE(conn, &conn_list, link, nconn) {
 		conn_cancel(conn);
 	}
 	while (conn_count) {

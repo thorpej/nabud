@@ -31,12 +31,13 @@
 #include <stdint.h>
 
 #include "nabu_proto.h"
+#include "util/nbsd_queue.h"
 
 struct nabu_segment;
 
 struct nabu_connection {
-	/* Next on the list of connections. */
-	struct nabu_connection *next;
+	/* Link on the list of connections. */
+	LIST_ENTRY(nabu_connection) link;
 	bool		on_list;
 
 	/* Display name for this connection. */
