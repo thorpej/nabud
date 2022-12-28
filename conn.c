@@ -204,10 +204,15 @@ conn_create_serial(const char *path)
 		goto bad;
 	}
 
-	/* 8N1, 111000 baud natively. */
+	/*
+	 * The native protocol is 8N1 @ 111000 baud, but it's much
+	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
+	 * can get out of sync when receiving a stream of bytes in
+	 * a packet.
+	 */
 	cfmakeraw(&t);
-	t.c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD);
-	t.c_cflag |= CLOCAL | CS8;
+	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
+	t.c_cflag |= CLOCAL | CS8 | CSTOPB;
 	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
 		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
 		    path);
@@ -222,9 +227,8 @@ conn_create_serial(const char *path)
 		 * so that the NABU's UART has a better chance of
 		 * re-synchronizing with the next start bit.
 		 */
-		log_info("Failed to 8N1-%d on %s; falling back to 8N2-%d.",
+		log_info("Failed to 8N2-%d on %s; falling back to 8N2-%d.",
 		    NABU_NATIVE_BPS, path, NABU_FALLBACK_BPS);
-		t.c_cflag |= CSTOPB;
 		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
 			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
 			    path);
@@ -332,12 +336,15 @@ conn_io_deadline(const struct nabu_connection *conn, struct timespec *deadline)
  *	the current deadline.
  */
 static int
-conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
+conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline,
+    bool is_recv)
 {
 	struct timespec now, timo;
+	const char *which = is_recv ? "recv" : "send";
 
 	if (deadline->tv_sec == 0 && deadline->tv_nsec == 0) {
-		log_debug("[%s] No deadline, returning INFTIM.", conn->name);
+		log_debug("[%s] No %s deadline, returning INFTIM.",
+		    conn->name, which);
 		return INFTIM;
 	}
 
@@ -351,8 +358,8 @@ conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
 	if (timo.tv_sec < 0 ||
 	    (timo.tv_sec == 0 && timo.tv_nsec <= 0)) {
 		/* Deadline has passed. */
-		log_debug("[%s] Deadline has passed, returning 0 ms.",
-		    conn->name);
+		log_debug("[%s] Deadline for %s has passed, returning 0 ms.",
+		    conn->name, which);
 		return 0;
 	}
 
@@ -367,7 +374,8 @@ conn_io_polltimo(struct nabu_connection *conn, const struct timespec *deadline)
 	} else if (millis == 0) {
 		millis = 1;
 	}
-	log_debug("[%s] next timeout: %d ms", conn->name, (int)millis);
+	log_debug("[%s] next %s timeout: %d ms", conn->name, which,
+	    (int)millis);
 	return (int)millis;
 }
 
@@ -393,7 +401,7 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 	int pollret;
 	const char *which = is_recv ? "recv" : "send";
 
-	pollret = poll(fds, 2, conn_io_polltimo(conn, deadline));
+	pollret = poll(fds, 2, conn_io_polltimo(conn, deadline, is_recv));
 	if (pollret < 0) {
 		log_error("[%s] poll() for %s failed: %s", conn->name,
 		    which, strerror(errno));
