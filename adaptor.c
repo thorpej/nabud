@@ -387,6 +387,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 static void
 adaptor_send_time(struct nabu_connection *conn)
 {
+	static char time_image_name[] = "TimeImage";
 	struct tm tm_store, *tm;
 	time_t now;
 	uint8_t buf[NABU_TIMESTAMPSIZE];
@@ -412,7 +413,7 @@ adaptor_send_time(struct nabu_connection *conn)
 	buf[8] = tm->tm_sec;
 
 	struct nabu_image img = {
-		.name = "TimeImage",
+		.name = time_image_name,
 		.data = buf,
 		.length = sizeof(buf),
 		.number = NABU_IMAGE_TIME,
@@ -462,6 +463,9 @@ static void
 adaptor_msg_get_status(struct nabu_connection *conn)
 {
 	uint8_t msg;
+
+	log_debug("[%s] Sending MABU_MSGSEQ_ACK.", conn->name);
+	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
 
 	log_debug("[%s] Expecting the NABU to send status type.", conn->name);
 	if (! conn_recv(conn, &msg, sizeof(&msg))) {
@@ -577,6 +581,9 @@ static void
 adaptor_msg_change_channel(struct nabu_connection *conn)
 {
 	uint8_t msg[2];
+
+	log_debug("[%s] Sending MABU_MSGSEQ_ACK.", conn->name);
+	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
 
 	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send channel code.",
