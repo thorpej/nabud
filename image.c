@@ -284,8 +284,8 @@ image_load(struct nabu_connection *conn, uint32_t image)
 
 	if ((img = conn->last_image) != NULL && img->number == image) {
 		/* Cache hit! */
-		log_debug("[%s] Cache hit for image 0x%08x", conn->name,
-		    image);
+		log_debug("[%s] Cache hit for image %06X: %s", conn->name,
+		    image, img->name);
 		return img;
 	}
 
