@@ -541,6 +541,17 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 }
 
 /*
+ * conn_recv_byte --
+ *	Convenience wrapper around conn_recv() that handles
+ *	receiving just a single byte.
+ */
+bool
+conn_recv_byte(struct nabu_connection *conn, uint8_t *val)
+{
+	return conn_recv(conn, val, 1);
+}
+
+/*
  * conn_start_watchdog --
  *	Enable the watchdog timer on this connection.
  */

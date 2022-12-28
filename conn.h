@@ -85,6 +85,7 @@ void	conn_shutdown(void);
 void	conn_send(struct nabu_connection *, const uint8_t *, size_t);
 void	conn_send_byte(struct nabu_connection *, uint8_t);
 bool	conn_recv(struct nabu_connection *, uint8_t *, size_t);
+bool	conn_recv_byte(struct nabu_connection *, uint8_t *);
 
 void	conn_start_watchdog(struct nabu_connection *, unsigned int);
 void	conn_stop_watchdog(struct nabu_connection *);
