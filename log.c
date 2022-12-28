@@ -35,6 +35,8 @@
 
 #include "log.h"
 
+bool		debug;
+
 static const char *log_typenames[] = {
 	[LOG_TYPE_INFO]		=	"INFO",
 	[LOG_TYPE_DEBUG]	=	"DEBUG",
@@ -51,6 +53,10 @@ log_message(log_type type, const char *func, const char *fmt, ...)
 	char *caller_string = NULL;
 
 	assert(log_type_is_valid(type));
+
+	if (type == LOG_TYPE_DEBUG && !debug) {
+		return;
+	}
 
 	va_start(ap, fmt);
 	vasprintf(&caller_string, fmt, ap);

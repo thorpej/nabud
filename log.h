@@ -27,12 +27,16 @@
 #ifndef log_h_included
 #define	log_h_included
 
+#include <stdbool.h>
+
 typedef enum {
 	LOG_TYPE_INFO	= 0,
 	LOG_TYPE_DEBUG	= 1,
 	LOG_TYPE_ERROR	= 2,
 	LOG_TYPE_FATAL	= 3,
 } log_type;
+
+extern bool debug;
 
 void	log_message(log_type, const char *, const char *, ...)
 	    __attribute__((__format__(__printf__, 3, 4)));

@@ -45,8 +45,6 @@
 #define	DEFAULT_NABU_IMAGES_DIR		"./nabu_images"
 #endif
 
-static int	debug = true;
-
 static void __attribute__((__noreturn__))
 usage(void)
 {
