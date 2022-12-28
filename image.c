@@ -49,6 +49,72 @@
 
 static const char *images_directory;
 
+/*
+ * image_load_file --
+ *	Load the specified file.  Caller is responsible for
+ *	freeing the buffer.
+ */
+static uint8_t *
+image_load_file(const char *path, size_t *filesizep)
+{
+	struct stat sb;
+	uint8_t *filebuf = NULL;
+	size_t filesize;
+	int fd = -1;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		log_error("open(%s): %s", path, strerror(errno));
+		goto bad;
+	}
+
+	if (fstat(fd, &sb) < 0) {
+		log_error("fstat(%s): %s", path, strerror(errno));
+		goto bad;
+	}
+	if (!S_ISREG(sb.st_mode)) {
+		log_error("%s is not a regular file.", path);
+		goto bad;
+	}
+
+	filesize = (size_t)sb.st_size;
+	filebuf = malloc(filesize);
+	if (filebuf == NULL) {
+		log_error("Unable to allocate %zu bytes for %s",
+		    filesize, path);
+		goto bad;
+	}
+
+	if (read(fd, filebuf, filesize) != (ssize_t)filesize) {
+		log_error("Unable to read %s", path);
+		goto bad;
+	}
+ out:
+	if (fd >= 0) {
+		close(fd);
+	}
+	*filesizep = filesize;
+	return filebuf;
+ bad:
+	if (filebuf != NULL) {
+		free(filebuf);
+		filebuf = NULL;
+	}
+	goto out;
+}
+
+/*
+ * image_nabu_name --
+ *	Generate a NABU flat image name.
+ */
+static char *
+image_nabu_name(uint32_t image)
+{
+	char namestr[sizeof("000001.nabu")];
+	snprintf(namestr, sizeof(namestr), "%06X.nabu", image);
+	return strdup(namestr);
+}
+
 #define	PAK_NAME_SIZE	\
 	sizeof("FE-A1-04-B7-3D-67-F8-8B-26-4C-0C-81-9B-F6-24-58.npak")
 
@@ -73,6 +139,35 @@ image_pak_name(uint32_t image)
 	    digest[12], digest[13], digest[14], digest[15]);
 
 	return strdup(pakname);
+}
+
+/*
+ * image_from_nabu --
+ *	Create an image descriptor from the provided NABU file buffer.
+ */
+static struct nabu_image *
+image_from_nabu(uint32_t image, uint8_t *filebuf, size_t filesize)
+{
+	char image_name[sizeof("nabu-000001")];
+
+	snprintf(image_name, sizeof(image_name), "nabu-%06X", image);
+
+	struct nabu_image *img = calloc(1, sizeof(*img));
+	if (img == NULL) {
+		log_error("Unable to allocate image descriptor for %s.",
+		    image_name);
+		free(filebuf);
+		return NULL;
+	}
+
+	img->name = strdup(image_name);
+	img->data = filebuf;
+	img->length = filesize;
+	img->number = image;
+	img->refcnt = 1;
+	img->is_pak = false;
+
+	return img;
 }
 
 /*
@@ -126,54 +221,28 @@ image_from_pak(uint32_t image, const uint8_t *pakbuf, size_t paklen)
 }
 
 /*
- * image_load_pak_from_path --
- *	Load a PAK file from the specified path.
+ * image_load_image_from_path --
+ *	Load an image from the specified path.
  */
 static struct nabu_image *
-image_load_pak_from_path(uint32_t image, const char *path)
+image_load_image_from_path(uint32_t image, const char *path, bool is_pak)
 {
-	struct stat sb;
-	uint8_t *pakbuf = NULL;
-	size_t paklen;
-	struct nabu_image *img = NULL;
-	int fd;
+	uint8_t *filebuf;
+	size_t filesize;
+	struct nabu_image *img;
 
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		log_error("open(%s): %s", path, strerror(errno));
-		goto bad;
+	filebuf = image_load_file(path, &filesize);
+	if (filebuf == NULL) {
+		return NULL;
 	}
 
-	if (fstat(fd, &sb) < 0) {
-		log_error("fstat(%s): %s", path, strerror(errno));
-		goto bad;
-	}
-	if (!S_ISREG(sb.st_mode)) {
-		log_error("%s is not a regular file.", path);
-		goto bad;
+	if (is_pak) {
+		img = image_from_pak(image, filebuf, filesize);
+		free(filebuf);
+	} else {
+		img = image_from_nabu(image, filebuf, filesize);
 	}
 
-	paklen = (size_t)sb.st_size;
-	pakbuf = malloc(paklen);
-	if (pakbuf == NULL) {
-		log_error("Unable to allocate %zu bytes for %s",
-		    paklen, path);
-		goto bad;
-	}
-
-	if (read(fd, pakbuf, paklen) != (ssize_t)paklen) {
-		log_error("Unable to read %s", path);
-		goto bad;
-	}
-
-	img = image_from_pak(image, pakbuf, paklen);
- bad:
-	if (pakbuf != NULL) {
-		free(pakbuf);
-	}
-	if (fd >= 0) {
-		close(fd);
-	}
 	return img;
 }
 
@@ -220,23 +289,41 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		return img;
 	}
 
-	/* XXX Just PAK files for now. */
-
-	fname = image_pak_name(image);
+	/* Try loading a .nabu image first. */
+	fname = image_nabu_name(image);
 	snprintf(image_path, sizeof(image_path), "%s/%s",
 	    images_directory, fname);
-	log_debug("[%s] Loading PAK-%06X from %s", conn->name, image,
+	log_debug("[%s] Loading NABU-%06X from %s", conn->name, image,
 	    image_path);
+	free(fname);
 
-	img = image_load_pak_from_path(image, image_path);
+	img = image_load_image_from_path(image, image_path, false);
 	if (img != NULL) {
 		if (conn->last_image != NULL) {
 			image_release(conn->last_image);
 		}
 		conn->last_image = img;
+		return img;
 	}
 
-	return img;
+	/* Not found -- try a PAK. */
+	fname = image_pak_name(image);
+	snprintf(image_path, sizeof(image_path), "%s/%s",
+	    images_directory, fname);
+	log_debug("[%s] Loading PAK-%06X from %s", conn->name, image,
+	    image_path);
+	free(fname);
+
+	img = image_load_image_from_path(image, image_path, true);
+	if (img != NULL) {
+		if (conn->last_image != NULL) {
+			image_release(conn->last_image);
+		}
+		conn->last_image = img;
+		return img;
+	}
+
+	return NULL;
 }
 
 /*
