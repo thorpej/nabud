@@ -264,7 +264,7 @@ mj_snprint(char *buf, size_t size, mj_t *atom, int encoded)
 		case MJ_JSON_ENCODE:
 			return snprintf(buf, size, "\"%s\"", atom->value.s);
 		default:
-			for (bp = buf, *bp++ = '"', s = atom->value.s ;
+			for (bp = buf, s = atom->value.s ;
 			     (size_t)(bp - buf) < size - 2 && (unsigned)(s - atom->value.s) < atom->c ; ) {
 				if (*s == JSON_ESCAPE) {
 					switch(s[1]) {
@@ -295,7 +295,6 @@ mj_snprint(char *buf, size_t size, mj_t *atom, int encoded)
 					*bp++ = *s++;
 				}
 			}
-			*bp++ = '"';
 			*bp = 0x0;
 			return bp - buf;
 		}
