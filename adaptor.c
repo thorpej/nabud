@@ -104,16 +104,6 @@ adaptor_get_int24(const uint8_t *buf)
 }
 
 /*
- * adaptor_channel_valid --
- *	Returns true if a the channel number is a valid channel.
- */
-static bool
-adaptor_channel_valid(int16_t channel)
-{
-	return channel > 0 && channel < 0x100;
-}
-
-/*
  * adaptor_crc --
  *	Compute the CRC of the provided data buffer.
  */
@@ -315,9 +305,10 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 
 	/*
 	 * PAK images are pre-wrapped, so we have to process them a little
-	 * differently.
+	 * differently.  Time packets don't have a channel, so check for
+	 * that.
 	 */
-	if (img->is_pak) {
+	if (img->channel != NULL && img->channel->type == IMAGE_CHANNEL_PAK) {
 		adaptor_send_pak(conn, segment, img);
 		return;
 	}
@@ -422,7 +413,6 @@ adaptor_send_time(struct nabu_connection *conn)
 		.data = buf,
 		.length = sizeof(buf),
 		.number = NABU_IMAGE_TIME,
-		.is_pak = false,
 	};
 	adaptor_send_image(conn, 0, &img);
 }
@@ -470,8 +460,7 @@ adaptor_msg_mystery(struct nabu_connection *conn)
 static void
 adaptor_msg_channel_status(struct nabu_connection *conn)
 {
-	/* XXX */conn->channel = 1;
-	if (adaptor_channel_valid(conn->channel)) {
+	if (conn->channel != NULL) {
 		log_debug("[%s] Sending HAVE_CHANNEL.",
 		    conn->name);
 		conn_send_byte(conn, NABU_MSG_HAVE_CHANNEL);
@@ -621,11 +610,7 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	int16_t channel = (int16_t)adaptor_get_int16(msg);
 	log_info("[%s] NABU selected channel 0x%04x.", conn->name, channel);
 
-	if (adaptor_channel_valid(channel)) {
-		conn->channel = channel;
-	} else {
-		conn->channel = 0;
-	}
+	image_channel_select(conn, channel);
 
 	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn->name);
 	conn_send_byte(conn, NABU_MSG_CONFIRMED);

@@ -30,19 +30,55 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "util/nbsd_queue.h"
+
+typedef enum {
+	IMAGE_SOURCE_INVALID	=	0,
+	IMAGE_SOURCE_LOCAL	=	1,
+} image_source_type;
+
+struct image_source {
+	LIST_ENTRY(image_source) link;
+	image_source_type type;
+	char		*name;
+	char		*root;
+	TAILQ_HEAD(, image_channel) channels;
+};
+
+typedef enum {
+	IMAGE_CHANNEL_INVALID	=	0,
+	IMAGE_CHANNEL_PAK	=	1,
+	IMAGE_CHANNEL_NABU	=	2,
+} image_channel_type;
+
+struct image_channel {
+	TAILQ_ENTRY(image_channel) link;
+	struct image_source *source;
+	image_channel_type type;
+	char		*name;
+	char		*path;
+	unsigned int	number;
+};
+
 struct nabu_image {
+	struct image_channel *channel;
 	char		*name;
 	uint8_t		*data;
 	size_t		length;
 	uint32_t	number;
 	uint32_t	refcnt;
-	bool		is_pak;
 };
 
 struct nabu_connection;
 
-bool	image_init(const char *);
+struct image_source *image_add_local_source(char *, char *);
+void	image_source_add_channel(struct image_source *, char *,
+	    image_channel_type, unsigned int);
+
+void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);
 void	image_release(struct nabu_image *);
+
+uint8_t *image_load_file(const char *, size_t *, size_t);
 
 #endif /* image_h_included */

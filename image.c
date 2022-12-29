@@ -47,19 +47,92 @@
 #include "image.h"
 #include "log.h"
 
-static const char *images_directory;
+static LIST_HEAD(, image_source) image_sources =
+    LIST_HEAD_INITIALIZER(&image_sources);
+unsigned int image_source_count;
+
+static struct image_source *
+image_source_alloc(char *name, image_source_type type)
+{
+	struct image_source *imgsrc = calloc(1, sizeof(*imgsrc));
+	if (imgsrc != NULL) {
+		TAILQ_INIT(&imgsrc->channels);
+		imgsrc->name = name;
+		imgsrc->type = type;
+	} else {
+		log_error("Unable to allocate image source descriptor for %s",
+		    name);
+		free(name);
+	}
+	return imgsrc;
+}
+
+/*
+ * image_add_local_source --
+ *	Add a local image source.
+ */
+struct image_source *
+image_add_local_source(char *name, char *path)
+{
+	struct image_source *imgsrc =
+	    image_source_alloc(name, IMAGE_SOURCE_LOCAL);
+	if (imgsrc != NULL) {
+		imgsrc->root = path;
+		LIST_INSERT_HEAD(&image_sources, imgsrc, link);
+		image_source_count++;
+		log_info("Adding Local source %s at %s",
+		    imgsrc->name, imgsrc->root);
+	} else {
+		free(path);
+	}
+
+	return imgsrc;
+}
+
+/*
+ * image_source_add_channel --
+ *	Add a channel to an image source.
+ */
+void
+image_source_add_channel(struct image_source *imgsrc, char *name,
+    image_channel_type type, unsigned int number)
+{
+	struct image_channel *chan = calloc(1, sizeof(*chan));
+	size_t pathlen = strlen(name) + strlen(imgsrc->root) + 2; /* / + NUL */
+	char *pathstr = malloc(pathlen);
+	if (pathstr != NULL) {
+		snprintf(pathstr, pathlen, "%s/%s", imgsrc->root, name);
+	}
+
+	if (pathstr != NULL && chan != NULL) {
+		chan->source = imgsrc;
+		chan->type = type;
+		chan->name = name;
+		chan->path = pathstr;
+		chan->number = number;
+		TAILQ_INSERT_TAIL(&imgsrc->channels, chan, link);
+		log_info("Adding %s channel %s for source %s at %s",
+		    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu",
+		    chan->name, chan->source->name, chan->path);
+	} else {
+		free(name);
+		if (pathstr != NULL) {
+			free(pathstr);
+		}
+	}
+}
 
 /*
  * image_load_file --
  *	Load the specified file.  Caller is responsible for
  *	freeing the buffer.
  */
-static uint8_t *
-image_load_file(const char *path, size_t *filesizep)
+uint8_t *
+image_load_file(const char *path, size_t *filesizep, size_t extra)
 {
 	struct stat sb;
 	uint8_t *filebuf = NULL;
-	size_t filesize;
+	size_t filesize = 0;
 	int fd = -1;
 
 	fd = open(path, O_RDONLY);
@@ -78,10 +151,10 @@ image_load_file(const char *path, size_t *filesizep)
 	}
 
 	filesize = (size_t)sb.st_size;
-	filebuf = malloc(filesize);
+	filebuf = malloc(filesize + extra);
 	if (filebuf == NULL) {
 		log_error("Unable to allocate %zu bytes for %s",
-		    filesize, path);
+		    filesize + extra, path);
 		goto bad;
 	}
 
@@ -146,7 +219,8 @@ image_pak_name(uint32_t image)
  *	Create an image descriptor from the provided NABU file buffer.
  */
 static struct nabu_image *
-image_from_nabu(uint32_t image, uint8_t *filebuf, size_t filesize)
+image_from_nabu(struct image_channel *chan, uint32_t image, uint8_t *filebuf,
+    size_t filesize)
 {
 	char image_name[sizeof("nabu-000001")];
 
@@ -160,12 +234,12 @@ image_from_nabu(uint32_t image, uint8_t *filebuf, size_t filesize)
 		return NULL;
 	}
 
+	img->channel = chan;
 	img->name = strdup(image_name);
 	img->data = filebuf;
 	img->length = filesize;
 	img->number = image;
 	img->refcnt = 1;
-	img->is_pak = false;
 
 	return img;
 }
@@ -175,7 +249,8 @@ image_from_nabu(uint32_t image, uint8_t *filebuf, size_t filesize)
  *	Create an image descriptor from the provided PAK buffer.
  */
 static struct nabu_image *
-image_from_pak(uint32_t image, const uint8_t *pakbuf, size_t paklen)
+image_from_pak(struct image_channel *chan, uint32_t image,
+    const uint8_t *pakbuf, size_t paklen)
 {
 	DES_cblock iv = NABU_PAK_IV;
 	DES_cblock key = NABU_PAK_KEY;
@@ -210,12 +285,12 @@ image_from_pak(uint32_t image, const uint8_t *pakbuf, size_t paklen)
 	DES_ncbc_encrypt((const unsigned char *)pakbuf,
 	    (unsigned char *)pakdata, (long)paklen, &ks, &iv, 0);
 
+	img->channel = chan;
 	img->name = strdup(image_name);
 	img->data = pakdata;
 	img->length = paklen;
 	img->number = image;
 	img->refcnt = 1;
-	img->is_pak = true;
 
 	return img;
 }
@@ -225,50 +300,56 @@ image_from_pak(uint32_t image, const uint8_t *pakbuf, size_t paklen)
  *	Load an image from the specified path.
  */
 static struct nabu_image *
-image_load_image_from_path(uint32_t image, const char *path, bool is_pak)
+image_load_image_from_path(struct image_channel *chan, uint32_t image,
+    const char *path)
 {
 	uint8_t *filebuf;
 	size_t filesize;
 	struct nabu_image *img;
 
-	filebuf = image_load_file(path, &filesize);
+	filebuf = image_load_file(path, &filesize, 0);
 	if (filebuf == NULL) {
 		return NULL;
 	}
 
-	if (is_pak) {
-		img = image_from_pak(image, filebuf, filesize);
+	if (chan->type == IMAGE_CHANNEL_PAK) {
+		img = image_from_pak(chan, image, filebuf, filesize);
 		free(filebuf);
 	} else {
-		img = image_from_nabu(image, filebuf, filesize);
+		img = image_from_nabu(chan, image, filebuf, filesize);
 	}
 
 	return img;
 }
 
 /*
- * image_init --
- *	Initialize the segment repository.
+ * image_channel_select --
+ *	Select the channel for this connection from the index
+ *	provided by the NABU.
  */
-bool
-image_init(const char *images_dir)
+void
+image_channel_select(struct nabu_connection *conn, int16_t channel)
 {
-	struct stat sb;
+	struct image_channel *chan;
 
-	if (stat(images_dir, &sb) < 0) {
-		log_error("stat() on images directory %s failed: %s",
-		    images_dir, strerror(errno));
-		return false;
-	}
-	if (!S_ISDIR(sb.st_mode)) {
-		log_error("Images directory %s is not a directory.",
-		    images_dir);
-		return false;
+	if (channel < 1 || channel > 0x100) {
+		log_info("[%s] Channel selection %d results in no channel.",
+		    conn->name, channel);
+		conn->channel = NULL;
+		return;
 	}
 
-	images_directory = images_dir;
-
-	return true;
+	TAILQ_FOREACH(chan, &conn->source->channels, link) {
+		if (chan->number == (unsigned int)channel) {
+			log_info("[%s] Selected channel %u (%s) "
+			    "in Source %s.\n", conn->name, chan->number,
+			    chan->name, conn->source->name);
+			conn->channel = chan;
+			return;
+		}
+	}
+	log_info("[%s] Channel %d not found in Source %s.\n", conn->name,
+	    channel, conn->source->name);
 }
 
 /*
@@ -280,41 +361,36 @@ image_load(struct nabu_connection *conn, uint32_t image)
 {
 	char image_path[PATH_MAX];
 	char *fname;
+	const char *imgtype;
 	struct nabu_image *img;
 
 	if ((img = conn->last_image) != NULL && img->number == image) {
 		/* Cache hit! */
-		log_debug("[%s] Cache hit for image %06X: %s", conn->name,
-		    image, img->name);
+		log_debug("[%s] Connection cache hit for image %06X: %s",
+		    conn->name, image, img->name);
 		return img;
 	}
 
-	/* Try loading a .nabu image first. */
-	fname = image_nabu_name(image);
-	snprintf(image_path, sizeof(image_path), "%s/%s",
-	    images_directory, fname);
-	log_debug("[%s] Loading NABU-%06X from %s", conn->name, image,
-	    image_path);
-	free(fname);
-
-	img = image_load_image_from_path(image, image_path, false);
-	if (img != NULL) {
-		if (conn->last_image != NULL) {
-			image_release(conn->last_image);
-		}
-		conn->last_image = img;
-		return img;
+	if (conn->channel == NULL) {
+		log_error("[%s] No channel selected.", conn->name);
+		return NULL;
 	}
 
-	/* Not found -- try a PAK. */
-	fname = image_pak_name(image);
-	snprintf(image_path, sizeof(image_path), "%s/%s",
-	    images_directory, fname);
-	log_debug("[%s] Loading PAK-%06X from %s", conn->name, image,
+	if (conn->channel->type == IMAGE_CHANNEL_PAK) {
+		fname = image_pak_name(image);
+		imgtype = "pak";
+	} else {
+		fname = image_nabu_name(image);
+		imgtype = "nabu";
+	}
+
+	snprintf(image_path, sizeof(image_path), "%s/%s", conn->channel->path,
+	    fname);
+	log_debug("[%s] Loading %s-%06X from %s", conn->name, imgtype, image,
 	    image_path);
 	free(fname);
 
-	img = image_load_image_from_path(image, image_path, true);
+	img = image_load_image_from_path(conn->channel, image, image_path);
 	if (img != NULL) {
 		if (conn->last_image != NULL) {
 			image_release(conn->last_image);

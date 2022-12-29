@@ -1,7 +1,7 @@
 PROG=	nabud
-SRCS=	adaptor.c conn.c log.c main.c image.c
+SRCS=	adaptor.c conn.c image.c log.c main.c mj.c
 
-CFLAGS+= -pthread
+CFLAGS+= -g -pthread
 LDFLAGS+= -pthread
 
 LDADD+= -lcrypto
