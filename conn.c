@@ -48,6 +48,11 @@
 #include "image.h"
 #include "log.h"
 
+/* Huh, some platforms don't define INFTIM. */
+#ifndef INFTIM
+#define	INFTIM		-1
+#endif
+
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t conn_list_cv = PTHREAD_COND_INITIALIZER;
 static LIST_HEAD(, nabu_connection) conn_list;
@@ -375,7 +380,7 @@ static bool
 conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
     bool is_recv)
 {
-	short pollwhich = is_recv ? POLLRDNORM : POLLWRNORM;
+	short pollwhich = is_recv ? POLLIN : POLLOUT;
 	struct pollfd fds[2] = {
 		[0] = {
 			.fd = conn->fd,
@@ -383,7 +388,7 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 		},
 		[1] = {
 			.fd = conn->cancel_fds[0],
-			.events = POLLRDNORM | POLLERR | POLLHUP | POLLNVAL,
+			.events = POLLIN | POLLERR | POLLHUP | POLLNVAL,
 		},
 	};
 	int pollret;
@@ -403,7 +408,7 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 		return false;
 	}
 	if (fds[1].revents) {
-		if (fds[1].revents & POLLRDNORM) {
+		if (fds[1].revents & POLLIN) {
 			log_info("[%s] Connection cancelled.",
 			    conn->name);
 			return false;
