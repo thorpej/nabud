@@ -40,8 +40,13 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef __APPLE__	/* Use CommonCrypto on macOS */
+#define	COMMON_DIGEST_FOR_OPENSSL
+#include <CommonCrypto/CommonCrypto.h>
+#else
 #include <openssl/des.h>
 #include <openssl/md5.h>
+#endif /* __APPLE__ */
 
 #include "conn.h"
 #include "image.h"
@@ -198,12 +203,16 @@ image_nabu_name(uint32_t image)
 static char *
 image_pak_name(uint32_t image)
 {
-        char namestr[sizeof("000001nabu")];
-        unsigned char digest[MD5_DIGEST_LENGTH];
+	char namestr[sizeof("000001nabu")];
+	MD5_CTX ctx;
+	unsigned char digest[MD5_DIGEST_LENGTH];
 	char pakname[PAK_NAME_SIZE];
 
-        snprintf(namestr, sizeof(namestr), "%06Xnabu", image);
-        MD5((unsigned char *)namestr, sizeof(namestr) - 1, digest);
+	snprintf(namestr, sizeof(namestr), "%06Xnabu", image);
+	MD5_Init(&ctx);
+	MD5_Update(&ctx, namestr, sizeof(namestr) - 1);
+	MD5_Final(digest, &ctx);
+
 	snprintf(pakname, sizeof(pakname),
 	    "%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X.npak",
 	    digest[0],  digest[1],  digest[2],  digest[3],
@@ -245,6 +254,52 @@ image_from_nabu(struct image_channel *chan, uint32_t image, uint8_t *filebuf,
 }
 
 /*
+ * image_decrypt_pak --
+ *	Decrypt a PAK image.
+ */
+static bool
+image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
+{
+#ifdef __APPLE__
+	uint8_t iv[] = NABU_PAK_IV;
+	uint8_t key[] = NABU_PAK_KEY;
+	CCCryptorStatus status;
+	CCCryptorRef cryptor;
+	size_t actual;
+
+	status = CCCryptorCreate(kCCDecrypt, kCCAlgorithmDES, 0,
+	    key, sizeof(key), iv, &cryptor);
+	if (status == kCCSuccess) {
+		status = CCCryptorUpdate(cryptor, src, len, dst, len, &actual);
+		if (status == kCCSuccess) {
+			status = CCCryptorFinal(cryptor, dst, len, &actual);
+			if (status != kCCSuccess) {
+				log_error("CCCryptorFinal() failed: %d",
+				    status);
+			}
+		} else {
+			log_error("CCCryptorUpdate() failed: %d", status);
+		}
+		CCCryptorRelease(cryptor);
+	} else {
+		log_error("CCCryptorCreate() failed: %d", status);
+	}
+
+	return status == kCCSuccess;
+#else /* ! __APPLE__ */
+	DES_cblock iv = NABU_PAK_IV;
+	DES_cblock key = NABU_PAK_KEY;
+	DES_key_schedule ks;
+
+	DES_set_key_unchecked(&key, &ks);
+	DES_ncbc_encrypt((const unsigned char *)src,
+	    (unsigned char *)dst, (long)len, &ks, &iv, 0);
+
+	return true;
+#endif /* __APPLE__ */
+}
+
+/*
  * image_from_pak --
  *	Create an image descriptor from the provided PAK buffer.
  */
@@ -252,20 +307,15 @@ static struct nabu_image *
 image_from_pak(struct image_channel *chan, uint32_t image,
     const uint8_t *pakbuf, size_t paklen)
 {
-	DES_cblock iv = NABU_PAK_IV;
-	DES_cblock key = NABU_PAK_KEY;
-	DES_key_schedule ks;
 	char image_name[sizeof("pak-000001")];
 
 	snprintf(image_name, sizeof(image_name), "pak-%06X", image);
 
-	if ((paklen % sizeof(DES_cblock)) != 0) {
+	if ((paklen % 8) != 0) {	/* XXX magic number */
 		log_error("%s size %zu is not a multiple of DES block size.",
 		    image_name, paklen);
 		return NULL;
 	}
-
-	DES_set_key_unchecked(&key, &ks);
 
 	uint8_t *pakdata = malloc(paklen);
 	if (pakdata == NULL) {
@@ -282,8 +332,11 @@ image_from_pak(struct image_channel *chan, uint32_t image,
 		return NULL;
 	}
 
-	DES_ncbc_encrypt((const unsigned char *)pakbuf,
-	    (unsigned char *)pakdata, (long)paklen, &ks, &iv, 0);
+	if (! image_decrypt_pak(pakbuf, pakdata, paklen)) {
+		log_error("Unable to decrypt PAK image %s.", image_name);
+		free(pakdata);
+		return NULL;
+	}
 
 	img->channel = chan;
 	img->name = strdup(image_name);
