@@ -33,6 +33,11 @@
 #include "nabu_proto.h"
 #include "util/nbsd_queue.h"
 
+typedef enum {
+	CONN_TYPE_INVALID	=	0,
+	CONN_TYPE_SERIAL	=	1,
+} conn_type;
+
 struct nabu_segment;
 
 struct nabu_connection {

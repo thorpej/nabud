@@ -44,7 +44,26 @@
 
 #define	DEFAULT_NABUD_CONF		"./nabud.conf"
 
-#define	VALID_ATOM(a, t)	((a) != NULL && (a)->type == (t))
+#define	VALID_ATOM(a, t)		((a) != NULL && (a)->type == (t))
+
+static void *
+connection_thread(void *arg)
+{
+	struct nabu_connection *conn = arg;
+
+	/* Just run the Adaptor event loop until it returns. */
+	adaptor_event_loop(conn);
+
+	/*
+	 * If the connection was cancelled, go ahead and destroy it
+	 * now.
+	 */
+	if (conn->cancelled) {
+		conn_destroy(conn);
+	}
+
+	return NULL;
+}
 
 static void
 config_load_channel(struct image_source *imgsrc, mj_t *atom,
@@ -107,7 +126,7 @@ config_load_channel(struct image_source *imgsrc, mj_t *atom,
 }
 
 static void
-config_load_source(mj_t *atom, int number)
+config_load_source(mj_t *atom, unsigned int number)
 {
 	mj_t *name_atom, *path_atom, *type_atom, *channels_atom;
 	char *name = NULL, *path = NULL, *type = NULL;
@@ -189,10 +208,21 @@ config_load_source(mj_t *atom, int number)
 	}
 }
 
+static void
+config_load_adaptor(mj_t *atom, unsigned int number)
+{
+	if (! VALID_ATOM(atom, MJ_OBJECT)) {
+		log_error("Invalid Adaptor %d.", number);
+		goto out;
+	}
+ out:
+	;
+}
+
 static bool
 config_load(const char *path)
 {
-	mj_t root_atom, *sources_atom /*, *adaptors_atom*/;
+	mj_t root_atom, *sources_atom, *adaptors_atom;
 	int from, to, tok, i;
 	uint8_t *file_data;
 	size_t file_size;
@@ -221,12 +251,30 @@ config_load(const char *path)
 		log_error("Missing or invalid Sources stanza.");
 		goto out;
 	}
+
+	/* Find the Adaptors array. */
+	adaptors_atom = mj_get_atom(&root_atom, "Adaptors");
+	if (!VALID_ATOM(adaptors_atom, MJ_ARRAY)) {
+		log_error("Missing or invalid Adaptors stanza.");
+		goto out;
+	}
+
+	/* Load up the sources and channels. */
 	if (mj_arraycount(sources_atom) < 1) {
 		log_error("No sources in Sources stanza.");
 		goto out;
 	}
 	for (i = 0; i < mj_arraycount(sources_atom); i++) {
 		config_load_source(mj_get_atom(sources_atom, i), i);
+	}
+
+	/* Now load up the adaptors. */
+	if (mj_arraycount(adaptors_atom) < 1) {
+		log_error("No adaptors in Adaptors stanza.");
+		goto out;
+	}
+	for (i = 0; i < mj_arraycount(sources_atom); i++) {
+		config_load_adaptor(mj_get_atom(sources_atom, i), i);
 	}
 
  out:
@@ -239,27 +287,6 @@ usage(void)
 {
 	fprintf(stderr, "usage: %s [-c conf] [-d]\n", getprogname());
 	exit(EXIT_FAILURE);
-}
-
-static void *
-connection_thread(void *arg)
-{
-	struct nabu_connection *conn = arg;
-
-	/*
-	 * Just run the Adaptor event loop until it returns.
-	 */
-	adaptor_event_loop(conn);
-
-	/*
-	 * If the connection was cancelled, go ahead and destroy it
-	 * now.
-	 */
-	if (conn->cancelled) {
-		conn_destroy(conn);
-	}
-
-	return NULL;
 }
 
 int
