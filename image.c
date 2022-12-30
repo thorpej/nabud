@@ -61,6 +61,21 @@ static TAILQ_HEAD(, image_channel) image_channels =
 unsigned int image_channel_count;
 
 /*
+ * image_release --
+ *	Release the specified image.
+ */
+static void
+image_release(struct nabu_image *img)
+{
+	assert(img->refcnt > 0);
+	if (img->refcnt-- == 1) {
+		free(img->name);
+		free(img->data);
+		free(img);
+	}
+}
+
+/*
  * image_source_lookup --
  *	Look up an image source by name.
  */
@@ -525,16 +540,16 @@ image_load(struct nabu_connection *conn, uint32_t image)
 }
 
 /*
- * image_release --
- *	Release the specified segment.
+ * image_done --
+ *	Indicate that the connection is done with it's
+ *	cached image.
  */
 void
-image_release(struct nabu_image *img)
+image_done(struct nabu_connection *conn, struct nabu_image *img)
 {
-	assert(img->refcnt > 0);
-	if (img->refcnt-- == 1) {
-		free(img->name);
-		free(img->data);
-		free(img);
+	assert(img != NULL);
+	if (img == conn->last_image) {
+		conn->last_image = NULL;
+		image_release(img);
 	}
 }

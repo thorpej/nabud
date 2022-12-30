@@ -75,7 +75,7 @@ void	image_add_channel(image_channel_type, char *, char *, unsigned int);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);
-void	image_release(struct nabu_image *);
+void	image_done(struct nabu_connection *, struct nabu_image *);
 
 uint8_t *image_load_file(const char *, size_t *, size_t);
 

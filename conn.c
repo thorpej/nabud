@@ -307,14 +307,8 @@ conn_add_serial(char *path, unsigned int channel)
 void
 conn_destroy(struct nabu_connection *conn)
 {
-	struct nabu_image *img;
-
 	conn_remove(conn);
-
-	if ((img = conn->last_image) != NULL) {
-		conn->last_image = NULL;
-		image_release(img);
-	}
+	image_done(conn);
 
 	/* close the writer first because SIGPIPE is super annoying. */
 	if (conn->cancel_fds[1] != -1) {

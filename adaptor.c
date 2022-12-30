@@ -282,9 +282,8 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
 
 	adaptor_send_packet(conn, pktbuf, len);
 
-	if (last && img == conn->last_image) {
-		conn->last_image = NULL;
-		image_release(img);
+	if (last) {
+		image_done(conn, img);
 	}
 }
 
@@ -370,9 +369,8 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 	    segment, img->number, last ? " (last segment)" : "");
 	adaptor_send_packet(conn, pktbuf, pktlen);
 
-	if (last && img == conn->last_image) {
-		conn->last_image = NULL;
-		image_release(img);
+	if (last) {
+		image_done(conn, img);
 	}
 }
 
