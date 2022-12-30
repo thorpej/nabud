@@ -149,6 +149,7 @@ log_message(log_type type, const char *func, const char *fmt, ...)
 	if (log_file) {
 		fprintf(log_file, "%s: %s: %s\n", log_typenames[type],
 		    func, caller_string);
+		fflush(log_file);
 	} else {
 		pthread_once(&log_syslog_init_once, log_syslog_init);
 		pthread_mutex_lock(&log_lock);
