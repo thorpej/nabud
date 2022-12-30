@@ -636,8 +636,7 @@ image_load(struct nabu_connection *conn, uint32_t image)
 void
 image_done(struct nabu_connection *conn, struct nabu_image *img)
 {
-	assert(img != NULL);
-	if (img == conn->last_image) {
+	if (conn->last_image != NULL && conn->last_image == img) {
 		conn->last_image = NULL;
 		image_release(img);
 	}
