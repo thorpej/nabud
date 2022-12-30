@@ -146,16 +146,6 @@ adaptor_escape_packet(struct nabu_connection *conn, const uint8_t *buf,
 }
 
 /*
- * adaptor_send_abort --
- *	Send an "abort" to the NABU.
- */
-static void
-adaptor_send_abort(struct nabu_connection *conn)
-{
-	conn_send_byte(conn, NABU_MSG_UNAUTHORIZED);
-}
-
-/*
  * adaptor_expect_byte --
  *	Wait for an expected byte from the NABU.
  */
@@ -204,6 +194,23 @@ adaptor_expect_ack(struct nabu_connection *conn)
 }
 
 /*
+ * adaptor_send_unauthorized --
+ *	Send an UNAUTHORIZED message to the NABU.
+ */
+static void
+adaptor_send_unauthorized(struct nabu_connection *conn)
+{
+	log_debug("[%s] Sending UNAUTHORIZED.", conn->name);
+	conn_send_byte(conn, NABU_MSG_UNAUTHORIZED);
+	log_debug("[%s] Waiting for NABU to ACK.", conn->name);
+	if (adaptor_expect_ack(conn)) {
+		log_debug("[%s] Received ACK.", conn->name);
+	} else {
+		log_error("[%s] NABU failed to ACK.", conn->name);
+	}
+}
+
+/*
  * adaptor_send_packet --
  *	Send a packet to the NABU.  The buffer will be freed once the
  *	packet has been sent.
@@ -247,7 +254,7 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
 		log_error(
 		    "[%s] PAK %s: offset %zu exceeds pak size %zu",
 		    conn->name, img->name, off, img->length);
-		adaptor_send_abort(conn);
+		adaptor_send_unauthorized(conn);
 		return;
 	}
 
@@ -260,14 +267,14 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
 		log_error(
 		    "[%s] PAK %s: offset %zu length %zu is nonsensical",
 		    conn->name, img->name, off, len);
-		adaptor_send_abort(conn);
+		adaptor_send_unauthorized(conn);
 		return;
 	}
 
 	pktbuf = malloc(len);
 	if (pktbuf == NULL) {
 		log_error("unable to allocate %zu byte packet buffer", len);
-		adaptor_send_abort(conn);
+		adaptor_send_unauthorized(conn);
 		return;
 	}
 
@@ -316,7 +323,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 		log_error(
 		    "image %u: segment %u offset %zu exceeds image size %zu",
 		    img->number, segment, off, img->length);
-		adaptor_send_abort(conn);
+		adaptor_send_unauthorized(conn);
 		return;
 	}
 
@@ -332,7 +339,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 	if (pktbuf == NULL) {
 		log_error("unable to allocate %zu byte packet buffer",
 		    pktlen);
-		adaptor_send_abort(conn);
+		adaptor_send_unauthorized(conn);
 		return;
 	}
 
@@ -569,7 +576,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 		log_error(
 		    "[%s] Unexpected request for segment %u of time image.",
 		    conn->name, segment);
-		adaptor_send_abort(conn);
+		adaptor_send_unauthorized(conn);
 		return;
 	}
 
@@ -577,7 +584,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 	if (img == NULL) {
 		log_error("[%s] Unable to load image %06X.",
 		    conn->name, image);
-		adaptor_send_abort(conn);
+		adaptor_send_unauthorized(conn);
 		return;
 	}
 
