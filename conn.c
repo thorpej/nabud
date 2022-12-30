@@ -44,6 +44,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "adaptor.h"
 #include "conn.h"
 #include "image.h"
 #include "log.h"
@@ -103,6 +104,10 @@ conn_shutdown(void)
 	pthread_mutex_unlock(&conn_list_mutex);
 }
 
+/*
+ * conn_set_nbio --
+ *	Set non-blocking I/O on the specified file descriptor.
+ */
 static bool
 conn_set_nbio(struct nabu_connection *conn, const char *which, int fd)
 {
@@ -125,17 +130,46 @@ conn_set_nbio(struct nabu_connection *conn, const char *which, int fd)
 	return true;
 }
 
-static struct nabu_connection *
-conn_create_common(const char *name, int fd)
+/*
+ * conn_thread --
+ *	Worker thread that handles NABU connections.
+ */
+static void *
+conn_thread(void *arg)
+{
+	struct nabu_connection *conn = arg;
+
+	/* Just run the Adaptor event loop until it returns. */
+	adaptor_event_loop(conn);
+
+	/*
+	 * If the connection was cancelled, go ahead and destroy it
+	 * now.
+	 */
+	if (conn->cancelled) {
+		conn_destroy(conn);
+	}
+
+	return NULL;
+}
+
+/*
+ * conn_create_common --
+ *	Common connection-creation duties.
+ */
+static void
+conn_create_common(const char *name, int fd, unsigned int channel)
 {
 	struct nabu_connection *conn;
+	pthread_attr_t attr;
+	int error;
 
 	conn = calloc(1, sizeof(*conn));
 	if (conn == NULL) {
 		log_error("[%s] Unable to allocate connection structure.",
 		    name);
 		close(fd);
-		return NULL;
+		return;
 	}
 	conn->fd = fd;
 	conn->cancel_fds[0] = conn->cancel_fds[1] = -1;
@@ -168,27 +202,53 @@ conn_create_common(const char *name, int fd)
 		goto bad;
 	}
 
+	/*
+	 * If a channel was specified, set it now.
+	 */
+	if (channel != 0) {
+		image_channel_select(conn, (int16_t)channel);
+	}
+
+	/*
+	 * Create the thread that handles the connection.
+	 */
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	error = pthread_create(&conn->thread, &attr, conn_thread, conn);
+	if (error) {
+		log_error("pthread_create() for %s failed: %s",
+		    name, strerror(error));
+		abort();
+		/* NOTREACHED */
+	}
+
 	conn_insert(conn);
-	return conn;
+	return;
 
  bad:
 	conn_destroy(conn);
-	return NULL;
+	return;
 }
 
 #define	NABU_NATIVE_BPS		111000
 #define	NABU_FALLBACK_BPS	115200
 
-struct nabu_connection *
-conn_create_serial(const char *path)
+/*
+ * conn_add_serial --
+ *	Add a serial connection.
+ */
+void
+conn_add_serial(char *path, unsigned int channel)
 {
 	struct termios t;
 	int fd;
 
+	log_info("Creating Serial connection on %s.", path);
+
 	fd = open(path, O_RDWR | O_NONBLOCK | O_NOCTTY);
 	if (fd < 0) {
 		log_error("Unable to open %s: %s", path, strerror(errno));
-		return NULL;
+		return;
 	}
 
 	if (tcgetattr(fd, &t) < 0) {
@@ -234,10 +294,10 @@ conn_create_serial(const char *path)
 		}
 	}
 
-	return conn_create_common(path, fd);
+	conn_create_common(path, fd, channel);
+ 	return;
  bad:
 	close(fd);
-	return NULL;
 }
 
 /*

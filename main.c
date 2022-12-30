@@ -46,25 +46,6 @@
 
 #define	VALID_ATOM(a, t)		((a) != NULL && (a)->type == (t))
 
-static void *
-connection_thread(void *arg)
-{
-	struct nabu_connection *conn = arg;
-
-	/* Just run the Adaptor event loop until it returns. */
-	adaptor_event_loop(conn);
-
-	/*
-	 * If the connection was cancelled, go ahead and destroy it
-	 * now.
-	 */
-	if (conn->cancelled) {
-		conn_destroy(conn);
-	}
-
-	return NULL;
-}
-
 static void
 config_error(const char *preamble, mj_t *atom)
 {
@@ -210,12 +191,64 @@ config_load_source(mj_t *atom)
 static void
 config_load_connection(mj_t *atom)
 {
+	mj_t *type_atom, *port_atom, *channel_atom;
+	char *type = NULL, *port = NULL, *channel = NULL;
+	long val;
+
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
 		config_error("Invalid Connection object.", atom);
 		goto out;
 	}
+
+	port_atom = mj_get_atom(atom, "Port");
+	if (! VALID_ATOM(port_atom, MJ_STRING)) {
+		config_error("Invalid or missing Port in Connection object",
+		    atom);
+		goto out;
+	}
+	mj_asprint(&port, port_atom, MJ_HUMAN);
+
+	/* Channel is optional. */
+	channel_atom = mj_get_atom(atom, "Channel");
+	if (VALID_ATOM(channel_atom, MJ_NUMBER)) {
+		mj_asprint(&channel, channel_atom, MJ_HUMAN);
+		val = strtol(channel, NULL, 10);
+		if (val < 1 || val > 255) {
+			config_error("Channel must be between 1 and 255",
+			    atom);
+			goto out;
+		}
+	} else {
+		val = 0;
+	}
+
+	type_atom = mj_get_atom(atom, "Type");
+	if (! VALID_ATOM(type_atom, MJ_STRING)) {
+		config_error("Invalid or missing Type in Connection object",
+		    atom);
+		goto out;
+	}
+	mj_asprint(&type, type_atom, MJ_HUMAN);
+
+	if (strcasecmp(type, "serial") == 0) {
+		conn_add_serial(port, val);
+		/* conn_create_serial() owns these. */
+		port = NULL;
+	} else {
+		config_error("Connection Type must be Serial", atom);
+		goto out;
+	}
+
  out:
-	;
+	if (type != NULL) {
+		free(type);
+	}
+	if (port != NULL) {
+		free(port);
+	}
+	if (channel != NULL) {
+		free(channel);
+	}
 }
 
 static bool
@@ -324,34 +357,6 @@ main(int argc, char *argv[])
 
 	/* Load our configuration */
 	config_load(nabud_conf);
-
-	/*
-	 * For each tty_path, create a serial connection and create a
-	 * thread to service it.
-	 */
-	struct nabu_connection *conn;
-	pthread_t thread;
-	pthread_attr_t attr;
-	int error;
-
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-
-	for (; argc != 0; argc--, argv++) {
-		log_info("Creating serial connection on %s.", *argv);
-		conn = conn_create_serial(*argv);
-		if (conn == NULL) {
-			/* Not fatal.  Error already logged. */
-			continue;
-		}
-		error = pthread_create(&thread, &attr, connection_thread, conn);
-		if (error) {
-			log_error("pthread_create() for %s failed: %s",
-			    *argv, strerror(error));
-			abort();
-			/* NOTREACHED */
-		}
-	}
 
 	if (conn_count == 0) {
 		log_error("No connections! So boring! Goodbye.");

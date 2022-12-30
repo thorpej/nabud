@@ -27,6 +27,7 @@
 #ifndef conn_h_included
 #define	conn_h_included
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -47,6 +48,9 @@ struct nabu_connection {
 
 	/* Display name for this connection. */
 	char		*name;
+
+	/* Thread that owns this connection. */
+	pthread_t	thread;
 
 	/* File descriptor for this connection. */
 	int		fd;
@@ -82,7 +86,7 @@ struct nabu_connection {
 
 extern unsigned int conn_count;
 
-struct nabu_connection *conn_create_serial(const char *);
+void	conn_add_serial(char *, unsigned int);
 void	conn_destroy(struct nabu_connection *);
 
 void	conn_cancel(struct nabu_connection *);
