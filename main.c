@@ -156,6 +156,14 @@ config_load_source(mj_t *atom)
 	}
 	mj_asprint(&name, name_atom, MJ_HUMAN);
 
+	loc_atom = mj_get_atom(atom, "Location");
+	if (! VALID_ATOM(loc_atom, MJ_STRING)) {
+		config_error("Invalid or missing Location in Source object",
+		    atom);
+		goto out;
+	}
+	mj_asprint(&loc, loc_atom, MJ_HUMAN);
+
 	type_atom = mj_get_atom(atom, "Type");
 	if (! VALID_ATOM(type_atom, MJ_STRING)) {
 		config_error("Invalid or missing Type in Source object",
@@ -165,13 +173,6 @@ config_load_source(mj_t *atom)
 	mj_asprint(&type, type_atom, MJ_HUMAN);
 
 	if (strcasecmp(type, "local") == 0) {
-		loc_atom = mj_get_atom(atom, "Path");
-		if (! VALID_ATOM(loc_atom, MJ_STRING)) {
-			config_error("Invalid or missing Path in Source object",
-			    atom);
-			goto out;
-		}
-		mj_asprint(&loc, loc_atom, MJ_HUMAN);
 		image_add_local_source(name, loc);
 		/* image_add_local_source() owns these. */
 		name = loc = NULL;
