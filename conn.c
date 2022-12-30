@@ -463,7 +463,7 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 	}
 	if (fds[1].revents) {
 		if (fds[1].revents & POLLIN) {
-			log_info("[%s] Connection cancelled.",
+			log_debug("[%s] Connection cancelled.",
 			    conn->name);
 			return false;
 		}
