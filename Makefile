@@ -1,7 +1,7 @@
 PROG=	nabud
 SRCS=	adaptor.c conn.c image.c log.c main.c mj.c
 
-CPPFLAGS+= -DNABUD_VERSION=\"0.5\"
+#CPPFLAGS+= -DNABUD_CONF=\"/usr/pkg/etc/nabud.conf\"
 
 CFLAGS+= -g -pthread
 LDFLAGS+= -pthread

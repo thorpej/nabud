@@ -42,9 +42,11 @@
 #include "log.h"
 #include "mj.h"
 
-#define	DEFAULT_NABUD_CONF		"./nabud.conf"
+#ifndef NABUD_CONF
+#define	NABUD_CONF		"/etc/nabud.conf"
+#endif
 
-#define	VALID_ATOM(a, t)		((a) != NULL && (a)->type == (t))
+#define	VALID_ATOM(a, t)	((a) != NULL && (a)->type == (t))
 
 static bool	foreground;
 
@@ -320,6 +322,10 @@ config_load(const char *path)
 	return ret;
 }
 
+#ifndef NABUD_VERSION
+#define	NABUD_VERSION		"0.5"
+#endif
+
 static const char nabud_version[] = NABUD_VERSION;
 
 static void __attribute__((__noreturn__))
@@ -338,7 +344,7 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	const char *nabud_conf = DEFAULT_NABUD_CONF;
+	const char *nabud_conf = NABUD_CONF;
 	unsigned int logopts = 0;
 	const char *logfile = NULL;
 	int ch;
@@ -348,7 +354,7 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "c:dfl:")) != -1) {
 		switch (ch) {
 		case 'c':
-			nabud_conf = DEFAULT_NABUD_CONF;
+			nabud_conf = optarg;
 			break;
 
 		case 'd':
@@ -381,6 +387,13 @@ main(int argc, char *argv[])
 	/* Initlalize logging. */
 	if (! log_init(logfile, logopts)) {
 		/* Error message already displayed. */
+		exit(EXIT_FAILURE);
+	}
+
+	/* If we're not running in the foreground, daemonize ourselves now. */
+	if (!foreground && daemon(0, 0) < 0) {
+		fprintf(stderr, "Unable to daemonize: %s\n",
+		    strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
