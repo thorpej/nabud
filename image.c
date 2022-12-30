@@ -333,6 +333,7 @@ image_cache_insert(struct image_channel *chan, struct nabu_image *newimg)
 	pthread_mutex_lock(&image_cache_lock);
 	img = image_cache_lookup_locked(chan, newimg->number);
 	if (img == NULL) {
+		image_retain(newimg);
 		LIST_INSERT_HEAD(&chan->image_cache, newimg, link);
 		image_cache_size += newimg->length;
 	}
@@ -571,6 +572,36 @@ image_channel_select(struct nabu_connection *conn, int16_t channel)
 }
 
 /*
+ * image_use --
+ *	Indicate that the connection is now using an image.  Assumes
+ *	the image has already been properly retained.
+ */
+static void
+image_use(struct nabu_connection *conn, struct nabu_image *img)
+{
+	image_done(conn, conn->last_image);
+	conn->last_image = img;
+	log_info("[%s] Using image %s from Channel %u.",
+	    conn->name, img->name, img->channel->number);
+}
+
+/*
+ * image_done --
+ *	Indicate that the connection is done with it's
+ *	cached image.
+ */
+void
+image_done(struct nabu_connection *conn, struct nabu_image *img)
+{
+	if (conn->last_image != NULL && conn->last_image == img) {
+		log_info("[%s] Done with image %s.", conn->name,
+		    img->name);
+		conn->last_image = NULL;
+		image_release(img);
+	}
+}
+
+/*
  * image_load --
  *	Load the specified segment.
  */
@@ -596,8 +627,9 @@ image_load(struct nabu_connection *conn, uint32_t image)
 
 	if ((img = image_cache_lookup(conn->channel, image)) != NULL) {
 		/* Cache hit! */
-		log_debug("[%s] Channel cache hit for image %06X: %s",
-		    conn->name, image, img->name);
+		log_debug("Channel %u cache hit for image %06X: %s",
+		    conn->channel->number, image, img->name);
+		image_use(conn, img);
 		return img;
 	}
 
@@ -618,26 +650,9 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	img = image_load_image_from_path(conn->channel, image, image_path);
 	if (img != NULL) {
 		img = image_cache_insert(conn->channel, img);
-		if (conn->last_image != NULL) {
-			image_release(conn->last_image);
-		}
-		conn->last_image = img;
+		image_use(conn, img);
 		return img;
 	}
 
 	return NULL;
-}
-
-/*
- * image_done --
- *	Indicate that the connection is done with it's
- *	cached image.
- */
-void
-image_done(struct nabu_connection *conn, struct nabu_image *img)
-{
-	if (conn->last_image != NULL && conn->last_image == img) {
-		conn->last_image = NULL;
-		image_release(img);
-	}
 }
