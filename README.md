@@ -178,7 +178,7 @@ what spurred the recent interest in these machines.
 * DJ Sures (his YouTube channel [here](https://www.youtube.com/@DJSures)) who has some family history
 with the NABU and did a bunch of reverse engineering on the Adaptor protocol and has led the charge
 on the NabuRetroNet.
-* Leo Binkowski (his YouTube channel [here](https://www.youtube.com/@leo.binkowski), a former NABU
+* Leo Binkowski (his YouTube channel [here](https://www.youtube.com/@leo.binkowski)), a former NABU
 engineer who preserved a TON of stuff when the NABU company folded.
 * The York University Computer Museum's [NABU Network Reconstruction Project](https://museum.eecs.yorku.ca/nabu),
 which has been working with these machines for many years now, and has been super gracious
