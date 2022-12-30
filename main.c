@@ -320,9 +320,12 @@ config_load(const char *path)
 	return ret;
 }
 
+static const char nabud_version[] = NABUD_VERSION;
+
 static void __attribute__((__noreturn__))
 usage(void)
 {
+	fprintf(stderr, "%s version %s\n", getprogname(), nabud_version);
 	fprintf(stderr, "usage: %s [-c conf] [-d] [-f] [-l logfile]\n",
 	    getprogname());
 	fprintf(stderr, "       -c conf    specifies the configuration file\n");
@@ -384,6 +387,9 @@ main(int argc, char *argv[])
 	/* Set up our signal state. */
 	(void) signal(SIGHUP, SIG_IGN);
 	(void) signal(SIGPIPE, SIG_IGN);
+
+	log_info("Welcome to NABU! I'm version %s of your host, %s.",
+	    nabud_version, getprogname());
 
 	/* Load our configuration */
 	config_load(nabud_conf);
