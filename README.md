@@ -127,6 +127,14 @@ And this is the file layout of my one Source location:
      .
      [ lots more .npak files ]
 
+## Building nabud
+
+Right now, nabud builds using a "BSD Makefile" that uses NetBSD's own native build system (because that's the
+platform where I'm doing all of nabud's development).  Despite the fact that NetBSD's native build system is
+superior in every possible way (_/me ducks_, but yah, actually it's kind of true), converting it to use GNU
+autotools is planned for the very near future, so stay tuned for that!  (Or, hey, if you want to contribute a
+pull request for that before I get around to it, be my guest!)
+
 ## Running nabud
 
 After building nabud, copy the example _nabud.conf_ to the selected location (default: _/etc/nabud.conf_), tailor
@@ -159,3 +167,29 @@ showing the messages you will typically see:
     Dec 30 12:07:15 the-ripe-vessel nabud[6179]: INFO: image_cache_insert: Cached pak-000001 on Channel 1; total cache size: 54336
     Dec 30 12:07:15 the-ripe-vessel nabud[6179]: INFO: image_use: [/dev/tty-uftdi-A10MHWD6-0] Using image pak-000001 from Channel 1.
     Dec 30 12:07:22 the-ripe-vessel nabud[6179]: INFO: image_done: [/dev/tty-uftdi-A10MHWD6-0] Done with image pak-000001.
+
+## Acknowledgements
+
+First off, I want to acknowledge the folks nominally responsible for this NABU "Great Awakening":
+* Adrian Black and his [Adrian's Digital Basement](https://www.youtube.com/@adriansdigitalbasement)
+YouTube channel. I'm a Patreon patron of this channel and the early-access to Adrian's NABU video
+is how I first learned of these cool machines.  I think it's fair to say that Adrian's video is
+what spurred the recent interest in these machines.
+* DJ Sures (his YouTube channel [here](https://www.youtube.com/@DJSures)) who has some family history
+with the NABU and did a bunch of reverse engineering on the Adaptor protocol and has led the charge
+on the NabuRetroNet.
+* Leo Binkowski (his YouTube channel [here](https://www.youtube.com/@leo.binkowski), a former NABU
+engineer who preserved a TON of stuff when the NABU company folded.
+* The York University Computer Museum's [NABU Network Reconstruction Project](https://museum.eecs.yorku.ca/nabu),
+which has been working with these machines for many years now, and has been super gracious
+even while being bombarded with requests for information.
+
+I also want to acknowledge some people whose code I have borrowed or used as a reference for this project:
+* Nick Daniels' [NabuNetworkEmulator](https://github.com/GryBsh/NabuNetworkEmulator) served as a reference
+for the NABU Adaptor protocol.  The _nabu_proto.h_ file was derived directly from his work, and the file
+_adaptor.c_ was partially derived from his work.
+* David Kuder's [nabu-tftp](https://github.com/dkgrizzly/nabu-tftp) gateway for the Raspberry Pi PICO
+also served to clarify some bits of the Adaptor protocol.
+* Alistair Crooks' "Minimal JSON" (_mj.c_, _mj.h_, and _mj_defs.h_) was used to build the configuraiton file parser.
+* [The NetBSD Project](https://www.netbsd.org) is where the file _nbsd_queue.h_ comes from (_<sys/queue.h>_ from BSD
+is one of the handiest system header files in existence and I wish it were available everywhere).
