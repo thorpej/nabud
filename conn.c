@@ -308,7 +308,7 @@ void
 conn_destroy(struct nabu_connection *conn)
 {
 	conn_remove(conn);
-	image_done(conn);
+	image_done(conn, conn->last_image);
 
 	/* close the writer first because SIGPIPE is super annoying. */
 	if (conn->cancel_fds[1] != -1) {
