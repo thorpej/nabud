@@ -471,6 +471,7 @@ image_channel_select(struct nabu_connection *conn, int16_t channel)
 
 	log_info("[%s] Selected channel %u (%s on %s).",
 	    conn->name, chan->number, chan->name, chan->source->name);
+	conn->channel = chan;
 }
 
 /*
