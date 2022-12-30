@@ -42,7 +42,6 @@ struct image_source {
 	image_source_type type;
 	char		*name;
 	char		*root;
-	TAILQ_HEAD(, image_channel) channels;
 };
 
 typedef enum {
@@ -71,9 +70,8 @@ struct nabu_image {
 
 struct nabu_connection;
 
-struct image_source *image_add_local_source(char *, char *);
-void	image_source_add_channel(struct image_source *, char *,
-	    image_channel_type, unsigned int);
+void	image_add_local_source(char *, char *);
+void	image_add_channel(image_channel_type, char *, char *, unsigned int);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);

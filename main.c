@@ -66,153 +66,152 @@ connection_thread(void *arg)
 }
 
 static void
-config_load_channel(struct image_source *imgsrc, mj_t *atom,
-    unsigned int number)
+config_error(const char *preamble, mj_t *atom)
 {
-	mj_t *name_atom, *type_atom;
-	char *name = NULL, *type = NULL;
+	char *atom_str;
+
+	mj_asprint(&atom_str, atom, MJ_HUMAN);
+	log_error("%s:\n%s", preamble, atom_str);
+	free(atom_str);
+}
+
+static void
+config_load_channel(mj_t *atom)
+{
+	mj_t *name_atom, *number_atom, *type_atom, *source_atom;
+	char *name = NULL, *number = NULL, *type = NULL, *source = NULL;
 	image_channel_type ictype;
+	long val;
 
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
-		log_error("Invalid Chanel %u in Source %s.", number,
-		    imgsrc->name);
-		goto out;
-	}
-	name_atom = mj_get_atom(atom, "Name");
-	if (! VALID_ATOM(name_atom, MJ_STRING)) {
-		log_error("Invalid or missing Name for Channel %u "
-		    "in Source %s.", number, imgsrc->name);
-		goto out;
-	}
-	type_atom = mj_get_atom(atom, "Type");
-	if (! VALID_ATOM(type_atom, MJ_STRING)) {
-		log_error("Invalid or missing Type for Channel %u "
-		    "in Source %s.", number, imgsrc->name);
+		config_error("Invalid Channel object", atom);
 		goto out;
 	}
 
+	name_atom = mj_get_atom(atom, "Name");
+	if (! VALID_ATOM(name_atom, MJ_STRING)) {
+		config_error("Invalid or missing Name in Channel object",
+		    atom);
+		goto out;
+	}
+	mj_asprint(&name, name_atom, MJ_HUMAN);
+
+	number_atom = mj_get_atom(atom, "Number");
+	if (! VALID_ATOM(number_atom, MJ_NUMBER)) {
+		config_error("Invalid or missing Number in Channel object",
+		    atom);
+		goto out;
+	}
+	mj_asprint(&number, number_atom, MJ_HUMAN);
+	val = strtol(number, NULL, 10);
+	if (val < 1 || val > 255) {
+		config_error("Channel Number must be between 1 and 255",
+		    atom);
+		goto out;
+	}
+
+	type_atom = mj_get_atom(atom, "Type");
+	if (! VALID_ATOM(type_atom, MJ_STRING)) {
+		config_error("Invalid or missing Type in Channel object",
+		    atom);
+		goto out;
+	}
 	mj_asprint(&type, type_atom, MJ_HUMAN);
 	if (strcasecmp(type, "pak") == 0) {
 		ictype = IMAGE_CHANNEL_PAK;
 	} else if (strcasecmp(type, "nabu") == 0) {
 		ictype = IMAGE_CHANNEL_NABU;
 	} else {
-		ictype = IMAGE_CHANNEL_INVALID;
-	}
-
-	mj_asprint(&name, name_atom, MJ_HUMAN);
-
-	switch (ictype) {
-	case IMAGE_CHANNEL_PAK:
-	case IMAGE_CHANNEL_NABU:
-		image_source_add_channel(imgsrc, name, ictype, number);
-		/* channel now owns these. */
-		name = NULL;
-		break;
-
-	default:
-		log_error("Invalid Type '%s' for Channel %u in Source %s.",
-		    type, number, imgsrc->name);
+		config_error("Channel Type must be pak or nabu", atom);
 		goto out;
 	}
+
+	source_atom = mj_get_atom(atom, "Source");
+	if (! VALID_ATOM(source_atom, MJ_STRING)) {
+		config_error("Invalid or missing Source in Channel object",
+		    atom);
+	}
+	mj_asprint(&source, source_atom, MJ_HUMAN);
+
+	image_add_channel(ictype, name, source, val);
+	/* image_add_channel() owns these */
+	name = source = NULL;
 
  out:
 	if (name != NULL) {
 		free(name);
 	}
+	if (number != NULL) {
+		free(number);
+	}
 	if (type != NULL) {
 		free(type);
+	}
+	if (source != NULL) {
+		free(source);
 	}
 }
 
 static void
-config_load_source(mj_t *atom, unsigned int number)
+config_load_source(mj_t *atom)
 {
-	mj_t *name_atom, *path_atom, *type_atom, *channels_atom;
-	char *name = NULL, *path = NULL, *type = NULL;
-	image_source_type istype;
-	struct image_source *imgsrc;
-	int i;
+	mj_t *name_atom, *loc_atom, *type_atom;
+	char *name = NULL, *loc = NULL, *type = NULL;
 
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
-		log_error("Invalid Source %d.", number);
+		config_error("Invalid Source object", atom);
 		goto out;
 	}
+
 	name_atom = mj_get_atom(atom, "Name");
 	if (! VALID_ATOM(name_atom, MJ_STRING)) {
-		log_error("Invalid or missing Name for Source %d.", number);
+		config_error("Invalid or missing Name in Source object",
+		    atom);
 		goto out;
 	}
-	type_atom = mj_get_atom(atom, "Type");
-	if (! VALID_ATOM(type_atom, MJ_STRING)) {
-		log_error("Invalid or missing Type for Source %d.", number);
-		goto out;
-	}
-	channels_atom = mj_get_atom(atom, "Channels");
-	if (! VALID_ATOM(channels_atom, MJ_ARRAY)) {
-		log_error("Invalid or missing Channels for Source %d.", number);
-		goto out;
-	}
-	if (mj_arraycount(channels_atom) < 1) {
-		log_error("No channels in Channels stanza for Source %d.",
-		    number);
-		goto out;
-	}
-
-	mj_asprint(&type, type_atom, MJ_HUMAN);
-	if (strcasecmp(type, "local") == 0) {
-		istype = IMAGE_SOURCE_LOCAL;
-	} else {
-		istype = IMAGE_SOURCE_INVALID;
-	}
-
 	mj_asprint(&name, name_atom, MJ_HUMAN);
 
-	switch (istype) {
-	case IMAGE_SOURCE_LOCAL:
-		path_atom = mj_get_atom(atom, "Path");
-		if (! VALID_ATOM(path_atom, MJ_STRING)) {
-			log_error("Invalid or missing Path for Source %d.",
-			    number);
-			goto out;
-		}
-		mj_asprint(&path, path_atom, MJ_HUMAN);
-		imgsrc = image_add_local_source(name, path);
-		if (imgsrc == NULL) {
-			/* Error already logged. */
-			goto out;
-		}
-		/* imgsrc now owns these. */
-		name = path = NULL;
-		break;
-
-	default:
-		log_error("Invalid Type '%s' for Source %d.", type, number);
+	type_atom = mj_get_atom(atom, "Type");
+	if (! VALID_ATOM(type_atom, MJ_STRING)) {
+		config_error("Invalid or missing Type in Source object",
+		    atom);
 		goto out;
 	}
+	mj_asprint(&type, type_atom, MJ_HUMAN);
 
-	for (i = 0; i < mj_arraycount(channels_atom); i++) {
-		config_load_channel(imgsrc, mj_get_atom(channels_atom, i),
-		    i + 1);
+	if (strcasecmp(type, "local") == 0) {
+		loc_atom = mj_get_atom(atom, "Path");
+		if (! VALID_ATOM(loc_atom, MJ_STRING)) {
+			config_error("Invalid or missing Path in Source object",
+			    atom);
+			goto out;
+		}
+		mj_asprint(&loc, loc_atom, MJ_HUMAN);
+		image_add_local_source(name, loc);
+		/* image_add_local_source() owns these. */
+		name = loc = NULL;
+	} else {
+		config_error("Source Type must be Local", atom);
+		goto out;
 	}
 
  out:
-	if (type != NULL) {
-		free(type);
-	}
 	if (name != NULL) {
 		free(name);
 	}
-	if (path != NULL) {
-		free(path);
+	if (loc != NULL) {
+		free(loc);
+	}
+	if (type != NULL) {
+		free(type);
 	}
 }
 
 static void
-config_load_adaptor(mj_t *atom, unsigned int number)
+config_load_connection(mj_t *atom)
 {
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
-		log_error("Invalid Adaptor %d.", number);
+		config_error("Invalid Connection object.", atom);
 		goto out;
 	}
  out:
@@ -222,7 +221,7 @@ config_load_adaptor(mj_t *atom, unsigned int number)
 static bool
 config_load(const char *path)
 {
-	mj_t root_atom, *sources_atom, *adaptors_atom;
+	mj_t root_atom, *sources_atom, *channels_atom, *connections_atom;
 	int from, to, tok, i;
 	uint8_t *file_data;
 	size_t file_size;
@@ -252,29 +251,33 @@ config_load(const char *path)
 		goto out;
 	}
 
-	/* Find the Adaptors array. */
-	adaptors_atom = mj_get_atom(&root_atom, "Adaptors");
-	if (!VALID_ATOM(adaptors_atom, MJ_ARRAY)) {
-		log_error("Missing or invalid Adaptors stanza.");
+	/* Find the Channels array. */
+	channels_atom = mj_get_atom(&root_atom, "Channels");
+	if (!VALID_ATOM(channels_atom, MJ_ARRAY)) {
+		log_error("Missing or invalid Channels stanza.");
 		goto out;
 	}
 
-	/* Load up the sources and channels. */
-	if (mj_arraycount(sources_atom) < 1) {
-		log_error("No sources in Sources stanza.");
+	/* Find the Connections array. */
+	connections_atom = mj_get_atom(&root_atom, "Connections");
+	if (!VALID_ATOM(connections_atom, MJ_ARRAY)) {
+		log_error("Missing or invalid Connections stanza.");
 		goto out;
-	}
-	for (i = 0; i < mj_arraycount(sources_atom); i++) {
-		config_load_source(mj_get_atom(sources_atom, i), i);
 	}
 
-	/* Now load up the adaptors. */
-	if (mj_arraycount(adaptors_atom) < 1) {
-		log_error("No adaptors in Adaptors stanza.");
-		goto out;
-	}
+	/* Load up the sources. */
 	for (i = 0; i < mj_arraycount(sources_atom); i++) {
-		config_load_adaptor(mj_get_atom(sources_atom, i), i);
+		config_load_source(mj_get_atom(sources_atom, i));
+	}
+
+	/* Load up the channels. */
+	for (i = 0; i < mj_arraycount(channels_atom); i++) {
+		config_load_channel(mj_get_atom(channels_atom, i));
+	}
+
+	/* Load up the connections. */
+	for (i = 0; i < mj_arraycount(connections_atom); i++) {
+		config_load_connection(mj_get_atom(connections_atom, i));
 	}
 
  out:

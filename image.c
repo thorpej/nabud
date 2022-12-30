@@ -53,30 +53,62 @@
 #include "log.h"
 
 static LIST_HEAD(, image_source) image_sources =
-    LIST_HEAD_INITIALIZER(&image_sources);
+    LIST_HEAD_INITIALIZER(image_sources);
 unsigned int image_source_count;
 
+static TAILQ_HEAD(, image_channel) image_channels =
+    TAILQ_HEAD_INITIALIZER(image_channels);
+unsigned int image_channel_count;
+
+/*
+ * image_source_lookup --
+ *	Look up an image source by name.
+ */
+static struct image_source *
+image_source_lookup(const char *name)
+{
+	struct image_source *imgsrc;
+
+	LIST_FOREACH(imgsrc, &image_sources, link) {
+		if (strcmp(imgsrc->name, name) == 0) {
+			return imgsrc;
+		}
+	}
+	return NULL;
+}
+
+/*
+ * image_source_alloc --
+ *	Allocate a new image source.
+ */
 static struct image_source *
 image_source_alloc(char *name, image_source_type type)
 {
+	if (image_source_lookup(name) != NULL) {
+		log_error("Image source %s alreadty exists.", name);
+		goto bad;
+	}
+
 	struct image_source *imgsrc = calloc(1, sizeof(*imgsrc));
 	if (imgsrc != NULL) {
-		TAILQ_INIT(&imgsrc->channels);
 		imgsrc->name = name;
 		imgsrc->type = type;
 	} else {
 		log_error("Unable to allocate image source descriptor for %s",
 		    name);
-		free(name);
+		goto bad;
 	}
 	return imgsrc;
+ bad:
+	free(name);
+	return NULL;
 }
 
 /*
  * image_add_local_source --
  *	Add a local image source.
  */
-struct image_source *
+void
 image_add_local_source(char *name, char *path)
 {
 	struct image_source *imgsrc =
@@ -88,43 +120,83 @@ image_add_local_source(char *name, char *path)
 		log_info("Adding Local source %s at %s",
 		    imgsrc->name, imgsrc->root);
 	} else {
+		/* Error already logged. */
 		free(path);
 	}
-
-	return imgsrc;
 }
 
 /*
- * image_source_add_channel --
- *	Add a channel to an image source.
+ * image_channel_lookup --
+ *	Look up an image channel by number.
  */
-void
-image_source_add_channel(struct image_source *imgsrc, char *name,
-    image_channel_type type, unsigned int number)
+static struct image_channel *
+image_channel_lookup(unsigned int number)
 {
-	struct image_channel *chan = calloc(1, sizeof(*chan));
-	size_t pathlen = strlen(name) + strlen(imgsrc->root) + 2; /* / + NUL */
-	char *pathstr = malloc(pathlen);
-	if (pathstr != NULL) {
-		snprintf(pathstr, pathlen, "%s/%s", imgsrc->root, name);
-	}
+	struct image_channel *chan;
 
-	if (pathstr != NULL && chan != NULL) {
-		chan->source = imgsrc;
-		chan->type = type;
-		chan->name = name;
-		chan->path = pathstr;
-		chan->number = number;
-		TAILQ_INSERT_TAIL(&imgsrc->channels, chan, link);
-		log_info("Adding %s channel %s for source %s at %s",
-		    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu",
-		    chan->name, chan->source->name, chan->path);
-	} else {
-		free(name);
-		if (pathstr != NULL) {
-			free(pathstr);
+	TAILQ_FOREACH(chan, &image_channels, link) {
+		if (chan->number == number) {
+			return chan;
 		}
 	}
+	return NULL;
+}
+
+/*
+ * image_add_channel --
+ *	Add a channel.
+ */
+void
+image_add_channel(image_channel_type type, char *name, char *source,
+    unsigned int number)
+{
+	struct image_channel *chan = NULL;
+	size_t pathlen;
+	char *pathstr = NULL;
+
+	struct image_source *imgsrc = image_source_lookup(source);
+	if (imgsrc == NULL) {
+		log_error("Unknown image source: %s", source);
+		goto bad;
+	}
+
+	if ((chan = image_channel_lookup(number)) != NULL) {
+		log_error("Channel %u already exists (%s on %s).",
+		    number, chan->name, chan->source->name);
+		chan = NULL;
+		goto bad;
+	}
+
+	pathlen = strlen(name) + strlen(imgsrc->root) + 2; /* / + NUL */
+	chan = calloc(1, sizeof(*chan));
+	pathstr = malloc(pathlen);
+	if (chan == NULL || pathstr == NULL) {
+		log_error("Unable to allocate descriptor for channel %u.",
+		    number);
+		goto bad;
+	}
+	snprintf(pathstr, pathlen, "%s/%s", imgsrc->root, name);
+
+	chan->source = imgsrc;
+	chan->type = type;
+	chan->name = name;
+	chan->path = pathstr;
+	chan->number = number;
+	TAILQ_INSERT_TAIL(&image_channels, chan, link);
+	image_channel_count++;
+	log_info("Adding %s channel %u (%s on %s) at %s",
+	    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu",
+	    chan->number, chan->name, chan->source->name, chan->path);
+	return;
+ bad:
+	if (chan != NULL) {
+		free(chan);
+	}
+	if (pathstr != NULL) {
+		free(pathstr);
+	}
+	free(name);
+	free(source);
 }
 
 /*
@@ -386,23 +458,19 @@ image_channel_select(struct nabu_connection *conn, int16_t channel)
 	struct image_channel *chan;
 
 	if (channel < 1 || channel > 0x100) {
-		log_info("[%s] Channel selection %d results in no channel.",
+		log_info("[%s] Invalid channel selection %d.",
 		    conn->name, channel);
-		conn->channel = NULL;
 		return;
 	}
 
-	TAILQ_FOREACH(chan, &conn->source->channels, link) {
-		if (chan->number == (unsigned int)channel) {
-			log_info("[%s] Selected channel %u (%s) "
-			    "in Source %s.\n", conn->name, chan->number,
-			    chan->name, conn->source->name);
-			conn->channel = chan;
-			return;
-		}
+	chan = image_channel_lookup((unsigned int)channel);
+	if (chan == NULL) {
+		log_info("[%s] Channel %d not found.", conn->name, channel);
+		return;
 	}
-	log_info("[%s] Channel %d not found in Source %s.\n", conn->name,
-	    channel, conn->source->name);
+
+	log_info("[%s] Selected channel %u (%s on %s).",
+	    conn->name, chan->number, chan->name, chan->source->name);
 }
 
 /*

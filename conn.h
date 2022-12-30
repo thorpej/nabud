@@ -67,7 +67,6 @@ struct nabu_connection {
 	bool		aborted;
 
 	/* Selected channel. */
-	struct image_source *source;
 	struct image_channel *channel;
 
 	/*
