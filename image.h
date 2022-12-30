@@ -30,7 +30,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "util/nbsd_queue.h"
+#include "nbsd_queue.h"
 
 typedef enum {
 	IMAGE_SOURCE_INVALID	=	0,

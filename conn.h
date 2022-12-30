@@ -31,7 +31,7 @@
 #include <stdint.h>
 
 #include "nabu_proto.h"
-#include "util/nbsd_queue.h"
+#include "nbsd_queue.h"
 
 typedef enum {
 	CONN_TYPE_INVALID	=	0,
