@@ -351,6 +351,11 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (argc != 0) {
+		usage();
+		/* NOTREACHED */
+	}
+
 	/* Set up our signal state. */
 	(void) signal(SIGHUP, SIG_IGN);
 	(void) signal(SIGPIPE, SIG_IGN);
