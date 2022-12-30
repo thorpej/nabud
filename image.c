@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -59,6 +60,17 @@ unsigned int image_source_count;
 static TAILQ_HEAD(, image_channel) image_channels =
     TAILQ_HEAD_INITIALIZER(image_channels);
 unsigned int image_channel_count;
+
+/*
+ * image_retain --
+ *	Retain (increment the refcnt) on the specified image.
+ */
+static void
+image_retain(struct nabu_image *img)
+{
+	img->refcnt++;
+	assert(img->refcnt != 0);
+}
 
 /*
  * image_release --
@@ -266,6 +278,75 @@ image_load_file(const char *path, size_t *filesizep, size_t extra)
 		filebuf = NULL;
 	}
 	goto out;
+}
+
+static pthread_mutex_t image_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+static size_t image_cache_size;
+
+/*
+ * image_cache_lookup_locked --
+ *	Look up an image in the channel's image cache.  This is
+ *	used by image_cache_lookup() and image_cache_insert().
+ */
+static struct nabu_image *
+image_cache_lookup_locked(struct image_channel *chan, uint32_t image)
+{
+	struct nabu_image *img;
+
+	LIST_FOREACH(img, &chan->image_cache, link) {
+		if (img->number == image) {
+			image_retain(img);
+			return img;
+		}
+	}
+	return NULL;
+}
+
+/*
+ * image_cache_lookup --
+ *	Look up an image in the channel's image cache.
+ */
+static struct nabu_image *
+image_cache_lookup(struct image_channel *chan, uint32_t image)
+{
+	struct nabu_image *img;
+
+	pthread_mutex_lock(&image_cache_lock);
+	img = image_cache_lookup_locked(chan, image);
+	pthread_mutex_unlock(&image_cache_lock);
+
+	return img;
+}
+
+/*
+ * image_cache_insert --
+ *	Insert an image into the image cache.  If the image
+ *	already exists, we release the new one and return
+ *	the one from the cache.
+ */
+static struct nabu_image *
+image_cache_insert(struct image_channel *chan, struct nabu_image *newimg)
+{
+	struct nabu_image *img;
+	size_t size;
+
+	pthread_mutex_lock(&image_cache_lock);
+	img = image_cache_lookup_locked(chan, newimg->number);
+	if (img == NULL) {
+		LIST_INSERT_HEAD(&chan->image_cache, newimg, link);
+		image_cache_size += newimg->length;
+	}
+	size = image_cache_size;
+	pthread_mutex_unlock(&image_cache_lock);
+
+	if (img == NULL) {
+		log_info("Cached %s on Channel %u; "
+		    "total cache size: %zu", newimg->name, chan->number, size);
+		return newimg;
+	}
+
+	image_release(newimg);
+	return img;
 }
 
 /*
@@ -513,6 +594,13 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		return NULL;
 	}
 
+	if ((img = image_cache_lookup(conn->channel, image)) != NULL) {
+		/* Cache hit! */
+		log_debug("[%s] Channel cache hit for image %06X: %s",
+		    conn->name, image, img->name);
+		return img;
+	}
+
 	if (conn->channel->type == IMAGE_CHANNEL_PAK) {
 		fname = image_pak_name(image);
 		imgtype = "pak";
@@ -529,6 +617,7 @@ image_load(struct nabu_connection *conn, uint32_t image)
 
 	img = image_load_image_from_path(conn->channel, image, image_path);
 	if (img != NULL) {
+		img = image_cache_insert(conn->channel, img);
 		if (conn->last_image != NULL) {
 			image_release(conn->last_image);
 		}

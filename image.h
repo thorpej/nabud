@@ -57,10 +57,12 @@ struct image_channel {
 	char		*name;
 	char		*path;
 	unsigned int	number;
+	LIST_HEAD(, nabu_image) image_cache;
 };
 
 struct nabu_image {
 	struct image_channel *channel;
+	LIST_ENTRY(nabu_image) link;
 	char		*name;
 	uint8_t		*data;
 	size_t		length;
