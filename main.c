@@ -46,6 +46,8 @@
 
 #define	VALID_ATOM(a, t)		((a) != NULL && (a)->type == (t))
 
+static bool	foreground;
+
 static void
 config_error(const char *preamble, mj_t *atom)
 {
@@ -321,7 +323,12 @@ config_load(const char *path)
 static void __attribute__((__noreturn__))
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-c conf] [-d]\n", getprogname());
+	fprintf(stderr, "usage: %s [-c conf] [-d] [-f] [-l logfile]\n",
+	    getprogname());
+	fprintf(stderr, "       -c conf    specifies the configuration file\n");
+	fprintf(stderr, "       -d         enable debugging (implies -f)\n");
+	fprintf(stderr, "       -f         run in the foreground\n");
+	fprintf(stderr, "       -l logfile specifies the log file\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -329,18 +336,30 @@ int
 main(int argc, char *argv[])
 {
 	const char *nabud_conf = DEFAULT_NABUD_CONF;
+	unsigned int logopts = 0;
+	const char *logfile = NULL;
 	int ch;
 
 	setprogname(argv[0]);
 
-	while ((ch = getopt(argc, argv, "c:d")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dfl:")) != -1) {
 		switch (ch) {
 		case 'c':
 			nabud_conf = DEFAULT_NABUD_CONF;
 			break;
 
 		case 'd':
-			debug = true;
+			/* debug implies foreground */
+			logopts |= LOG_OPT_DEBUG | LOG_OPT_FOREGROUND;
+			break;
+
+		case 'f':
+			logopts |= LOG_OPT_FOREGROUND;
+			foreground = true;
+			break;
+
+		case 'l':
+			logfile = optarg;
 			break;
 
 		default:
@@ -354,6 +373,12 @@ main(int argc, char *argv[])
 	if (argc != 0) {
 		usage();
 		/* NOTREACHED */
+	}
+
+	/* Initlalize logging. */
+	if (! log_init(logfile, logopts)) {
+		/* Error message already displayed. */
+		exit(EXIT_FAILURE);
 	}
 
 	/* Set up our signal state. */
@@ -386,6 +411,8 @@ main(int argc, char *argv[])
 
 	log_info("Received signal %d, shutting down...", sig);
 	conn_shutdown();
+	log_info("Exiting. Thank you, come again!");
+	log_fini();
 
 	exit(0);
 }

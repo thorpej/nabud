@@ -36,10 +36,15 @@ typedef enum {
 	LOG_TYPE_FATAL	= 3,
 } log_type;
 
+#define	LOG_OPT_FOREGROUND	(1U << 0)
+#define	LOG_OPT_DEBUG		(1U << 1)
+
 extern bool debug;
 
+bool	log_init(const char *, unsigned int);
 void	log_message(log_type, const char *, const char *, ...)
 	    __attribute__((__format__(__printf__, 3, 4)));
+void	log_fini(void);
 
 #define	log_info(...)	log_message(LOG_TYPE_INFO, __func__, __VA_ARGS__)
 #define	log_debug(...)	log_message(LOG_TYPE_DEBUG, __func__, __VA_ARGS__)

@@ -29,13 +29,23 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <syslog.h>
 
 #include "log.h"
 
-bool		debug;
+/* XXX use syslog_r(3) if available. */
+#include <pthread.h>
+static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_once_t log_syslog_init_once = PTHREAD_ONCE_INIT;
+static bool log_using_syslog;
+
+static unsigned int log_options;
+static FILE *log_file;
 
 static const char *log_typenames[] = {
 	[LOG_TYPE_INFO]		=	"INFO",
@@ -44,8 +54,81 @@ static const char *log_typenames[] = {
 	[LOG_TYPE_FATAL]	=	"FATAL",
 };
 
+static const int log_type_to_syslog[] = {
+	[LOG_TYPE_INFO]		=	LOG_INFO,
+	[LOG_TYPE_DEBUG]	=	LOG_DEBUG,
+	[LOG_TYPE_ERROR]	=	LOG_ERR,
+	[LOG_TYPE_FATAL]	=	LOG_ERR,
+};
+
 #define	log_type_is_valid(t)	((t) >= LOG_TYPE_INFO && (t) <= LOG_TYPE_FATAL)
 
+/*
+ * log_syslog_init --
+ *	Initialize our interface to syslog.  Just once.
+ */
+static void
+log_syslog_init(void)
+{
+	pthread_mutex_lock(&log_lock);
+	openlog(getprogname(), LOG_NDELAY | LOG_PID, LOG_USER);
+	log_using_syslog = true;
+	pthread_mutex_unlock(&log_lock);
+}
+
+/*
+ * log_init --
+ *	Initialize the logging interface.
+ */
+bool
+log_init(const char *path, unsigned int options)
+{
+	log_options = options;
+
+	/* If we're in the foreground, always log to stdout. */
+	if (log_options & LOG_OPT_FOREGROUND) {
+		log_file = stdout;
+		return true;
+	}
+
+	/* If the caller specified a path, log there. */
+	if (path != NULL) {
+		FILE *fp = fopen(path, "a");
+		if (fp == NULL) {
+			fprintf(stderr, "%s: Unable to open log file %s: %s",
+			    getprogname(), path, strerror(errno));
+			return false;
+		}
+		log_file = fp;
+		return true;
+	}
+
+	/*
+	 * We will be using syslog() -- initialization will be deferred
+	 * until the first message has been sent.
+	 */
+	return true;
+}
+
+/*
+ * log_fini --
+ *	Finish using the logging interface.
+ */
+void
+log_fini(void)
+{
+	pthread_mutex_lock(&log_lock);
+	if (log_using_syslog) {
+		closelog();
+	}
+	pthread_mutex_unlock(&log_lock);
+}
+
+/*
+ * log_message --
+ *	Log a message.  This is usually invoked via the macros
+ *	for specific log message types.
+ */
 void
 log_message(log_type type, const char *func, const char *fmt, ...)
 {
@@ -54,7 +137,8 @@ log_message(log_type type, const char *func, const char *fmt, ...)
 
 	assert(log_type_is_valid(type));
 
-	if (type == LOG_TYPE_DEBUG && !debug) {
+	if (type == LOG_TYPE_DEBUG &&
+	    (log_options & LOG_OPT_DEBUG) == 0) {
 		return;
 	}
 
@@ -62,9 +146,16 @@ log_message(log_type type, const char *func, const char *fmt, ...)
 	vasprintf(&caller_string, fmt, ap);
 	va_end(ap);
 
-	/* XXX Add support for sending to syslog. */
-
-	printf("%s: %s: %s\n", log_typenames[type], func, caller_string);
+	if (log_file) {
+		fprintf(log_file, "%s: %s: %s\n", log_typenames[type],
+		    func, caller_string);
+	} else {
+		pthread_once(&log_syslog_init_once, log_syslog_init);
+		pthread_mutex_lock(&log_lock);
+		syslog(log_type_to_syslog[type], "%s: %s: %s",
+		    log_typenames[type], func, caller_string);
+		pthread_mutex_unlock(&log_lock);
+	}
 	free(caller_string);
 
 	if (type == LOG_TYPE_FATAL) {
