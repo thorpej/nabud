@@ -141,11 +141,22 @@ And this is the file layout of my one Source location:
 
 ## Building nabud
 
-Right now, nabud builds using a "BSD Makefile" that uses NetBSD's own native build system (because that's the
-platform where I'm doing all of nabud's development).  Despite the fact that NetBSD's native build system is
-superior in every possible way (_/me ducks_, but yah, actually it's kind of true), converting it to use GNU
-autotools is planned for the very near future, so stay tuned for that!  (Or, hey, if you want to contribute a
-pull request for that before I get around to it, be my guest!)
+nabud uses the GNU autotools-based build system that you're probably already familiar with, as it's used by
+many software packages.  Most people will only need to do:
+
+    % ./configure
+    % make
+    # make install
+
+nabud uses POSIX threads, which must be provided by your system.
+
+nabud also requires a cryptographic library
+to handle _pak_ files; MD5 is used to generate _pak_ file names and DES is used to decrypt them.  The following
+cryptographic libraries are currently supported:
+
+* CommonCrypto (the native API on macOS)
+* OpenSSL's _libcrypto_.  This is the native API already provided by many Unix-like systems, so it's unlikely
+that you'll have to go find and install it.
 
 ## Running nabud
 
@@ -156,7 +167,8 @@ it to your system, and then run it:
 
 nabud requires no special permissions; only the ability to open files to be served to the NABU for reading,
 and the ability to open the serial ports for reading and writing.  You can choose to run it as _root_ or as
-an unprivileged user if you set the permissions on your serial port devices properly.
+an unprivileged user if you set the permissions on your serial port devices properly.  If you're only using
+TCP functionality, it can run completely unprivileged.
 
 nabud understands the following command line options:
 * _-c conf_ -- specifies an alternate name / location for _nabud.conf_.
