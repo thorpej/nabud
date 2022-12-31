@@ -145,8 +145,8 @@ config_load_channel(mj_t *atom)
 static void
 config_load_source(mj_t *atom)
 {
-	mj_t *name_atom, *loc_atom, *type_atom;
-	char *name = NULL, *loc = NULL, *type = NULL;
+	mj_t *name_atom, *loc_atom;
+	char *name = NULL, *loc = NULL;
 
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
 		config_error("Invalid Source object", atom);
@@ -169,22 +169,9 @@ config_load_source(mj_t *atom)
 	}
 	mj_asprint(&loc, loc_atom, MJ_HUMAN);
 
-	type_atom = mj_get_atom(atom, "Type");
-	if (! VALID_ATOM(type_atom, MJ_STRING)) {
-		config_error("Invalid or missing Type in Source object",
-		    atom);
-		goto out;
-	}
-	mj_asprint(&type, type_atom, MJ_HUMAN);
-
-	if (strcasecmp(type, "local") == 0) {
-		image_add_local_source(name, loc);
-		/* image_add_local_source() owns these. */
-		name = loc = NULL;
-	} else {
-		config_error("Source Type must be Local", atom);
-		goto out;
-	}
+	image_add_source(name, loc);
+	/* image_add_source() owns these. */
+	name = loc = NULL;
 
  out:
 	if (name != NULL) {
@@ -192,9 +179,6 @@ config_load_source(mj_t *atom)
 	}
 	if (loc != NULL) {
 		free(loc);
-	}
-	if (type != NULL) {
-		free(type);
 	}
 }
 

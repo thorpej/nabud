@@ -124,11 +124,11 @@ image_source_lookup(const char *name)
 }
 
 /*
- * image_source_alloc --
- *	Allocate a new image source.
+ * image_add_source --
+ *	Add an image source.
  */
-static struct image_source *
-image_source_alloc(char *name, image_source_type type)
+void
+image_add_source(char *name, char *root)
 {
 	if (image_source_lookup(name) != NULL) {
 		log_error("Image source %s alreadty exists.", name);
@@ -138,37 +138,20 @@ image_source_alloc(char *name, image_source_type type)
 	struct image_source *imgsrc = calloc(1, sizeof(*imgsrc));
 	if (imgsrc != NULL) {
 		imgsrc->name = name;
-		imgsrc->type = type;
+		imgsrc->root = root;
+		LIST_INSERT_HEAD(&image_sources, imgsrc, link);
+		image_source_count++;
+		log_info("Adding Source %s at %s",
+		    imgsrc->name, imgsrc->root);
 	} else {
 		log_error("Unable to allocate image source descriptor for %s",
 		    name);
 		goto bad;
 	}
-	return imgsrc;
+	return;
  bad:
 	free(name);
-	return NULL;
-}
-
-/*
- * image_add_local_source --
- *	Add a local image source.
- */
-void
-image_add_local_source(char *name, char *path)
-{
-	struct image_source *imgsrc =
-	    image_source_alloc(name, IMAGE_SOURCE_LOCAL);
-	if (imgsrc != NULL) {
-		imgsrc->root = path;
-		LIST_INSERT_HEAD(&image_sources, imgsrc, link);
-		image_source_count++;
-		log_info("Adding Local source %s at %s",
-		    imgsrc->name, imgsrc->root);
-	} else {
-		/* Error already logged. */
-		free(path);
-	}
+	free(root);
 }
 
 /*
