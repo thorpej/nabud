@@ -39,10 +39,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netdb.h>
 
 #include "adaptor.h"
 #include "conn.h"
@@ -143,12 +148,10 @@ conn_thread(void *arg)
 	adaptor_event_loop(conn);
 
 	/*
-	 * If the connection was cancelled, go ahead and destroy it
-	 * now.
+	 * If we got there, the connection was cancelled or aborted,
+	 * so so ahead and destroy it now.
 	 */
-	if (conn->cancelled) {
-		conn_destroy(conn);
-	}
+	conn_destroy(conn);
 
 	return NULL;
 }
@@ -158,7 +161,8 @@ conn_thread(void *arg)
  *	Common connection-creation duties.
  */
 static void
-conn_create_common(const char *name, int fd, unsigned int channel)
+conn_create_common(const char *name, int fd, unsigned int channel,
+    void *(*func)(void *))
 {
 	struct nabu_connection *conn;
 	pthread_attr_t attr;
@@ -214,7 +218,7 @@ conn_create_common(const char *name, int fd, unsigned int channel)
 	 */
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	error = pthread_create(&conn->thread, &attr, conn_thread, conn);
+	error = pthread_create(&conn->thread, &attr, func, conn);
 	if (error) {
 		log_error("pthread_create() for %s failed: %s",
 		    name, strerror(error));
@@ -294,10 +298,161 @@ conn_add_serial(char *path, unsigned int channel)
 		}
 	}
 
-	conn_create_common(path, fd, channel);
+	conn_create_common(path, fd, channel, conn_thread);
  	return;
  bad:
 	close(fd);
+}
+
+static bool	conn_io_wait(struct nabu_connection *conn,
+		    const struct timespec *deadline, bool is_recv);
+
+/*
+ * conn_tcp_thread --
+ *	Worker thread that handles accepting TCP connections from
+ *	NABU emulators (like MAME).
+ */
+static void *
+conn_tcp_thread(void *arg)
+{
+	struct nabu_connection *conn = arg;
+	char host[NI_MAXHOST];
+	struct sockaddr_storage peerss;
+	socklen_t peersslen;
+	int sock, v;
+
+	/* Never a deadline for these. */
+	struct timespec deadline = { 0, 0 };
+
+	for (;;) {
+		if (! conn_io_wait(conn, &deadline, true)) {
+			/* Error already logged. */
+			break;
+		}
+		peersslen = sizeof(peerss);
+		sock = accept(conn->fd, (struct sockaddr *)&peerss, &peersslen);
+		if (sock < 0) {
+			if (errno != EAGAIN) {
+				log_error("[%s] accept() failed: %s",
+				    conn->name, strerror(errno));
+				conn->aborted = true;
+				break;
+			}
+			continue;
+		}
+
+		/* Disable Nagle. */
+		v = 1;
+		setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &v, sizeof(v));
+
+		/* Get the numeric peer name string. */
+		v = getnameinfo((struct sockaddr *)&peerss,
+		    peersslen, host, sizeof(host), NULL, 0,
+		    NI_NUMERICHOST);
+		if (v) {
+			log_error("[%s] getnameinfo() failed: %s",
+			    conn->name, gai_strerror(v));
+			close(sock);
+			continue;
+		}
+
+		log_info("[%s] Creating TCP connection for %s.",
+		    conn->name, host);
+
+		conn_create_common(host, sock, conn->channel->number,
+		    conn_thread);
+	}
+
+	/* Error on the listen socket -- He's dead, Jim. */
+	conn_destroy(conn);
+
+	return NULL;
+}
+
+/*
+ * conn_add_tcp --
+ *	Add a TCP listener.  This creates a "connection" that simply
+ *	listens for incoming connections from the network and in-turn
+ *	creates new connections to service them.
+ */
+void
+conn_add_tcp(char *portstr, unsigned int channel)
+{
+	int sock;
+	long port;
+	char name[sizeof("IPv4-65536")];
+
+	log_info("Creating TCP listener on port %s.", portstr);
+
+	port = strtol(portstr, NULL, 10);
+	if (port < 1 || port > UINT16_MAX) {
+		log_error("Invalid TCP port number: %s", portstr);
+		return;
+	}
+
+	struct sockaddr_in sin = {
+		.sin_len = sizeof(sin),
+		.sin_family = AF_INET,
+		.sin_port = htons((in_port_t)port),
+		.sin_addr = { .s_addr = htonl(INADDR_ANY) },
+	};
+
+	snprintf(name, sizeof(name), "IPv4-%ld", port);
+	sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sock >= 0) {
+		if (bind(sock, (struct sockaddr *)&sin, sizeof(sin)) == 0) {
+			if (listen(sock, 8) == 0) {
+				conn_create_common(name, sock, channel,
+				    conn_tcp_thread);
+				sock = -1;
+			} else {
+				log_error("Unable to listen on IPv4 socket: %s",
+				    strerror(errno));
+			}
+		} else {
+			log_error("Unable to bind IPv4 socket: %s",
+			    strerror(errno));
+		}
+	} else {
+		log_error("Unable to create IPv4 socket: %s",
+		    strerror(errno));
+	}
+	if (sock >= 0) {
+		close(sock);
+	}
+
+#ifdef PF_INET6
+	struct sockaddr_in6 sin6 = {
+		.sin6_len = sizeof(sin6),
+		.sin6_family = AF_INET6,
+		.sin6_port = htons((in_port_t)port),
+		.sin6_addr = IN6ADDR_ANY_INIT,
+	};
+
+	snprintf(name, sizeof(name), "IPv6-%ld", port);
+	sock = socket(PF_INET6, SOCK_STREAM, IPPROTO_TCP);
+	if (sock >= 0) {
+		if (bind(sock, (struct sockaddr *)&sin6, sizeof(sin6)) == 0) {
+			if (listen(sock, 8) == 0) {
+				conn_create_common(name, sock, channel,
+				    conn_tcp_thread);
+				sock = -1;
+			} else {
+				log_error("Unable to listen on IPv6 socket: %s",
+				    strerror(errno));
+			}
+		} else {
+			log_error("Unable to bind IPv6 socket: %s",
+			    strerror(errno));
+		}
+	} else {
+		log_error("Unable to create IPv6 socket: %s",
+		    strerror(errno));
+	}
+	if (sock >= 0) {
+		close(sock);
+	}
+#endif /* PF_INET6 */
 }
 
 /*
@@ -512,13 +667,16 @@ conn_send(struct nabu_connection *conn, const uint8_t *buf, size_t len)
 			conn->aborted = true;
 			return;
 		}
+		if (actual == 0) {
+			log_info("[%s] Got End-of-File", conn->name);
+			conn->aborted = true;
+			return;
+		}
 
-		if (actual > 0) {
-			resid -= actual;
-			curptr += actual;
-			if (resid == 0) {
-				return;
-			}
+		resid -= actual;
+		curptr += actual;
+		if (resid == 0) {
+			return;
 		}
 
 		/* Wait for the connection to accept writes again. */
@@ -570,13 +728,16 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 			conn->aborted = true;
 			return false;
 		}
+		if (actual == 0) {
+			log_info("[%s] Got End-of-File", conn->name);
+			conn->aborted = true;
+			return false;
+		}
 
-		if (actual > 0) {
-			resid -= actual;
-			curptr += actual;
-			if (resid == 0) {
-				return true;
-			}
+		resid -= actual;
+		curptr += actual;
+		if (resid == 0) {
+			return true;
 		}
 
 		/* Wait for the connection to be ready for reads again. */

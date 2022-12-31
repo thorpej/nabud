@@ -237,10 +237,14 @@ config_load_connection(mj_t *atom)
 
 	if (strcasecmp(type, "serial") == 0) {
 		conn_add_serial(port, val);
-		/* conn_create_serial() owns these. */
+		/* conn_add_serial() owns these. */
+		port = NULL;
+	} else if (strcasecmp(type, "tcp") == 0) {
+		conn_add_tcp(port, val);
+		/* conn_add_tcp() owns these. */
 		port = NULL;
 	} else {
-		config_error("Connection Type must be Serial", atom);
+		config_error("Connection Type must be Serial or TCP", atom);
 		goto out;
 	}
 
@@ -360,8 +364,8 @@ main(int argc, char *argv[])
 
 		case 'd':
 			/* debug implies foreground */
-			logopts |= LOG_OPT_DEBUG | LOG_OPT_FOREGROUND;
-			break;
+			logopts |= LOG_OPT_DEBUG;
+			/* FALLTHROUGH */
 
 		case 'f':
 			logopts |= LOG_OPT_FOREGROUND;
