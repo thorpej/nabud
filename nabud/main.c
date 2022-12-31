@@ -269,13 +269,38 @@ config_load(const char *path)
 {
 	mj_t root_atom, *sources_atom, *channels_atom, *connections_atom;
 	int from, to, tok, i;
-	uint8_t *file_data;
-	size_t file_size;
+	uint8_t *file_data = NULL;
+	long file_size;
+	FILE *fp;
 	bool ret = false;
 
-	file_data = image_load_file(path, &file_size, 1);
+	if ((fp = fopen(path, "r")) == NULL) {
+		log_error("Unable to open configuration file: %s",
+		    strerror(errno));
+		return false;
+	}
+	if (fseek(fp, 0, SEEK_END) < 0 ||
+	    (file_size = ftell(fp)) < 0 ||
+	    fseek(fp, 0, SEEK_SET) < 0) {
+		log_error("Unable to get size of configuration file: %s",
+		    strerror(errno));
+		goto read_fail;
+	}
+	file_data = calloc(1, file_size + 1);
 	if (file_data == NULL) {
-		log_error("Unable to load configuration file.");
+		log_error("Unable to allocate %ld bytes for "
+		    "configuration file.", file_size + 1);
+		goto read_fail;
+	}
+	if (fread(file_data, file_size, 1, fp) != 1) {
+		log_error("Unable to read configuration file: %s",
+		    strerror(errno));
+		free(file_data);
+		file_data = NULL;
+	}
+ read_fail:
+	fclose(fp);
+	if (file_data == NULL) {
 		return false;
 	}
 
