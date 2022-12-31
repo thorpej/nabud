@@ -162,7 +162,7 @@ nabud understands the following command line options:
 * _-c conf_ -- specifies an alternate name / location for _nabud.conf_.
 * _-d_ -- enables debugging.  This option also implies _-f_.
 * _-f_ -- run in the foreground.  Without this, nabud will detach from the controlling terminal and run as a daemon.
-* _-l_ -- specifies the path to a log file.  Without this option, nabud will log to the system log using _syslog(3)_
+* _-l logfile_ -- specifies the path to a log file.  Without this option, nabud will log to the system log using _syslog(3)_
 using the _LOG_USER_ facility.  Note that when running in the foreground, log messages are always sent to the
 controlling terminal.
 
