@@ -80,6 +80,7 @@ AX_PTHREAD([],
 #
 AC_CONFIG_FILES([
 	Makefile
+	libfetch/Makefile
 	libmj/Makefile
 	nabud/Makefile
 ])
