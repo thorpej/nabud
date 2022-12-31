@@ -110,8 +110,9 @@ am_nabud_OBJECTS = nabud-adaptor.$(OBJEXT) nabud-conn.$(OBJEXT) \
 	nabud-image.$(OBJEXT) nabud-log.$(OBJEXT) nabud-main.$(OBJEXT)
 nabud_OBJECTS = $(am_nabud_OBJECTS)
 am__DEPENDENCIES_1 =
-nabud_DEPENDENCIES = ../libmj/libmj.la $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+nabud_DEPENDENCIES = ../libfetch/libfetch.la ../libmj/libmj.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -321,7 +322,8 @@ top_srcdir = @top_srcdir@
 AM_CFLAGS = $(PTHREAD_CFLAGS) $(WARNCFLAGS)
 nabud_SOURCES = adaptor.c conn.c image.c log.c main.c
 nabud_CPPFLAGS = $(PAK_DECRYPT_INCLUDES)
-nabud_LDADD = ../libmj/libmj.la \
+nabud_LDADD = ../libfetch/libfetch.la \
+			  ../libmj/libmj.la \
 			  $(PAK_DECRYPT_LDFLAGS) $(PAK_DECRYPT_LIBS) \
 			  $(PTHREAD_LIBS)
 

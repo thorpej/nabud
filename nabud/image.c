@@ -59,6 +59,8 @@
 #include "image.h"
 #include "log.h"
 
+#include "../libfetch/fetch.h"
+
 static LIST_HEAD(, image_source) image_sources =
     LIST_HEAD_INITIALIZER(image_sources);
 unsigned int image_source_count;
@@ -241,60 +243,6 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	}
 	free(name);
 	free(source);
-}
-
-/*
- * image_load_file --
- *	Load the specified file.  Caller is responsible for
- *	freeing the buffer.
- */
-uint8_t *
-image_load_file(const char *path, size_t *filesizep, size_t extra)
-{
-	struct stat sb;
-	uint8_t *filebuf = NULL;
-	size_t filesize = 0;
-	int fd = -1;
-
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		log_error("open(%s): %s", path, strerror(errno));
-		goto bad;
-	}
-
-	if (fstat(fd, &sb) < 0) {
-		log_error("fstat(%s): %s", path, strerror(errno));
-		goto bad;
-	}
-	if (!S_ISREG(sb.st_mode)) {
-		log_error("%s is not a regular file.", path);
-		goto bad;
-	}
-
-	filesize = (size_t)sb.st_size;
-	filebuf = malloc(filesize + extra);
-	if (filebuf == NULL) {
-		log_error("Unable to allocate %zu bytes for %s",
-		    filesize + extra, path);
-		goto bad;
-	}
-
-	if (read(fd, filebuf, filesize) != (ssize_t)filesize) {
-		log_error("Unable to read %s", path);
-		goto bad;
-	}
- out:
-	if (fd >= 0) {
-		close(fd);
-	}
-	*filesizep = filesize;
-	return filebuf;
- bad:
-	if (filebuf != NULL) {
-		free(filebuf);
-		filebuf = NULL;
-	}
-	goto out;
 }
 
 /*
@@ -539,19 +487,48 @@ image_from_pak(struct image_channel *chan, uint32_t image,
 }
 
 /*
- * image_load_image_from_path --
- *	Load an image from the specified path.
+ * image_load_image_from_url --
+ *	Load an image from the specified url.
  */
 static struct nabu_image *
 image_load_image_from_path(struct image_channel *chan, uint32_t image,
-    const char *path)
+    const char *url)
 {
+	struct url_stat ust;
 	uint8_t *filebuf;
 	size_t filesize;
 	struct nabu_image *img;
+	fetchIO *fio;
 
-	filebuf = image_load_file(path, &filesize, 0);
-	if (filebuf == NULL) {
+	fio = fetchXGetURL(url, &ust, "");
+	if (fio == NULL) {
+		log_error("Unable to fetch %s", url);
+		return NULL;
+	}
+
+	if (ust.size < 0) {
+		/* XXX Support for chunked transfer encodings. */
+		log_error("Size for %s unavailable.", url);
+		fetchIO_close(fio);
+		return NULL;
+	} else if (ust.size == 0 || ust.size > NABU_MAXSEGMENTSIZE) {
+		log_error("Size of %s (%lld) is nonsensical.",
+		    url, (long long)ust.size);
+		fetchIO_close(fio);
+		return NULL;
+	} else {
+		filesize = (size_t)ust.size;
+	}
+	if ((filebuf = malloc(filesize)) == NULL) {
+		log_error("Unable to allocate %zu bytes for %s",
+		    filesize, url);
+		fetchIO_close(fio);
+		return NULL;
+	}
+	if (fetchIO_read(fio, filebuf, filesize) != (ssize_t)filesize) {
+		log_error("Unable to read %s", url);
+		fetchIO_close(fio);
+		free(filebuf);
 		return NULL;
 	}
 
