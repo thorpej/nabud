@@ -323,7 +323,11 @@ conn_tcp_thread(void *arg)
 
 	for (;;) {
 		if (! conn_io_wait(conn, &deadline, true)) {
-			/* Error already logged. */
+			if (conn->state == CONN_STATE_CANCELLED) {
+				log_info("[%s] Received cancellation request.",
+				    conn->name);
+				break;
+			}
 			break;
 		}
 		peersslen = sizeof(peerss);
