@@ -61,12 +61,16 @@ static TAILQ_HEAD(, image_channel) image_channels =
     TAILQ_HEAD_INITIALIZER(image_channels);
 unsigned int image_channel_count;
 
+static pthread_mutex_t image_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+static size_t image_cache_size;
+
 /*
- * image_retain --
+ * image_retain_locked --
  *	Retain (increment the refcnt) on the specified image.
+ *	image_cache_lock must be held.
  */
 static void
-image_retain(struct nabu_image *img)
+image_retain_locked(struct nabu_image *img)
 {
 	img->refcnt++;
 	assert(img->refcnt != 0);
@@ -75,12 +79,19 @@ image_retain(struct nabu_image *img)
 /*
  * image_release --
  *	Release the specified image.
+ *	image_cache_lock must NOT be held.
  */
 static void
 image_release(struct nabu_image *img)
 {
-	assert(img->refcnt > 0);
-	if (img->refcnt-- == 1) {
+	uint32_t ocnt;
+
+	pthread_mutex_lock(&image_cache_lock);
+	ocnt = img->refcnt--;
+	pthread_mutex_unlock(&image_cache_lock);
+
+	assert(ocnt > 0);
+	if (ocnt == 1) {
 		free(img->name);
 		free(img->data);
 		free(img);
@@ -280,9 +291,6 @@ image_load_file(const char *path, size_t *filesizep, size_t extra)
 	goto out;
 }
 
-static pthread_mutex_t image_cache_lock = PTHREAD_MUTEX_INITIALIZER;
-static size_t image_cache_size;
-
 /*
  * image_cache_lookup_locked --
  *	Look up an image in the channel's image cache.  This is
@@ -295,7 +303,7 @@ image_cache_lookup_locked(struct image_channel *chan, uint32_t image)
 
 	LIST_FOREACH(img, &chan->image_cache, link) {
 		if (img->number == image) {
-			image_retain(img);
+			image_retain_locked(img);
 			return img;
 		}
 	}
@@ -333,7 +341,7 @@ image_cache_insert(struct image_channel *chan, struct nabu_image *newimg)
 	pthread_mutex_lock(&image_cache_lock);
 	img = image_cache_lookup_locked(chan, newimg->number);
 	if (img == NULL) {
-		image_retain(newimg);
+		image_retain_locked(newimg);
 		LIST_INSERT_HEAD(&chan->image_cache, newimg, link);
 		image_cache_size += newimg->length;
 	}
