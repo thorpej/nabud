@@ -14,20 +14,20 @@ and _daemon(3)_.
 ## Features
 
 * Define up to 254 content channels (numbered 1-255) from an arbitrary number of sources.
-* Serve an arbitrary number of NABU PCs.
+* Serve an arbitrary number of NABU PCs:
+    * As many RS422 serial ports as you can connect to your system for real NABU hardware.
+    * Support for connections from NABU emulators (such as MAME) over TCP.
 * Decrypt and serve NABU _pak_ files (available from NabuRetroNet).
 * Serve your own or others' homebrew NABU binaries (_nabu_ files).
 * High-performance; nabud implements a content cache to optimize common access patterns and avoid redundant I/O.
 * Small footprint; it can run on small machines. The only thing it throws memory at is the content cache.
 
 Currently, only local sources are supported.  Support for directly vending NabuRetroNet
-content via HTTP is planned and is pretty high on the priority list.  Additionally, only
-real NABU PCs connected via the native RS422 serial interface are currently supported, but
-support for TCP is also planned in order to support MAME.  Even with these limitations, I
-wanted to get this out into the world for people to play with, especially folks who are
-interested in serving their NABUs from other retro or machines or small single-board computers 
-that can't easily (or at all) run some of the other Adaptor emulators that are already out in
-the wild.
+content via HTTP is planned and is pretty high on the priority list.  Even with this
+limitation, I wanted to get this out into the world for people to play with, especially
+folks who are interested in serving their NABUs from other retro or machines or small
+single-board computers that can't easily (or at all) run some of the other Adaptor
+emulators that are already out in the wild.
 
 ## Configuration
 
@@ -66,11 +66,13 @@ files.
 ### Connections
 
 Each Connection has 3 properties:
-* Type: a string that specifies the type of connection.  Currently, the only
-valid value for this property is "serial".
+* Type: a string that specifies the type of connection:
+    * serial: an RS422 serial connection to real NABU hardware.
+    * tcp: a TCP listener that accepts connections from emulators (e.g. MAME).
 * Port: a string that specifies the "port" to use for the connection, which varies
 based on the connection type:
     * serial: a string that specifies the path to the serial port to use for the connection.
+    * tcp: a string that specifies the TCP port on which connections will be accepted.
 * Channel: a numnber from 1 to 255 that specifies which channel to use for this connection.
 
 ### Example configuration file
@@ -104,6 +106,16 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "serial",
           "Port": "/dev/tty-uftdi-A10MHWD6-0",
           "Channel": 1,
+        },
+        {
+          "Type": "tcp",
+          "Port": "5001",
+          "Channel": 1,
+        },
+        {
+          "Type": "tcp",
+          "Port": "5002",
+          "Channel": 2,
         }
       ]
     }
