@@ -161,7 +161,7 @@ conn_thread(void *arg)
  *	Common connection-creation duties.
  */
 static void
-conn_create_common(const char *name, int fd, unsigned int channel,
+conn_create_common(char *name, int fd, unsigned int channel,
     void *(*func)(void *))
 {
 	struct nabu_connection *conn;
@@ -178,11 +178,8 @@ conn_create_common(const char *name, int fd, unsigned int channel,
 	conn->fd = fd;
 	conn->cancel_fds[0] = conn->cancel_fds[1] = -1;
 
-	conn->name = strdup(name);
-	if (conn->name == NULL) {
-		log_error("[%s] Unable to allocate connection name.", name);
-		goto bad;
-	}
+	assert(name != NULL);
+	conn->name = name;
 
 	/*
 	 * Create the pipe that's used for connection cancellation.
@@ -359,7 +356,7 @@ conn_tcp_thread(void *arg)
 		log_info("[%s] Creating TCP connection for %s.",
 		    conn->name, host);
 
-		conn_create_common(host, sock, conn->channel->number,
+		conn_create_common(strdup(host), sock, conn->channel->number,
 		    conn_thread);
 	}
 
@@ -402,7 +399,7 @@ conn_add_tcp(char *portstr, unsigned int channel)
 	if (sock >= 0) {
 		if (bind(sock, (struct sockaddr *)&sin, sizeof(sin)) == 0) {
 			if (listen(sock, 8) == 0) {
-				conn_create_common(name, sock, channel,
+				conn_create_common(strdup(name), sock, channel,
 				    conn_tcp_thread);
 				sock = -1;
 			} else {
@@ -434,7 +431,7 @@ conn_add_tcp(char *portstr, unsigned int channel)
 	if (sock >= 0) {
 		if (bind(sock, (struct sockaddr *)&sin6, sizeof(sin6)) == 0) {
 			if (listen(sock, 8) == 0) {
-				conn_create_common(name, sock, channel,
+				conn_create_common(strdup(name), sock, channel,
 				    conn_tcp_thread);
 				sock = -1;
 			} else {
