@@ -12748,7 +12748,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 printf %s "checking if using gcc... " >&6; }
 if test "$GCC" = "yes"
 then :
-  WARNCFLAGS="-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
+  CFLAGS="$CFLAGS -std=gnu99"
+	 WARNCFLAGS="-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
 		     -Wpointer-arith -Wno-sign-compare -Wreturn-type -Wswitch \
 		     -Wshadow -Wcast-qual -Wwrite-strings \
 		     -Wformat=2 -Wno-format-zero-length"
