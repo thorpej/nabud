@@ -28,6 +28,10 @@
  * Image management.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <sys/stat.h>
 #include <assert.h>
 #include <errno.h>
@@ -41,13 +45,15 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef __APPLE__	/* Use CommonCrypto on macOS */
+#if defined(HAVE_COMMONCRYPTO_H)
 #define	COMMON_DIGEST_FOR_OPENSSL
 #include <CommonCrypto/CommonCrypto.h>
-#else
+#elif defined(HAVE_OPENSSL)
 #include <openssl/des.h>
 #include <openssl/md5.h>
-#endif /* __APPLE__ */
+#else
+#error No crypto support for PAK files!
+#endif
 
 #include "conn.h"
 #include "image.h"
@@ -381,14 +387,19 @@ static char *
 image_pak_name(uint32_t image)
 {
 	char namestr[sizeof("000001nabu")];
+	char pakname[PAK_NAME_SIZE];
+
+#if defined(HAVE_COMMONCRYPTO_H) || defined(HAVE_OPENSSL)
 	MD5_CTX ctx;
 	unsigned char digest[MD5_DIGEST_LENGTH];
-	char pakname[PAK_NAME_SIZE];
 
 	snprintf(namestr, sizeof(namestr), "%06Xnabu", image);
 	MD5_Init(&ctx);
 	MD5_Update(&ctx, namestr, sizeof(namestr) - 1);
 	MD5_Final(digest, &ctx);
+#else
+#error Unable to generate PAK file names!
+#endif
 
 	snprintf(pakname, sizeof(pakname),
 	    "%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X.npak",
@@ -437,7 +448,7 @@ image_from_nabu(struct image_channel *chan, uint32_t image, uint8_t *filebuf,
 static bool
 image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
 {
-#ifdef __APPLE__
+#if defined(HAVE_COMMONCRYPTO_H)
 	uint8_t iv[] = NABU_PAK_IV;
 	uint8_t key[] = NABU_PAK_KEY;
 	CCCryptorStatus status;
@@ -463,7 +474,7 @@ image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
 	}
 
 	return status == kCCSuccess;
-#else /* ! __APPLE__ */
+#elif defined(HAVE_OPENSSL)
 	DES_cblock iv = NABU_PAK_IV;
 	DES_cblock key = NABU_PAK_KEY;
 	DES_key_schedule ks;
@@ -473,7 +484,9 @@ image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
 	    (unsigned char *)dst, (long)len, &ks, &iv, 0);
 
 	return true;
-#endif /* __APPLE__ */
+#else
+#error Unable to decrypt PAK files!
+#endif
 }
 
 /*
