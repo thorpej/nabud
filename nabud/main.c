@@ -44,7 +44,8 @@
 #include "conn.h"
 #include "image.h"
 #include "log.h"
-#include "mj.h"
+
+#include "../libmj/mj.h"
 
 #ifndef NABUD_CONF
 #define	NABUD_CONF		"/etc/nabud.conf"
