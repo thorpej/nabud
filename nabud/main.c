@@ -28,6 +28,10 @@
  * nabud -- a server for the NABU PC.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
@@ -327,11 +331,7 @@ config_load(const char *path)
 	return ret;
 }
 
-#ifndef NABUD_VERSION
-#define	NABUD_VERSION		"0.5"
-#endif
-
-static const char nabud_version[] = NABUD_VERSION;
+static const char nabud_version[] = VERSION;
 
 static void __attribute__((__noreturn__))
 usage(void)
