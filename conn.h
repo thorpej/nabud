@@ -39,6 +39,13 @@ typedef enum {
 	CONN_TYPE_SERIAL	=	1,
 } conn_type;
 
+typedef enum {
+	CONN_STATE_OK		=	0,
+	CONN_STATE_EOF		=	1,
+	CONN_STATE_CANCELLED	=	2,
+	CONN_STATE_ABORTED	=	3,
+} conn_state;
+
 struct nabu_segment;
 
 struct nabu_connection {
@@ -58,17 +65,14 @@ struct nabu_connection {
 	/* I/O watchdog time. */
 	unsigned int	watchdog;
 
-	/* True if we've been cancelled and should exit from the event loop. */
-	bool		cancelled;
+	/* Our connection state. */
+	conn_state	state;
 
 	/*
 	 * Pipe file descriptors used to wake threads blocked in poll()
 	 * when the connection is cancelled.
 	 */
 	int		cancel_fds[2];
-
-	/* True if an error occurs that causes us to abourt the connection. */
-	bool		aborted;
 
 	/* Selected channel. */
 	struct image_channel *channel;

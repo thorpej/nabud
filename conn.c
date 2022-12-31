@@ -335,7 +335,7 @@ conn_tcp_thread(void *arg)
 			if (errno != EAGAIN) {
 				log_error("[%s] accept() failed: %s",
 				    conn->name, strerror(errno));
-				conn->aborted = true;
+				conn->state = CONN_STATE_ABORTED;
 				break;
 			}
 			continue;
@@ -495,9 +495,8 @@ conn_cancel(struct nabu_connection *conn)
 	 * Mark the connection as cancelled and wake any threads
 	 * waiting to do I/O.
 	 */
-	conn->cancelled = true;
-	(void) write(conn->cancel_fds[1], &conn->cancelled,
-	    sizeof(conn->cancelled));
+	conn->state = CONN_STATE_CANCELLED;
+	(void) write(conn->cancel_fds[1], &conn->state, sizeof(conn->state));
 }
 
 /*
@@ -607,13 +606,13 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 	if (pollret < 0) {
 		log_error("[%s] poll() for %s failed: %s", conn->name,
 		    which, strerror(errno));
-		conn->aborted = true;
+		conn->state = CONN_STATE_ABORTED;
 		return false;
 	}
 	if (pollret == 0) {
 		log_info("[%s] Connection (%s) timed out.", conn->name,
 		    which);
-		conn->aborted = true;
+		conn->state = CONN_STATE_ABORTED;
 		return false;
 	}
 	if (fds[1].revents) {
@@ -636,7 +635,7 @@ conn_io_wait(struct nabu_connection *conn, const struct timespec *deadline,
 	}
 	log_error("[%s] Connection failure in %s: fds[0].revents = 0x%04x.",
 	    conn->name, which, fds[0].revents);
-	conn->aborted = true;
+	conn->state = CONN_STATE_ABORTED;
 	return false;
 }
 
@@ -664,12 +663,12 @@ conn_send(struct nabu_connection *conn, const uint8_t *buf, size_t len)
 		if (actual < 0 && errno != EAGAIN) {
 			log_error("[%s] write() failed: %s", conn->name,
 			    strerror(errno));
-			conn->aborted = true;
+			conn->state = CONN_STATE_ABORTED;
 			return;
 		}
 		if (actual == 0) {
-			log_info("[%s] Got End-of-File", conn->name);
-			conn->aborted = true;
+			log_debug("[%s] Got End-of-File", conn->name);
+			conn->state = CONN_STATE_EOF;
 			return;
 		}
 
@@ -725,12 +724,12 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 		if (actual < 0 && errno != EAGAIN) {
 			log_error("[%s] read() failed: %s", conn->name,
 			    strerror(errno));
-			conn->aborted = true;
+			conn->state = CONN_STATE_ABORTED;
 			return false;
 		}
 		if (actual == 0) {
-			log_info("[%s] Got End-of-File", conn->name);
-			conn->aborted = true;
+			log_debug("[%s] Got End-of-File", conn->name);
+			conn->state = CONN_STATE_EOF;
 			return false;
 		}
 

@@ -555,7 +555,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send segment/image message.",
 		    conn->name);
-		conn->aborted = true;
+		conn->state = CONN_STATE_ABORTED;
 		return;
 	}
 
@@ -608,7 +608,7 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send channel code.",
 		    conn->name);
-		conn->aborted = true;
+		conn->state = CONN_STATE_ABORTED;
 		return;
 	}
 
@@ -637,12 +637,17 @@ adaptor_event_loop(struct nabu_connection *conn)
 		conn_stop_watchdog(conn);
 
 		if (! conn_recv_byte(conn, &msg)) {
-			if (conn->cancelled) {
+			if (conn->state == CONN_STATE_EOF) {
+				log_info("[%s] Peer disconnected.",
+				    conn->name);
+				break;
+			}
+			if (conn->state == CONN_STATE_CANCELLED) {
 				log_info("[%s] Received cancellation request.",
 				    conn->name);
 				break;
 			}
-			if (conn->aborted) {
+			if (conn->state == CONN_STATE_ABORTED) {
 				log_error("[%s] Connection aborted.",
 				    conn->name);
 				break;
