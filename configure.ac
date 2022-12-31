@@ -34,7 +34,10 @@ LT_INIT
 AC_LANG(C)
 AC_MSG_CHECKING([if using gcc])
 AS_IF([test "$GCC" = "yes"],
-	[WARNCFLAGS="-Werror -Wall -Wpointer-arith"
+	[WARNCFLAGS="-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
+		     -Wpointer-arith -Wno-sign-compare -Wreturn-type -Wswitch \
+		     -Wshadow -Wcast-qual -Wwrite-strings \
+		     -Wformat=2 -Wno-format-zero-length"
 	 AC_MSG_RESULT([yes; adding to CFLAGS: "$WARNCFLAGS"])],
 	[WARNCFLAGS=""
 	 AC_MSG_RESULT([no])])
