@@ -13089,6 +13089,9 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
 
 # Check for which SSL implementation to use.
 #
+if test x$WITH_SECURETRANSPORT != x; then
+	WITH_SSL="$WITH_SECURETRANSPORT"
+	SSL_LIBS="-framework Security"
 if test x$WITH_OPENSSL != x; then
 	WITH_SSL="$WITH_OPENSSL"
 	SSL_LDFLAGS="$OPENSSL_LDFLAGS"
@@ -13106,9 +13109,6 @@ fi
 #
 if test x$WITH_COMMONCRYPTO != x; then
 	WITH_PAK="$WITH_COMMONCRYPTO"
-	PAK_LDFLAGS=""
-	PAK_LIBS=""
-	PAK_INCLUDES=""
 elif test x$WITH_OPENSSL != x; then
 	WITH_PAK="$WITH_OPENSSL"
 	PAK_LDFLAGS="$OPENSSL_LDFLAGS"
