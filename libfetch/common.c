@@ -456,26 +456,30 @@ fetch_SSLErrorStr(OSStatus status, char *buf, size_t buflen)
 }
 
 static OSStatus
-fetch_SSLIOFuncFinish(ssize_t actual, size_t *dataLength)
-{
-	if (actual < 0) {
-		if (errno == EAGAIN) {
-			return (errSSLWouldBlock);
-		}
-		return (errSSLTransportReset);	/* Good enough. */
-	}
-
-	*dataLength = actual;
-	return (noErr);
-}
-
-static OSStatus
 fetch_SSLReadFunc(SSLConnectionRef connection, void *data, size_t *dataLength)
 {
 	const conn_t *conn = connection;
+	ssize_t actual;
+	char *cp = data;
+	size_t resid = *dataLength;
+	OSStatus status = errSSLWouldBlock;
 
-	return fetch_SSLIOFuncFinish(read(conn->sd, data, *dataLength),
-				     dataLength);
+	while (resid != 0) {
+		actual = read(conn->sd, cp, resid);
+		if (actual <= 0) {
+			if (actual < 0 && errno == EAGAIN) {
+				goto out;
+			}
+			status = errSSLTransportReset;
+			goto out;
+		}
+		cp += actual;
+		resid -= actual;
+	}
+	status = noErr;
+ out:
+	*dataLength -= resid;
+	return status;
 }
 
 static OSStatus
@@ -483,14 +487,33 @@ fetch_SSLWriteFunc(SSLConnectionRef connection, const void *data,
     size_t *dataLength)
 {
 	const conn_t *conn = connection;
+	ssize_t actual;
+	const char *cp = data;
+	size_t resid = *dataLength;
+	OSStatus status = errSSLWouldBlock;
 
-	return fetch_SSLIOFuncFinish(send(conn->sd, data, *dataLength,
+	while (resid != 0) {
+		actual = send(conn->sd, cp, resid,
 #ifndef MSG_NOSIGNAL
-					  0
+			      0
 #else
-					  MSG_NOSIGNAL
+			      MSG_NOSIGNAL
 #endif
-					 ), dataLength);
+			     );
+		if (actual <= 0) {
+			if (actual < 0 && errno == EAGAIN) {
+				goto out;
+			}
+			status = errSSLTransportReset;
+			goto out;
+		}
+		cp += actual;
+		resid -= actual;
+	}
+	status = noErr;
+ out:
+	*dataLength -= resid;
+	return status;
 }
 #endif /* HAVE_SECURETRANSPORT */
 
@@ -503,7 +526,7 @@ fetch_ssl(conn_t *conn, int verbose)
 #if defined(HAVE_SECURETRANSPORT)
 	SSLContextRef ssl;
 	OSStatus status;
-	char buf[64];
+	char errstr[64];
 
 	ssl = SSLCreateContext(kCFAllocatorDefault, kSSLClientSide,
 	    kSSLStreamType);
@@ -523,6 +546,18 @@ fetch_ssl(conn_t *conn, int verbose)
 		goto bad;
 	}
 
+#if 0	/* XXX Maybe later */
+	/*
+	 * kSSLSessionOptionBreakOnServerAuth so that we can skip
+	 * server certificate verification.
+	 */
+	if (SSLSetSessionOption(ssl, kSSLSessionOptionBreakOnServerAuth,
+				true) != noErr) {
+		fprintf(stderr, "SSLSetSessionOption() failed\n");
+		goto bad;
+	}
+#endif
+
 	/* XXX Should call SSLSetPeerDomainName(). */
 
 	for (;;) {
@@ -536,9 +571,14 @@ fetch_ssl(conn_t *conn, int verbose)
 			continue;
 		}
 
-		if (verbose) fprintf(stderr,
-		    "SSLHandshake() -> %s\n",
-		    fetch_SSLErrorStr(status, buf, sizeof(buf)));
+		if (status == errSSLServerAuthCompleted) {
+			/* Skipping server certificate verification. */
+			continue;
+		}
+
+		fprintf(stderr, "SSLHandshake() -> %s\n",
+		    fetch_SSLErrorStr(status, errstr,
+		        sizeof(errstr)));
 		goto bad;
 	}
 
