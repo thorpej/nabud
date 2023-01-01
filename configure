@@ -12781,7 +12781,7 @@ esac
 WITH_SSL=no
 WITH_PAK=no
 
-# Check for CommonCrypto (the native crypto library on macOS.
+# Check for CommonCrypto (the native crypto library on macOS).
 #
 ac_fn_c_check_header_compile "$LINENO" "CommonCrypto/CommonCrypto.h" "ac_cv_header_CommonCrypto_CommonCrypto_h" "$ac_includes_default"
 if test "x$ac_cv_header_CommonCrypto_CommonCrypto_h" = xyes
@@ -12790,6 +12790,20 @@ then :
 printf "%s\n" "#define HAVE_COMMONCRYPTO_H 1" >>confdefs.h
 
 	 WITH_COMMONCRYPTO="CommonCrypto"
+fi
+
+
+# Check for SecureTransport (the old native SSL/TLS framework on macOS).
+# It is deprecated, but we will use it until we can make libfetch use
+# the Network framework.
+#
+ac_fn_c_check_header_compile "$LINENO" "Security/SecureTransport.h" "ac_cv_header_Security_SecureTransport_h" "$ac_includes_default"
+if test "x$ac_cv_header_Security_SecureTransport_h" = xyes
+then :
+
+printf "%s\n" "#define HAVE_SECURETRANSPORT 1" >>confdefs.h
+
+	 WITH_SECURETRANSPORT="SecureTransport"
 fi
 
 

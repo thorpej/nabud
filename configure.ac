@@ -60,12 +60,21 @@ AC_SUBST([WARNCFLAGS])
 WITH_SSL=no
 WITH_PAK=no
 
-# Check for CommonCrypto (the native crypto library on macOS.
+# Check for CommonCrypto (the native crypto library on macOS).
 #
 AC_CHECK_HEADER([CommonCrypto/CommonCrypto.h],
 	[AC_DEFINE([HAVE_COMMONCRYPTO_H], [1],
-		   [Define to 1 if you have <<CommonCrypto/CommonCrypto.h>])
+		   [Define to 1 if you have <CommonCrypto/CommonCrypto.h>])
 	 WITH_COMMONCRYPTO="CommonCrypto"])
+
+# Check for SecureTransport (the old native SSL/TLS framework on macOS).
+# It is deprecated, but we will use it until we can make libfetch use
+# the Network framework.
+#
+AC_CHECK_HEADER([Security/SecureTransport.h],
+	[AC_DEFINE([HAVE_SECURETRANSPORT], [1],
+		   [Define to 1 if you have <Security/SecureTransport.h>])
+	 WITH_SECURETRANSPORT="SecureTransport"])
 
 # Check for OpenSSL
 #
