@@ -12764,6 +12764,15 @@ else $as_nop
 printf "%s\n" "no" >&6; }
 fi
 
+case "$CANONICAL_TARGET" in
+	*-*-darwin*)
+		# MD5 is marked as deprecated on macOS, but we're
+		# kind of forced to use it regardless.
+		WARNCFLAGS="$WARNCFLAGS -Wno-deprecated-declarations"
+		;;
+esac
+
+
 
 #
 # Deal with the crypto libraries we need.

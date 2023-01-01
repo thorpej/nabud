@@ -42,6 +42,15 @@ AS_IF([test "$GCC" = "yes"],
 	 AC_MSG_RESULT([yes; adding to CFLAGS: "$WARNCFLAGS"])],
 	[WARNCFLAGS=""
 	 AC_MSG_RESULT([no])])
+
+case "$CANONICAL_TARGET" in
+	*-*-darwin*)
+		# MD5 is marked as deprecated on macOS, but we're
+		# kind of forced to use it regardless.
+		WARNCFLAGS="$WARNCFLAGS -Wno-deprecated-declarations"
+		;;
+esac
+
 AC_SUBST([WARNCFLAGS])
 
 #
