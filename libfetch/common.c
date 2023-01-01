@@ -535,14 +535,17 @@ fetch_ssl(conn_t *conn, int verbose)
 		return (-1);
 	}
 
-	if (SSLSetIOFuncs(ssl, fetch_SSLReadFunc,
-			  fetch_SSLWriteFunc) != noErr) {
-		fprintf(stderr, "SSLSetIOFuncs() failed\n");
+	status = SSLSetIOFuncs(ssl, fetch_SSLReadFunc, fetch_SSLWriteFunc);
+	if (status != noErr) {
+		fprintf(stderr, "SSLSetIOFuncs() failed: %s\n",
+		    fetch_SSLErrorStr(status, errstr, sizeof(errstr)));
 		goto bad;
 	}
 
-	if (SSLSetConnection(ssl, conn) != noErr) {
-		fprintf(stderr, "SSLSetConnection() failed\n");
+	status = SSLSetConnection(ssl, conn);
+	if (status != noErr) {
+		fprintf(stderr, "SSLSetConnection() failed: %s\n",
+		    fetch_SSLErrorStr(status, errstr, sizeof(errstr)));
 		goto bad;
 	}
 
@@ -551,14 +554,24 @@ fetch_ssl(conn_t *conn, int verbose)
 	 * kSSLSessionOptionBreakOnServerAuth so that we can skip
 	 * server certificate verification.
 	 */
-	if (SSLSetSessionOption(ssl, kSSLSessionOptionBreakOnServerAuth,
-				true) != noErr) {
-		fprintf(stderr, "SSLSetSessionOption() failed\n");
+	status = SSLSetSessionOption(ssl,
+				     kSSLSessionOptionBreakOnServerAuth, true);
+	if (status != noErr) {
+		fprintf(stderr, "SSLSetSessionOption() failed: %s\n",
+		    fetch_SSLErrorStr(status, errstr, sizeof(errstr)));
 		goto bad;
 	}
 #endif
 
-	/* XXX Should call SSLSetPeerDomainName(). */
+	if (conn->cache_url != NULL) {
+		status = SSLSetPeerDomainName(ssl, conn->cache_url->host,
+					      strlen(conn->cache_url->host));
+		if (status != noErr) {
+			fprintf(stderr, "SSLSetPeerDomainName() failed: %s\n",
+			    fetch_SSLErrorStr(status, errstr, sizeof(errstr)));
+			goto bad;
+		}
+	}
 
 	for (;;) {
 		status = SSLHandshake(ssl);
@@ -576,9 +589,8 @@ fetch_ssl(conn_t *conn, int verbose)
 			continue;
 		}
 
-		fprintf(stderr, "SSLHandshake() -> %s\n",
-		    fetch_SSLErrorStr(status, errstr,
-		        sizeof(errstr)));
+		fprintf(stderr, "SSLHandshake() failed: %s\n",
+		    fetch_SSLErrorStr(status, errstr, sizeof(errstr)));
 		goto bad;
 	}
 
