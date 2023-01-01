@@ -485,7 +485,7 @@ image_from_pak(struct image_channel *chan, uint32_t image,
  *	Load an image from the specified url.
  */
 static struct nabu_image *
-image_load_image_from_path(struct image_channel *chan, uint32_t image,
+image_load_image_from_url(struct image_channel *chan, uint32_t image,
     const char *url)
 {
 	struct url_stat ust;
@@ -512,6 +512,7 @@ image_load_image_from_path(struct image_channel *chan, uint32_t image,
 		return NULL;
 	} else {
 		filesize = (size_t)ust.size;
+		log_debug("Size of %s is %zu bytes.", url, filesize);
 	}
 	if ((filebuf = malloc(filesize)) == NULL) {
 		log_error("Unable to allocate %zu bytes for %s",
@@ -603,8 +604,7 @@ image_done(struct nabu_connection *conn, struct nabu_image *img)
 struct nabu_image *
 image_load(struct nabu_connection *conn, uint32_t image)
 {
-	char image_path[PATH_MAX];
-	char *fname;
+	char *fname, *image_url = NULL;
 	const char *imgtype;
 	struct nabu_image *img;
 
@@ -639,13 +639,14 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		imgtype = "nabu";
 	}
 
-	snprintf(image_path, sizeof(image_path), "%s/%s", conn->channel->path,
-	    fname);
+	asprintf(&image_url, "%s/%s", conn->channel->path, fname);
+	assert(image_url != NULL);
 	log_debug("[%s] Loading %s-%06X from %s", conn->name, imgtype, image,
-	    image_path);
+	    image_url);
 	free(fname);
 
-	img = image_load_image_from_path(conn->channel, image, image_path);
+	img = image_load_image_from_url(conn->channel, image, image_url);
+	free(image_url);
 	if (img != NULL) {
 		img = image_cache_insert(conn->channel, img);
 		image_use(conn, img);
