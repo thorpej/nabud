@@ -426,14 +426,134 @@ fetch_cache_put(conn_t *conn, int (*closecb)(conn_t *))
 	connection_cache = conn;
 }
 
+#ifdef HAVE_SECURETRANSPORT
+static const char *
+fetch_SSLErrorStr(OSStatus status, char *buf, size_t buflen)
+{
+	static const struct {
+		OSStatus status;
+		const char *string;
+	} error_strings[] = {
+#define	ERRSTR(x)	{ .status = x, .string = #x }
+		ERRSTR(errSSLUnknownRootCert),
+		ERRSTR(errSSLNoRootCert),
+		ERRSTR(errSSLCertExpired),
+		ERRSTR(errSSLXCertChainInvalid),
+		ERRSTR(errSSLClientCertRequested),
+		ERRSTR(errSSLServerAuthCompleted),
+		ERRSTR(noErr),
+	};
+	int i;
+
+	for (i = 0; error_strings[i].status != noErr; i++) {
+		if (status == error_strings[i].status) {
+			snprintf(buf, buflen, "%s", error_strings[i].string);
+			return buf;
+		}
+	}
+	snprintf(buf, buflen, "error %d\n", status);
+	return buf;
+}
+
+static OSStatus
+fetch_SSLIOFuncFinish(ssize_t actual, size_t *dataLength)
+{
+	if (actual < 0) {
+		if (errno == EAGAIN) {
+			return (errSSLWouldBlock);
+		}
+		return (errSSLTransportReset);	/* Good enough. */
+	}
+
+	*dataLength = actual;
+	return (noErr);
+}
+
+static OSStatus
+fetch_SSLReadFunc(SSLConnectionRef connection, void *data, size_t *dataLength)
+{
+	const conn_t *conn = connection;
+
+	return fetch_SSLIOFuncFinish(read(conn->sd, data, *dataLength),
+				     dataLength);
+}
+
+static OSStatus
+fetch_SSLWriteFunc(SSLConnectionRef connection, const void *data,
+    size_t *dataLength)
+{
+	const conn_t *conn = connection;
+
+	return fetch_SSLIOFuncFinish(send(conn->sd, data, *dataLength,
+#ifndef MSG_NOSIGNAL
+					  0
+#else
+					  MSG_NOSIGNAL
+#endif
+					 ), dataLength);
+}
+#endif /* HAVE_SECURETRANSPORT */
+
 /*
  * Enable SSL on a connection.
  */
 int
 fetch_ssl(conn_t *conn, int verbose)
 {
+#if defined(HAVE_SECURETRANSPORT)
+	SSLContextRef ssl;
+	OSStatus status;
+	char buf[64];
 
-#ifdef HAVE_OPENSSL
+	ssl = SSLCreateContext(kCFAllocatorDefault, kSSLClientSide,
+	    kSSLStreamType);
+	if (ssl == NULL) {
+		fprintf(stderr, "SSLCreateContext() failed\n");
+		return (-1);
+	}
+
+	if (SSLSetIOFuncs(ssl, fetch_SSLReadFunc,
+			  fetch_SSLWriteFunc) != noErr) {
+		fprintf(stderr, "SSLSetIOFuncs() failed\n");
+		goto bad;
+	}
+
+	if (SSLSetConnection(ssl, conn) != noErr) {
+		fprintf(stderr, "SSLSetConnection() failed\n");
+		goto bad;
+	}
+
+	/* XXX Should call SSLSetPeerDomainName(). */
+
+	for (;;) {
+		status = SSLHandshake(ssl);
+		if (status == noErr) {
+			break;
+		}
+
+		if (status == errSSLWouldBlock) {
+			usleep(1000);
+			continue;
+		}
+
+		if (verbose) fprintf(stderr,
+		    "SSLHandshake() -> %s\n",
+		    fetch_SSLErrorStr(status, buf, sizeof(buf)));
+		goto bad;
+	}
+
+	/* XXX Don't bother with verbose for now. */
+	(void)verbose;
+
+	conn->ssl = ssl;
+	return (0);
+
+ bad:
+	CFRelease(ssl);
+	return (-1);
+
+#elif defined(HAVE_OPENSSL)
+
 	/* Init the SSL library and context */
 	if (!SSL_library_init()){
 		fprintf(stderr, "SSL library init failed\n");
@@ -537,7 +657,17 @@ fetch_read(conn_t *conn, char *buf, size_t len)
 				return (-1);
 			}
 		}
-#ifdef HAVE_OPENSSL
+#if defined(HAVE_SECURETRANSPORT)
+		if (conn->ssl != NULL) {
+			size_t actual;
+
+			if (SSLRead(conn->ssl, buf, len, &actual) != noErr) {
+				rlen = -1;
+			} else {
+				rlen = (ssize_t)actual;
+			}
+		} else
+#elif defined(HAVE_OPENSSL)
 		if (conn->ssl != NULL)
 			rlen = SSL_read(conn->ssl, buf, (int)len);
 		else
@@ -672,7 +802,17 @@ fetch_write(conn_t *conn, const void *buf, size_t len)
 			}
 		}
 		errno = 0;
-#ifdef HAVE_OPENSSL
+#if defined(HAVE_SECURETRANSPORT)
+		if (conn->ssl != NULL) {
+			size_t actual;
+
+			if (SSLWrite(conn->ssl, buf, len, &actual) != noErr) {
+				wlen = -1;
+			} else {
+				wlen = (ssize_t)actual;
+			}
+		} else
+#elif defined(HAVE_OPENSSL)
 		if (conn->ssl != NULL)
 			wlen = SSL_write(conn->ssl, buf, (int)len);
 		else
@@ -708,6 +848,13 @@ int
 fetch_close(conn_t *conn)
 {
 	int ret;
+
+#ifdef HAVE_SECURETRANSPORT
+	if (conn->ssl != NULL) {
+		SSLClose(conn->ssl);
+		CFRelease(conn->ssl);
+	}
+#endif
 
 	ret = close(conn->sd);
 	if (conn->cache_url)
