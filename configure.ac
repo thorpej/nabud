@@ -87,7 +87,7 @@ AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL], [1],
 #
 if test x$WITH_SECURETRANSPORT != x; then
 	WITH_SSL="$WITH_SECURETRANSPORT"
-	SSL_LIBS="-framework Security"
+	SSL_LIBS="-framework Security -framework CoreFoundation"
 elif test x$WITH_OPENSSL != x; then
 	WITH_SSL="$WITH_OPENSSL"
 	SSL_LDFLAGS="$OPENSSL_LDFLAGS"
