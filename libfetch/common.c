@@ -433,7 +433,7 @@ int
 fetch_ssl(conn_t *conn, int verbose)
 {
 
-#ifdef WITH_SSL
+#ifdef HAVE_OPENSSL
 	/* Init the SSL library and context */
 	if (!SSL_library_init()){
 		fprintf(stderr, "SSL library init failed\n");
@@ -537,7 +537,7 @@ fetch_read(conn_t *conn, char *buf, size_t len)
 				return (-1);
 			}
 		}
-#ifdef WITH_SSL
+#ifdef HAVE_OPENSSL
 		if (conn->ssl != NULL)
 			rlen = SSL_read(conn->ssl, buf, (int)len);
 		else
@@ -672,7 +672,7 @@ fetch_write(conn_t *conn, const void *buf, size_t len)
 			}
 		}
 		errno = 0;
-#ifdef WITH_SSL
+#ifdef HAVE_OPENSSL
 		if (conn->ssl != NULL)
 			wlen = SSL_write(conn->ssl, buf, (int)len);
 		else

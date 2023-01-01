@@ -32,12 +32,16 @@
 #ifndef _COMMON_H_INCLUDED
 #define _COMMON_H_INCLUDED
 
+#if HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #define FTP_DEFAULT_PORT	21
 #define HTTP_DEFAULT_PORT	80
 #define FTP_DEFAULT_PROXY_PORT	21
 #define HTTP_DEFAULT_PROXY_PORT	3128
 
-#ifdef WITH_SSL
+#ifdef HAVE_OPENSSL
 #include <openssl/crypto.h>
 #include <openssl/x509.h>
 #include <openssl/pem.h>
@@ -62,7 +66,7 @@ struct fetchconn {
 	char		*next_buf;	/* pending buffer, e.g. after getln */
 	size_t		 next_len;	/* size of pending buffer */
 	int		 err;		/* last protocol reply code */
-#ifdef WITH_SSL
+#ifdef HAVE_OPENSSL
 	SSL		*ssl;		/* SSL handle */
 	SSL_CTX		*ssl_ctx;	/* SSL context */
 	X509		*ssl_cert;	/* server certificate */

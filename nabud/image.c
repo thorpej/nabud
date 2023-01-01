@@ -52,7 +52,7 @@
 #include <openssl/des.h>
 #include <openssl/md5.h>
 #else
-#error No crypto support for PAK files!
+#define NO_PAK_FILE_SUPPORT
 #endif
 
 #include "conn.h"
@@ -192,9 +192,16 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	if ((chan = image_channel_lookup(number)) != NULL) {
 		log_error("Channel %u already exists (%s on %s).",
 		    number, chan->name, chan->source->name);
-		chan = NULL;
 		goto bad;
 	}
+
+#ifdef NO_PAK_FILE_SUPPORT
+	if (type == IMAGE_CHANNEL_PAK) {
+		log_error("Skipping pak channel %u (%s on %s); "
+		    "no pak file support.");
+		goto bad;
+	}
+#endif /* NO_PAK_FILE_SUPPORT */
 
 	pathlen = strlen(name) + strlen(imgsrc->root) + 2; /* / + NUL */
 	chan = calloc(1, sizeof(*chan));
@@ -310,6 +317,7 @@ image_nabu_name(uint32_t image)
 #define	PAK_NAME_SIZE	\
 	sizeof("FE-A1-04-B7-3D-67-F8-8B-26-4C-0C-81-9B-F6-24-58.npak")
 
+#ifndef NO_PAK_FILE_SUPPORT
 /*
  * image_pak_name --
  *	Generate a NabuRetroNet PAK name from the given image number.
@@ -341,6 +349,7 @@ image_pak_name(uint32_t image)
 
 	return strdup(pakname);
 }
+#endif /* ! NO_PAK_FILE_SUPPORT */
 
 /*
  * image_from_nabu --
@@ -372,6 +381,7 @@ image_from_nabu(struct image_channel *chan, uint32_t image, uint8_t *filebuf,
 	return img;
 }
 
+#ifndef NO_PAK_FILE_SUPPORT
 /*
  * image_decrypt_pak --
  *	Decrypt a PAK image.
@@ -468,6 +478,7 @@ image_from_pak(struct image_channel *chan, uint32_t image,
 
 	return img;
 }
+#endif /* ! NO_PAK_FILE_SUPPORT */
 
 /*
  * image_load_image_from_url --
@@ -515,10 +526,13 @@ image_load_image_from_path(struct image_channel *chan, uint32_t image,
 		return NULL;
 	}
 
+#ifndef NO_PAK_FILE_SUPPORT
 	if (chan->type == IMAGE_CHANNEL_PAK) {
 		img = image_from_pak(chan, image, filebuf, filesize);
 		free(filebuf);
-	} else {
+	} else
+#endif /* ! NO_PAK_FILE_SUPPORT */
+	{
 		img = image_from_nabu(chan, image, filebuf, filesize);
 	}
 
@@ -614,10 +628,13 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		return img;
 	}
 
+#ifndef NO_PAK_FILE_SUPPORT
 	if (conn->channel->type == IMAGE_CHANNEL_PAK) {
 		fname = image_pak_name(image);
 		imgtype = "pak";
-	} else {
+	} else
+#endif /* ! NO_PAK_FILE_SUPPORT */
+	{
 		fname = image_nabu_name(image);
 		imgtype = "nabu";
 	}
