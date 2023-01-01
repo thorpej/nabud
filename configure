@@ -13092,7 +13092,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
 if test x$WITH_SECURETRANSPORT != x; then
 	WITH_SSL="$WITH_SECURETRANSPORT"
 	SSL_LIBS="-framework Security"
-if test x$WITH_OPENSSL != x; then
+elif test x$WITH_OPENSSL != x; then
 	WITH_SSL="$WITH_OPENSSL"
 	SSL_LDFLAGS="$OPENSSL_LDFLAGS"
 	SSL_LIBS="$OPENSSL_LIBS"
