@@ -89,7 +89,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-subdir = libmj
+subdir = libfetch
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -104,9 +104,10 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
-libmj_la_LIBADD =
-am_libmj_la_OBJECTS = mj.lo
-libmj_la_OBJECTS = $(am_libmj_la_OBJECTS)
+libfetch_la_LIBADD =
+am_libfetch_la_OBJECTS = libfetch_la-fetch.lo libfetch_la-common.lo \
+	libfetch_la-ftp.lo libfetch_la-http.lo libfetch_la-file.lo
+libfetch_la_OBJECTS = $(am_libfetch_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -126,7 +127,11 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/mj.Plo
+am__depfiles_remade = ./$(DEPDIR)/libfetch_la-common.Plo \
+	./$(DEPDIR)/libfetch_la-fetch.Plo \
+	./$(DEPDIR)/libfetch_la-file.Plo \
+	./$(DEPDIR)/libfetch_la-ftp.Plo \
+	./$(DEPDIR)/libfetch_la-http.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -146,8 +151,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libmj_la_SOURCES)
-DIST_SOURCES = $(libmj_la_SOURCES)
+SOURCES = $(libfetch_la_SOURCES)
+DIST_SOURCES = $(libfetch_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -315,10 +320,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(WARNCFLAGS)
-noinst_LTLIBRARIES = libmj.la
-
-#libmj_la_CPPFLAGS	=
-libmj_la_SOURCES = mj.c
+noinst_LTLIBRARIES = libfetch.la
+libfetch_la_CPPFLAGS = -DNETBSD -DFTP_COMBINE_CWDS -DINET6 $(SSL_INCLUDES)
+libfetch_la_SOURCES = fetch.c common.c ftp.c http.c file.c
 all: all-am
 
 .SUFFIXES:
@@ -332,9 +336,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign libmj/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign libfetch/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign libmj/Makefile
+	  $(AUTOMAKE) --foreign libfetch/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -364,8 +368,8 @@ clean-noinstLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
-libmj.la: $(libmj_la_OBJECTS) $(libmj_la_DEPENDENCIES) $(EXTRA_libmj_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(LINK)  $(libmj_la_OBJECTS) $(libmj_la_LIBADD) $(LIBS)
+libfetch.la: $(libfetch_la_OBJECTS) $(libfetch_la_DEPENDENCIES) $(EXTRA_libfetch_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(LINK)  $(libfetch_la_OBJECTS) $(libfetch_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -373,7 +377,11 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mj.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfetch_la-common.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfetch_la-fetch.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfetch_la-file.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfetch_la-ftp.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfetch_la-http.Plo@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -401,6 +409,41 @@ am--depfiles: $(am__depfiles_remade)
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+libfetch_la-fetch.lo: fetch.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libfetch_la-fetch.lo -MD -MP -MF $(DEPDIR)/libfetch_la-fetch.Tpo -c -o libfetch_la-fetch.lo `test -f 'fetch.c' || echo '$(srcdir)/'`fetch.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libfetch_la-fetch.Tpo $(DEPDIR)/libfetch_la-fetch.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fetch.c' object='libfetch_la-fetch.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libfetch_la-fetch.lo `test -f 'fetch.c' || echo '$(srcdir)/'`fetch.c
+
+libfetch_la-common.lo: common.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libfetch_la-common.lo -MD -MP -MF $(DEPDIR)/libfetch_la-common.Tpo -c -o libfetch_la-common.lo `test -f 'common.c' || echo '$(srcdir)/'`common.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libfetch_la-common.Tpo $(DEPDIR)/libfetch_la-common.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='common.c' object='libfetch_la-common.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libfetch_la-common.lo `test -f 'common.c' || echo '$(srcdir)/'`common.c
+
+libfetch_la-ftp.lo: ftp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libfetch_la-ftp.lo -MD -MP -MF $(DEPDIR)/libfetch_la-ftp.Tpo -c -o libfetch_la-ftp.lo `test -f 'ftp.c' || echo '$(srcdir)/'`ftp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libfetch_la-ftp.Tpo $(DEPDIR)/libfetch_la-ftp.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ftp.c' object='libfetch_la-ftp.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libfetch_la-ftp.lo `test -f 'ftp.c' || echo '$(srcdir)/'`ftp.c
+
+libfetch_la-http.lo: http.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libfetch_la-http.lo -MD -MP -MF $(DEPDIR)/libfetch_la-http.Tpo -c -o libfetch_la-http.lo `test -f 'http.c' || echo '$(srcdir)/'`http.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libfetch_la-http.Tpo $(DEPDIR)/libfetch_la-http.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='http.c' object='libfetch_la-http.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libfetch_la-http.lo `test -f 'http.c' || echo '$(srcdir)/'`http.c
+
+libfetch_la-file.lo: file.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libfetch_la-file.lo -MD -MP -MF $(DEPDIR)/libfetch_la-file.Tpo -c -o libfetch_la-file.lo `test -f 'file.c' || echo '$(srcdir)/'`file.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libfetch_la-file.Tpo $(DEPDIR)/libfetch_la-file.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='file.c' object='libfetch_la-file.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libfetch_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libfetch_la-file.lo `test -f 'file.c' || echo '$(srcdir)/'`file.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -532,7 +575,11 @@ clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/mj.Plo
+		-rm -f ./$(DEPDIR)/libfetch_la-common.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-fetch.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-file.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-ftp.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-http.Plo
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -578,7 +625,11 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/mj.Plo
+		-rm -f ./$(DEPDIR)/libfetch_la-common.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-fetch.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-file.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-ftp.Plo
+	-rm -f ./$(DEPDIR)/libfetch_la-http.Plo
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -615,6 +666,14 @@ uninstall-am:
 
 .PRECIOUS: Makefile
 
+
+ftperr.h: errlist.sh ftp.errors
+	sh $(srcdir)/errlist.sh ftp_errlist FTP \
+	    $(srcdir)/ftp.errors > ftperr.h
+
+httperr.h: errlist.sh http.errors
+	sh $(srcdir)/errlist.sh http_errlist HTTP \
+	    $(srcdir)/http.errors > httperr.h
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

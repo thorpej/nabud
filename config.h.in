@@ -1,6 +1,6 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* Define to 1 if you have <<CommonCrypto/CommonCrypto.h> */
+/* Define to 1 if you have <CommonCrypto/CommonCrypto.h> */
 #undef HAVE_COMMONCRYPTO_H
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
@@ -17,6 +17,9 @@
 
 /* Have PTHREAD_PRIO_INHERIT. */
 #undef HAVE_PTHREAD_PRIO_INHERIT
+
+/* Define to 1 if you have <Security/SecureTransport.h> */
+#undef HAVE_SECURETRANSPORT
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H

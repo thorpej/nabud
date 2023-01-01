@@ -669,9 +669,12 @@ PTHREAD_CXX
 PTHREAD_CC
 ax_pthread_config
 CPP
-PAK_DECRYPT_INCLUDES
-PAK_DECRYPT_LIBS
-PAK_DECRYPT_LDFLAGS
+PAK_INCLUDES
+PAK_LIBS
+PAK_LDFLAGS
+SSL_INCLUDES
+SSL_LIBS
+SSL_LDFLAGS
 OPENSSL_LDFLAGS
 OPENSSL_LIBS
 OPENSSL_INCLUDES
@@ -12761,6 +12764,48 @@ else $as_nop
 printf "%s\n" "no" >&6; }
 fi
 
+case "$CANONICAL_TARGET" in
+	*-*-darwin*)
+		# MD5 is marked as deprecated on macOS, but we're
+		# kind of forced to use it regardless.
+		WARNCFLAGS="$WARNCFLAGS -Wno-deprecated-declarations"
+		;;
+esac
+
+
+
+#
+# Deal with the crypto libraries we need.
+#
+
+WITH_SSL=no
+WITH_PAK=no
+
+# Check for CommonCrypto (the native crypto library on macOS).
+#
+ac_fn_c_check_header_compile "$LINENO" "CommonCrypto/CommonCrypto.h" "ac_cv_header_CommonCrypto_CommonCrypto_h" "$ac_includes_default"
+if test "x$ac_cv_header_CommonCrypto_CommonCrypto_h" = xyes
+then :
+
+printf "%s\n" "#define HAVE_COMMONCRYPTO_H 1" >>confdefs.h
+
+	 WITH_COMMONCRYPTO="CommonCrypto"
+fi
+
+
+# Check for SecureTransport (the old native SSL/TLS framework on macOS).
+# It is deprecated, but we will use it until we can make libfetch use
+# the Network framework.
+#
+ac_fn_c_check_header_compile "$LINENO" "Security/SecureTransport.h" "ac_cv_header_Security_SecureTransport_h" "$ac_includes_default"
+if test "x$ac_cv_header_Security_SecureTransport_h" = xyes
+then :
+
+printf "%s\n" "#define HAVE_SECURETRANSPORT 1" >>confdefs.h
+
+	 WITH_SECURETRANSPORT="SecureTransport"
+fi
+
 
 # Check for OpenSSL
 #
@@ -13022,12 +13067,13 @@ printf "%s\n" "yes" >&6; }
 
 printf "%s\n" "#define HAVE_OPENSSL 1" >>confdefs.h
 
+		 WITH_OPENSSL="OpenSSL"
 
 else $as_nop
 
             { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
-            as_fn_error $? "Missing OpenSSL" "$LINENO" 5
+
 
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam \
@@ -13041,27 +13087,37 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
 
 
 
-# Check for which crypto (md5 + des) library to use for PAK files.
+# Check for which SSL implementation to use.
 #
-# We look for <CommonCrypto/CommonCrypto.h>, which is the native
-# API on macOS.  Otherwise, we fall back to OpenSSL's libcrypto.
-#
-ac_fn_c_check_header_compile "$LINENO" "CommonCrypto/CommonCrypto.h" "ac_cv_header_CommonCrypto_CommonCrypto_h" "$ac_includes_default"
-if test "x$ac_cv_header_CommonCrypto_CommonCrypto_h" = xyes
-then :
-
-printf "%s\n" "#define HAVE_COMMONCRYPTO_H 1" >>confdefs.h
-
-	 PAK_DECRYPT_LDFLAGS=""
-	 PAK_DECRYPT_LIBS=""
-	 PAK_DECRYPT_INCLUDES=""
-else $as_nop
-  PAK_DECRYPT_LDFLAGS="$OPENSSL_LDFLAGS"
-	 PAK_DECRYPT_LIBS="-lcrypto"
-	 PAK_DECRYPT_INCLUDES="$OPENSSL_INCLUDES"
-
+if test x$WITH_SECURETRANSPORT != x; then
+	WITH_SSL="$WITH_SECURETRANSPORT"
+	SSL_LIBS="-framework Security -framework CoreFoundation"
+elif test x$WITH_OPENSSL != x; then
+	WITH_SSL="$WITH_OPENSSL"
+	SSL_LDFLAGS="$OPENSSL_LDFLAGS"
+	SSL_LIBS="$OPENSSL_LIBS"
+	SSL_INCLUDES="$OPENSSL_INCLUDES"
+else
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Building without SSL support" >&5
+printf "%s\n" "$as_me: WARNING: Building without SSL support" >&2;}
 fi
 
+
+
+
+# Check for which crypto (md5 + des) library to use for PAK files.
+#
+if test x$WITH_COMMONCRYPTO != x; then
+	WITH_PAK="$WITH_COMMONCRYPTO"
+elif test x$WITH_OPENSSL != x; then
+	WITH_PAK="$WITH_OPENSSL"
+	PAK_LDFLAGS="$OPENSSL_LDFLAGS"
+	PAK_LIBS="-lcrypto"
+	PAK_INCLUDES="$OPENSSL_INCLUDES"
+else
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Building without PAK file support" >&5
+printf "%s\n" "$as_me: WARNING: Building without PAK file support" >&2;}
+fi
 
 
 
@@ -14080,7 +14136,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 # Generate the Makefiles
 #
-ac_config_files="$ac_config_files Makefile libmj/Makefile nabud/Makefile"
+ac_config_files="$ac_config_files Makefile libfetch/Makefile libmj/Makefile nabud/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -15095,6 +15151,7 @@ do
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+    "libfetch/Makefile") CONFIG_FILES="$CONFIG_FILES libfetch/Makefile" ;;
     "libmj/Makefile") CONFIG_FILES="$CONFIG_FILES libmj/Makefile" ;;
     "nabud/Makefile") CONFIG_FILES="$CONFIG_FILES nabud/Makefile" ;;
 
@@ -16387,18 +16444,22 @@ printf "%s\n" "$as_me: POSIX threads CFLAGS:     $PTHREAD_CFLAGS" >&6;}
 printf "%s\n" "$as_me: POSIX threads libraries:  $PTHREAD_LIBS" >&6;}
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Warning CFLAGS:           $WARNCFLAGS" >&5
 printf "%s\n" "$as_me: Warning CFLAGS:           $WARNCFLAGS" >&6;}
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: OpenSSL includes:         $OPENSSL_INCLUDES" >&5
-printf "%s\n" "$as_me: OpenSSL includes:         $OPENSSL_INCLUDES" >&6;}
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: OpenSSL libraries:        $OPENSSL_LIBS" >&5
-printf "%s\n" "$as_me: OpenSSL libraries:        $OPENSSL_LIBS" >&6;}
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: OpenSSL LDFLAGS:          $OPENSSL_LDFLAGS" >&5
-printf "%s\n" "$as_me: OpenSSL LDFLAGS:          $OPENSSL_LDFLAGS" >&6;}
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK decrypt includes:     $PAK_DECRYPT_INCLUDES" >&5
-printf "%s\n" "$as_me: PAK decrypt includes:     $PAK_DECRYPT_INCLUDES" >&6;}
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK decrypt libraries:    $PAK_DECRYPT_LIBS" >&5
-printf "%s\n" "$as_me: PAK decrypt libraries:    $PAK_DECRYPT_LIBS" >&6;}
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK decrypt LDFLAGS:      $PAK_DECRYPT_LDFLAGS" >&5
-printf "%s\n" "$as_me: PAK decrypt LDFLAGS:      $PAK_DECRYPT_LDFLAGS" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: SSL support:              $WITH_SSL" >&5
+printf "%s\n" "$as_me: SSL support:              $WITH_SSL" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: SSL includes:             $SSL_INCLUDES" >&5
+printf "%s\n" "$as_me: SSL includes:             $SSL_INCLUDES" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: SSL libraries:            $SSL_LIBS" >&5
+printf "%s\n" "$as_me: SSL libraries:            $SSL_LIBS" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: SSL LDFLAGS:              $SSL_LDFLAGS" >&5
+printf "%s\n" "$as_me: SSL LDFLAGS:              $SSL_LDFLAGS" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK file support:         $WITH_PAK" >&5
+printf "%s\n" "$as_me: PAK file support:         $WITH_PAK" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK file includes:        $PAK_INCLUDES" >&5
+printf "%s\n" "$as_me: PAK file includes:        $PAK_INCLUDES" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK file libraries:       $PAK_LIBS" >&5
+printf "%s\n" "$as_me: PAK file libraries:       $PAK_LIBS" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK file LDFLAGS:         $PAK_LDFLAGS" >&5
+printf "%s\n" "$as_me: PAK file LDFLAGS:         $PAK_LDFLAGS" >&6;}
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: =============================" >&5
 printf "%s\n" "$as_me: =============================" >&6;}
 

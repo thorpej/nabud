@@ -33,7 +33,7 @@
 #include <unistd.h>
 
 #include "mj.h"
-#include "mj_defs.h"
+#include "defs.h"
 
 #define JSON_ESCAPE '\xac'
 #define JSON_INDENT 4

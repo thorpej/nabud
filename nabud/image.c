@@ -52,12 +52,14 @@
 #include <openssl/des.h>
 #include <openssl/md5.h>
 #else
-#error No crypto support for PAK files!
+#define NO_PAK_FILE_SUPPORT
 #endif
 
 #include "conn.h"
 #include "image.h"
 #include "log.h"
+
+#include "../libfetch/fetch.h"
 
 static LIST_HEAD(, image_source) image_sources =
     LIST_HEAD_INITIALIZER(image_sources);
@@ -122,11 +124,11 @@ image_source_lookup(const char *name)
 }
 
 /*
- * image_source_alloc --
- *	Allocate a new image source.
+ * image_add_source --
+ *	Add an image source.
  */
-static struct image_source *
-image_source_alloc(char *name, image_source_type type)
+void
+image_add_source(char *name, char *root)
 {
 	if (image_source_lookup(name) != NULL) {
 		log_error("Image source %s alreadty exists.", name);
@@ -136,37 +138,20 @@ image_source_alloc(char *name, image_source_type type)
 	struct image_source *imgsrc = calloc(1, sizeof(*imgsrc));
 	if (imgsrc != NULL) {
 		imgsrc->name = name;
-		imgsrc->type = type;
+		imgsrc->root = root;
+		LIST_INSERT_HEAD(&image_sources, imgsrc, link);
+		image_source_count++;
+		log_info("Adding Source %s at %s",
+		    imgsrc->name, imgsrc->root);
 	} else {
 		log_error("Unable to allocate image source descriptor for %s",
 		    name);
 		goto bad;
 	}
-	return imgsrc;
+	return;
  bad:
 	free(name);
-	return NULL;
-}
-
-/*
- * image_add_local_source --
- *	Add a local image source.
- */
-void
-image_add_local_source(char *name, char *path)
-{
-	struct image_source *imgsrc =
-	    image_source_alloc(name, IMAGE_SOURCE_LOCAL);
-	if (imgsrc != NULL) {
-		imgsrc->root = path;
-		LIST_INSERT_HEAD(&image_sources, imgsrc, link);
-		image_source_count++;
-		log_info("Adding Local source %s at %s",
-		    imgsrc->name, imgsrc->root);
-	} else {
-		/* Error already logged. */
-		free(path);
-	}
+	free(root);
 }
 
 /*
@@ -207,9 +192,16 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	if ((chan = image_channel_lookup(number)) != NULL) {
 		log_error("Channel %u already exists (%s on %s).",
 		    number, chan->name, chan->source->name);
-		chan = NULL;
 		goto bad;
 	}
+
+#ifdef NO_PAK_FILE_SUPPORT
+	if (type == IMAGE_CHANNEL_PAK) {
+		log_error("Skipping pak channel %u (%s on %s); "
+		    "no pak file support.");
+		goto bad;
+	}
+#endif /* NO_PAK_FILE_SUPPORT */
 
 	pathlen = strlen(name) + strlen(imgsrc->root) + 2; /* / + NUL */
 	chan = calloc(1, sizeof(*chan));
@@ -241,60 +233,6 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	}
 	free(name);
 	free(source);
-}
-
-/*
- * image_load_file --
- *	Load the specified file.  Caller is responsible for
- *	freeing the buffer.
- */
-uint8_t *
-image_load_file(const char *path, size_t *filesizep, size_t extra)
-{
-	struct stat sb;
-	uint8_t *filebuf = NULL;
-	size_t filesize = 0;
-	int fd = -1;
-
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		log_error("open(%s): %s", path, strerror(errno));
-		goto bad;
-	}
-
-	if (fstat(fd, &sb) < 0) {
-		log_error("fstat(%s): %s", path, strerror(errno));
-		goto bad;
-	}
-	if (!S_ISREG(sb.st_mode)) {
-		log_error("%s is not a regular file.", path);
-		goto bad;
-	}
-
-	filesize = (size_t)sb.st_size;
-	filebuf = malloc(filesize + extra);
-	if (filebuf == NULL) {
-		log_error("Unable to allocate %zu bytes for %s",
-		    filesize + extra, path);
-		goto bad;
-	}
-
-	if (read(fd, filebuf, filesize) != (ssize_t)filesize) {
-		log_error("Unable to read %s", path);
-		goto bad;
-	}
- out:
-	if (fd >= 0) {
-		close(fd);
-	}
-	*filesizep = filesize;
-	return filebuf;
- bad:
-	if (filebuf != NULL) {
-		free(filebuf);
-		filebuf = NULL;
-	}
-	goto out;
 }
 
 /*
@@ -379,6 +317,7 @@ image_nabu_name(uint32_t image)
 #define	PAK_NAME_SIZE	\
 	sizeof("FE-A1-04-B7-3D-67-F8-8B-26-4C-0C-81-9B-F6-24-58.npak")
 
+#ifndef NO_PAK_FILE_SUPPORT
 /*
  * image_pak_name --
  *	Generate a NabuRetroNet PAK name from the given image number.
@@ -410,6 +349,7 @@ image_pak_name(uint32_t image)
 
 	return strdup(pakname);
 }
+#endif /* ! NO_PAK_FILE_SUPPORT */
 
 /*
  * image_from_nabu --
@@ -441,6 +381,7 @@ image_from_nabu(struct image_channel *chan, uint32_t image, uint8_t *filebuf,
 	return img;
 }
 
+#ifndef NO_PAK_FILE_SUPPORT
 /*
  * image_decrypt_pak --
  *	Decrypt a PAK image.
@@ -537,28 +478,62 @@ image_from_pak(struct image_channel *chan, uint32_t image,
 
 	return img;
 }
+#endif /* ! NO_PAK_FILE_SUPPORT */
 
 /*
- * image_load_image_from_path --
- *	Load an image from the specified path.
+ * image_load_image_from_url --
+ *	Load an image from the specified url.
  */
 static struct nabu_image *
-image_load_image_from_path(struct image_channel *chan, uint32_t image,
-    const char *path)
+image_load_image_from_url(struct image_channel *chan, uint32_t image,
+    const char *url)
 {
+	struct url_stat ust;
 	uint8_t *filebuf;
 	size_t filesize;
 	struct nabu_image *img;
+	fetchIO *fio;
 
-	filebuf = image_load_file(path, &filesize, 0);
-	if (filebuf == NULL) {
+	fio = fetchXGetURL(url, &ust, "");
+	if (fio == NULL) {
+		log_error("Unable to fetch %s", url);
 		return NULL;
 	}
 
+	if (ust.size < 0) {
+		/* XXX Support for chunked transfer encodings. */
+		log_error("Size for %s unavailable.", url);
+		fetchIO_close(fio);
+		return NULL;
+	} else if (ust.size == 0 || ust.size > NABU_MAXSEGMENTSIZE) {
+		log_error("Size of %s (%lld) is nonsensical.",
+		    url, (long long)ust.size);
+		fetchIO_close(fio);
+		return NULL;
+	} else {
+		filesize = (size_t)ust.size;
+		log_debug("Size of %s is %zu bytes.", url, filesize);
+	}
+	if ((filebuf = malloc(filesize)) == NULL) {
+		log_error("Unable to allocate %zu bytes for %s",
+		    filesize, url);
+		fetchIO_close(fio);
+		return NULL;
+	}
+	if (fetchIO_read(fio, filebuf, filesize) != (ssize_t)filesize) {
+		log_error("Unable to read %s", url);
+		fetchIO_close(fio);
+		free(filebuf);
+		return NULL;
+	}
+
+#ifndef NO_PAK_FILE_SUPPORT
 	if (chan->type == IMAGE_CHANNEL_PAK) {
 		img = image_from_pak(chan, image, filebuf, filesize);
 		free(filebuf);
-	} else {
+	} else
+#endif /* ! NO_PAK_FILE_SUPPORT */
+	{
 		img = image_from_nabu(chan, image, filebuf, filesize);
 	}
 
@@ -629,8 +604,7 @@ image_done(struct nabu_connection *conn, struct nabu_image *img)
 struct nabu_image *
 image_load(struct nabu_connection *conn, uint32_t image)
 {
-	char image_path[PATH_MAX];
-	char *fname;
+	char *fname, *image_url = NULL;
 	const char *imgtype;
 	struct nabu_image *img;
 
@@ -654,21 +628,25 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		return img;
 	}
 
+#ifndef NO_PAK_FILE_SUPPORT
 	if (conn->channel->type == IMAGE_CHANNEL_PAK) {
 		fname = image_pak_name(image);
 		imgtype = "pak";
-	} else {
+	} else
+#endif /* ! NO_PAK_FILE_SUPPORT */
+	{
 		fname = image_nabu_name(image);
 		imgtype = "nabu";
 	}
 
-	snprintf(image_path, sizeof(image_path), "%s/%s", conn->channel->path,
-	    fname);
+	asprintf(&image_url, "%s/%s", conn->channel->path, fname);
+	assert(image_url != NULL);
 	log_debug("[%s] Loading %s-%06X from %s", conn->name, imgtype, image,
-	    image_path);
+	    image_url);
 	free(fname);
 
-	img = image_load_image_from_path(conn->channel, image, image_path);
+	img = image_load_image_from_url(conn->channel, image, image_url);
+	free(image_url);
 	if (img != NULL) {
 		img = image_cache_insert(conn->channel, img);
 		image_use(conn, img);

@@ -32,14 +32,8 @@
 
 #include "nbsd_queue.h"
 
-typedef enum {
-	IMAGE_SOURCE_INVALID	=	0,
-	IMAGE_SOURCE_LOCAL	=	1,
-} image_source_type;
-
 struct image_source {
 	LIST_ENTRY(image_source) link;
-	image_source_type type;
 	char		*name;
 	char		*root;
 };
@@ -72,13 +66,11 @@ struct nabu_image {
 
 struct nabu_connection;
 
-void	image_add_local_source(char *, char *);
+void	image_add_source(char *, char *);
 void	image_add_channel(image_channel_type, char *, char *, unsigned int);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);
 void	image_done(struct nabu_connection *, struct nabu_image *);
-
-uint8_t *image_load_file(const char *, size_t *, size_t);
 
 #endif /* image_h_included */
