@@ -59,7 +59,7 @@ rn_store_get_slot(struct nabu_connection *conn, uint8_t slot)
 	struct rn_blob *blob;
 
 	/*
-	 * No need to hold the channel mutex or track references -- the
+	 * No need to hold the connection mutex or track references -- the
 	 * blobs are only ever referenced by the thread that owns the
 	 * connection.
 	 */
