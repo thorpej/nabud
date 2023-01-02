@@ -67,7 +67,8 @@ struct nabu_image {
 struct nabu_connection;
 
 void	image_add_source(char *, char *);
-void	image_add_channel(image_channel_type, char *, char *, unsigned int);
+void	image_add_channel(image_channel_type, char *, char *, const char *,
+	    unsigned int);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);

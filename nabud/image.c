@@ -197,7 +197,7 @@ image_channel_lookup(unsigned int number)
  */
 void
 image_add_channel(image_channel_type type, char *name, char *source,
-    unsigned int number)
+    const char *relpath, unsigned int number)
 {
 	struct image_channel *chan = NULL;
 	size_t pathlen;
@@ -223,7 +223,19 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	}
 #endif /* NO_PAK_FILE_SUPPORT */
 
-	pathlen = strlen(name) + strlen(imgsrc->root) + 2; /* / + NUL */
+	if (relpath != NULL) {
+		/* Get rid of leading /'s */
+		while (*relpath == '/') {
+			relpath++;
+		}
+		if (*relpath == '\0') {
+			relpath = NULL;
+		}
+	}
+	if (relpath == NULL) {
+		relpath = name;
+	}
+	pathlen = strlen(relpath) + strlen(imgsrc->root) + 2; /* / + NUL */
 	chan = calloc(1, sizeof(*chan));
 	pathstr = malloc(pathlen);
 	if (chan == NULL || pathstr == NULL) {
@@ -231,7 +243,7 @@ image_add_channel(image_channel_type type, char *name, char *source,
 		    number);
 		goto bad;
 	}
-	snprintf(pathstr, pathlen, "%s/%s", imgsrc->root, name);
+	snprintf(pathstr, pathlen, "%s/%s", imgsrc->root, relpath);
 
 	chan->source = imgsrc;
 	chan->type = type;

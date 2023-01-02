@@ -68,8 +68,9 @@ config_error(const char *preamble, mj_t *atom)
 static void
 config_load_channel(mj_t *atom)
 {
-	mj_t *name_atom, *number_atom, *type_atom, *source_atom;
-	char *name = NULL, *number = NULL, *type = NULL, *source = NULL;
+	mj_t *name_atom, *number_atom, *type_atom, *source_atom, *path_atom;
+	char *name = NULL, *number = NULL, *type = NULL, *source = NULL,
+	    *path = NULL;
 	image_channel_type ictype;
 	long val;
 
@@ -123,7 +124,16 @@ config_load_channel(mj_t *atom)
 	}
 	mj_asprint(&source, source_atom, MJ_HUMAN);
 
-	image_add_channel(ictype, name, source, val);
+	/*
+	 * Optional Path -- specifies a path relative to the
+	 * Source root that contains the files for this channel.
+	 */
+	path_atom = mj_get_atom(atom, "Path");
+	if (VALID_ATOM(path_atom, MJ_STRING)) {
+		mj_asprint(&path, path_atom, MJ_HUMAN);
+	}
+
+	image_add_channel(ictype, name, source, path, val);
 	/* image_add_channel() owns these */
 	name = source = NULL;
 
@@ -139,6 +149,9 @@ config_load_channel(mj_t *atom)
 	}
 	if (source != NULL) {
 		free(source);
+	}
+	if (path != NULL) {
+		free(path);
 	}
 }
 
