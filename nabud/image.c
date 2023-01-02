@@ -73,7 +73,6 @@ static size_t image_cache_size;
 /*
  * image_retain_locked --
  *	Retain (increment the refcnt) on the specified image.
- *	image_cache_lock must be held.
  */
 static void
 image_retain_locked(struct nabu_image *img)
@@ -83,25 +82,48 @@ image_retain_locked(struct nabu_image *img)
 }
 
 /*
- * image_release --
+ * image_release_locked --
  *	Release the specified image.
- *	image_cache_lock must NOT be held.
+ */
+static struct nabu_image *
+image_release_locked(struct nabu_image *img)
+{
+	if (img != NULL) {
+		uint32_t ocnt = img->refcnt--;
+		assert(ocnt > 0);
+		if (ocnt > 1) {
+			img = NULL;
+		}
+	}
+	return img;
+}
+
+/*
+ * image_free --
+ *	Free an image.
  */
 static void
-image_release(struct nabu_image *img)
+image_free(struct nabu_image *img)
 {
-	uint32_t ocnt;
-
-	pthread_mutex_lock(&image_cache_lock);
-	ocnt = img->refcnt--;
-	pthread_mutex_unlock(&image_cache_lock);
-
-	assert(ocnt > 0);
-	if (ocnt == 1) {
+	if (img != NULL) {
+		assert(img->refcnt == 0);
 		free(img->name);
 		free(img->data);
 		free(img);
 	}
+}
+
+/*
+ * image_release --
+ *	Relase an image.  This version is visible to outsiders.
+ */
+void
+image_release(struct nabu_image *img)
+{
+	pthread_mutex_lock(&image_cache_lock);
+	img = image_release_locked(img);
+	pthread_mutex_unlock(&image_cache_lock);
+	image_free(img);
 }
 
 /*
@@ -235,8 +257,8 @@ image_add_channel(image_channel_type type, char *name, char *source,
 
 /*
  * image_cache_lookup_locked --
- *	Look up an image in the channel's image cache.  This is
- *	used by image_cache_lookup() and image_cache_insert().
+ *	Look up an image in the channel's image cache.  Gains a retain
+ *	on the image, of found.
  */
 static struct nabu_image *
 image_cache_lookup_locked(struct image_channel *chan, uint32_t image)
@@ -253,50 +275,37 @@ image_cache_lookup_locked(struct image_channel *chan, uint32_t image)
 }
 
 /*
- * image_cache_lookup --
- *	Look up an image in the channel's image cache.
- */
-static struct nabu_image *
-image_cache_lookup(struct image_channel *chan, uint32_t image)
-{
-	struct nabu_image *img;
-
-	pthread_mutex_lock(&image_cache_lock);
-	img = image_cache_lookup_locked(chan, image);
-	pthread_mutex_unlock(&image_cache_lock);
-
-	return img;
-}
-
-/*
- * image_cache_insert --
+ * image_cache_insert_locked --
  *	Insert an image into the image cache.  If the image
  *	already exists, we release the new one and return
  *	the one from the cache.
+ *
+ *	The image returned has 2 retains:
+ *
+ *	-> For new images, we start with a retain count of 1 (the
+ *	   caller's retain) and the image cache also gains a retain.
+ *
+ *	-> For collisions, we start with a retain count of 1 (the
+ *	   image cache's retain) and the gain another for the caller.
  */
 static struct nabu_image *
-image_cache_insert(struct image_channel *chan, struct nabu_image *newimg)
+image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 {
 	struct nabu_image *img;
-	size_t size;
 
-	pthread_mutex_lock(&image_cache_lock);
 	img = image_cache_lookup_locked(chan, newimg->number);
 	if (img == NULL) {
 		image_retain_locked(newimg);
 		LIST_INSERT_HEAD(&chan->image_cache, newimg, link);
 		image_cache_size += newimg->length;
 	}
-	size = image_cache_size;
-	pthread_mutex_unlock(&image_cache_lock);
 
 	if (img == NULL) {
 		log_info("Cached %s on Channel %u; "
-		    "total cache size: %zu", newimg->name, chan->number, size);
-		return newimg;
+		    "total cache size: %zu", newimg->name, chan->number,
+		        image_cache_size);
+		img = newimg;
 	}
-
-	image_release(newimg);
 	return img;
 }
 
@@ -538,43 +547,6 @@ image_channel_select(struct nabu_connection *conn, int16_t channel)
 }
 
 /*
- * image_use --
- *	Indicate that the connection is now using an image.  Assumes
- *	the image has already been properly retained.
- */
-static void
-image_use(struct nabu_connection *conn, struct nabu_image *img)
-{
-	struct nabu_image *oimg;
-
-	oimg = conn_set_last_image(conn, img);
-	if (oimg != NULL) {
-		image_done(conn, oimg);
-	}
-
-	log_info("[%s] Using image %s from Channel %u.",
-	    conn->name, img->name, img->channel->number);
-}
-
-/*
- * image_done --
- *	Indicate that the connection is done with it's
- *	cached image.
- */
-void
-image_done(struct nabu_connection *conn, struct nabu_image *img)
-{
-	struct nabu_image *oimg;
-
-	oimg = conn_set_last_image_if(conn, img, NULL);
-
-	if (oimg != NULL) {
-		log_info("[%s] Done with image %s.", conn->name, img->name);
-		image_release(img);
-	}
-}
-
-/*
  * image_load --
  *	Load the specified segment.
  */
@@ -586,27 +558,42 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	struct nabu_image *img;
 	struct image_channel *chan;
 
+	pthread_mutex_lock(&image_cache_lock);
+
 	img = conn_get_last_image(conn);
 	if (img != NULL && img->number == image) {
 		/* Cache hit! */
 		log_debug("[%s] Connection cache hit for image %06X: %s",
 		    conn->name, image, img->name);
+		image_retain_locked(img);
+		pthread_mutex_unlock(&image_cache_lock);
 		return img;
 	}
 
 	chan = conn_get_channel(conn);
 	if (chan == NULL) {
 		log_error("[%s] No channel selected.", conn->name);
+		pthread_mutex_unlock(&image_cache_lock);
 		return NULL;
 	}
 
-	if ((img = image_cache_lookup(chan, image)) != NULL) {
+	if ((img = image_cache_lookup_locked(chan, image)) != NULL) {
+		struct nabu_image *oimg;
+
 		/* Cache hit! */
 		log_debug("Channel %u cache hit for image %06X: %s",
 		    chan->number, image, img->name);
-		image_use(conn, img);
+
+		/* Add an extra retain for the last-image cache. */
+		image_retain_locked(img);
+		oimg = conn_set_last_image(conn, img);
+		oimg = image_release_locked(oimg);
+		pthread_mutex_unlock(&image_cache_lock);
+		image_free(oimg);
 		return img;
 	}
+
+	pthread_mutex_unlock(&image_cache_lock);
 
 #ifndef NO_PAK_FILE_SUPPORT
 	if (chan->type == IMAGE_CHANNEL_PAK) {
@@ -628,9 +615,25 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	img = image_load_image_from_url(chan, image, image_url);
 	free(image_url);
 	if (img != NULL) {
-		img = image_cache_insert(chan, img);
-		image_use(conn, img);
+		struct nabu_image *oimg, *using_img;
+
+		pthread_mutex_lock(&image_cache_lock);
+		using_img = image_cache_insert_locked(chan, img);
+
+		/* Add an extra retain for the last-image cache. */
+		image_retain_locked(using_img);
+		oimg = conn_set_last_image(conn, using_img);
+		oimg = image_release_locked(oimg);
+		if (using_img != img) {
+			img = image_release_locked(img);
+		} else {
+			img = NULL;
+		}
+		pthread_mutex_unlock(&image_cache_lock);
+		image_free(oimg);
+		image_free(img);
+		return using_img;
 	}
 
-	return img;
+	return NULL;
 }

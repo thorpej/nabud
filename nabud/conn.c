@@ -470,15 +470,9 @@ conn_add_tcp(char *portstr, unsigned int channel)
 void
 conn_destroy(struct nabu_connection *conn)
 {
-	struct nabu_image *img;
-
 	conn_remove(conn);
 
-	pthread_mutex_lock(&conn->mutex);
-	img = conn->l_last_image;
-	pthread_mutex_unlock(&conn->mutex);
-
-	image_done(conn, img);
+	image_release(conn_set_last_image(conn, NULL));
 
 	pthread_mutex_destroy(&conn->mutex);
 
