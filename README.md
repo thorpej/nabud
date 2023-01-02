@@ -253,5 +253,7 @@ _adaptor.c_ was partially derived from his work.
 * David Kuder's [nabu-tftp](https://github.com/dkgrizzly/nabu-tftp) gateway for the Raspberry Pi PICO
 also served to clarify some bits of the Adaptor protocol.
 * Alistair Crooks' "Minimal JSON" (_libmj_) was used to build the configuraiton file parser.
+* The _fetch_ library (_libfetch_) was written by primarily by Dag-Erling Smørgrav, with additional
+contributions by Joerg Sonnenberger.  The version here comes from The NetBSD Project.
 * [The NetBSD Project](https://www.netbsd.org) is where the file _nbsd_queue.h_ comes from.  _<sys/queue.h>_ from BSD
 is one of the handiest system header files in existence and I wish it were available everywhere.
