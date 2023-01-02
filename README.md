@@ -113,13 +113,13 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Name": "cycle1",
           "Number": 11,
           "Type": "pak",
-          "Source": "KTNet",
+          "Source": "Local",
         },
         {
           "Name": "homebrew",
           "Number": 12,
           "Type": "nabu",
-          "Source": "KTNet",
+          "Source": "Local",
         }
       ],
       "Connections": [
