@@ -230,6 +230,29 @@ showing the messages you will typically see:
     Dec 30 12:07:15 the-ripe-vessel nabud[6179]: INFO: image_use: [/dev/tty-uftdi-A10MHWD6-0] Using image pak-000001 from Channel 1.
     Dec 30 12:07:22 the-ripe-vessel nabud[6179]: INFO: image_done: [/dev/tty-uftdi-A10MHWD6-0] Done with image pak-000001.
 
+## Changes
+
+### nabud-0.8 (in development on main branch)
+* Support for the NabuRetroNet blob store extensions to the Adaptor protocol.  These extensions
+allow programs running on the NABU to access up to 256 "slots" of cloud storage that are cached
+in the server.  This opens up a lot of exciting opportunities for things like downloadable game
+levels, music tracks, etc.
+
+### nabud-0.7
+* Support for remote sources, including NabuRetroNet, althrough NabuRetroNet's "HomeBrew"
+channel does not work due to how the data is vended by that channel.
+* Support for SecureTransport on macOS, eliminating the dependency on OpenSSL on that platform.
+
+### nabud-0.6
+* Added TCP connection support, for emulators such as MAME.
+* Changed the build system to use GNU autotools.
+* Several small bug fixes.
+
+### nabud-0.5
+This was the initial "preview" release, just meant to get it out there for folks to play with.
+It supported only local sources and serial connections.  Written over the course of a few days
+during the Christmas 2022 holiday break.
+
 ## Acknowledgements
 
 First off, I want to acknowledge the folks nominally responsible for this NABU "Great Awakening":
