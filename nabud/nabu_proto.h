@@ -58,6 +58,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef nabu_proto_h_included
 #define	nabu_proto_h_included
 
+#include <stdint.h>
+
 /*
  * Definitions for the NABU <--> Adaptor protocol.
  *
@@ -179,5 +181,165 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /* Magic image number used when sending time packets. */
 #define	NABU_IMAGE_TIME		0x007fffff
+
+/*
+ * The NABU Adaptor packet header.
+ */
+struct nabu_pkthdr {
+	uint8_t		image[3];	/* image number; big-endian */
+	uint8_t		segment_lsb;	/* segment LSB */
+	uint8_t		owner;		/* owner */
+	uint8_t		tier[4];	/* tier; big endian */
+	uint8_t		mystery[2];	/* mystery bytes */
+	uint8_t		type;		/* packet type / flags */
+	uint8_t		segment[2];	/* segment number; little-endian */
+	uint8_t		offset[2];	/* offset; big-endian */
+};
+
+#ifdef NABU_PROTO_INLINES
+
+/*
+ * nabu_get_uint16 --
+ *	Get a 16-bit integer from the specified buffer.
+ */
+static inline uint16_t
+nabu_get_uint16(const uint8_t *buf)
+{
+	/* little-endian */
+	return buf[0] | (buf[1] << 8);
+}
+
+/*
+ * nabu_get_uint24 --
+ *	Get a 24-bit integer from the specified buffer.
+ */
+static inline uint32_t
+nabu_get_uint24(const uint8_t *buf)
+{
+	/* little-endian */
+	return buf[0] | (buf[1] << 8) | (buf[2] << 16);
+}
+
+/*
+ * nabu_set_uint16 --
+ *	Set a 16-bit integer in the specified buffer.
+ */
+static inline void
+nabu_set_uint16(uint8_t *buf, uint16_t val)
+{
+	/* little-endian */
+	buf[0] = (uint8_t)(val);
+	buf[1] = (uint8_t)(val >> 8);
+}
+
+/*
+ * nabu_set_uint16_be --
+ *	Set a 16-bit big-endian integer in the specified buffer.
+ */
+static inline void
+nabu_set_uint16_be(uint8_t *buf, uint16_t val)
+{
+	buf[0] = (uint8_t)(val >> 8);
+	buf[1] = (uint8_t)(val);
+}
+
+/*
+ * nabu_set_uint24_be --
+ *	Set a 24-bit big-endian integer in the specified buffer.
+ */
+static inline void
+nabu_set_uint24_be(uint8_t *buf, uint32_t val)
+{
+	buf[0] = (uint8_t)(val >> 16);
+	buf[1] = (uint8_t)(val >> 8);
+	buf[2] = (uint8_t)(val);
+}
+
+/*
+ * nabu_set_uint32_be --
+ *	Set a 32-bit big-endian integer in the specified buffer.
+ */
+static inline void
+nabu_set_uint32_be(uint8_t *buf, uint32_t val)
+{
+	buf[0] = (uint8_t)(val >> 24);
+	buf[1] = (uint8_t)(val >> 16);
+	buf[2] = (uint8_t)(val >> 8);
+	buf[3] = (uint8_t)(val);
+}
+
+/*
+ * nabu_init_pkthdr --
+ *	Initialize a NABU packet header.
+ */
+static inline size_t
+nabu_init_pkthdr(void *vbuf, uint32_t image, uint16_t segment,
+    uint16_t offset, bool last)
+{
+	struct nabu_pkthdr *hdr = vbuf;
+
+	nabu_set_uint24_be(hdr->image, image);
+	hdr->segment_lsb = (uint8_t)segment;
+	hdr->owner = 0x01;
+	nabu_set_uint32_be(hdr->tier, 0x7fffffff);
+	hdr->mystery[0] = 0x7f;
+	hdr->mystery[1] = 0x80;
+	hdr->type = (segment == 0 ? 0xa1 : 0x20) |
+		    (last         ? 0x10 : 0x00);
+	nabu_set_uint16(hdr->segment, segment);
+	nabu_set_uint16_be(hdr->offset, offset);
+
+	return sizeof(*hdr);
+}
+
+/*
+ * nabu_crc --
+ *	Compute the CRC of the provided data buffer.
+ */
+static inline uint16_t
+nabu_crc(const void *vbuf, size_t len)
+{
+	static const uint16_t crctab[] = NABU_CRC_TAB;
+	const uint8_t *buf = vbuf;
+	size_t i;
+	uint16_t crc = 0xffff;
+	uint8_t c;
+
+	for (i = 0; i < len; i++) {
+		c = (crc >> 8) ^ buf[i];
+		crc <<= 8;
+		crc ^= crctab[c];
+	}
+	return crc;
+}
+
+/*
+ * nabu_set_crc --
+ *	Write the packet CRC into the packet buffer.
+ */
+static inline size_t
+nabu_set_crc(void *vbuf, uint16_t crc)
+{
+	uint8_t *buf = vbuf;
+
+	buf[0] = (uint8_t)(crc >> 8) ^ 0xff;	/* CRC MSB */
+	buf[1] = (uint8_t)(crc)      ^ 0xff;	/* CRC LSB */
+
+	return sizeof(crc);
+}
+
+/*
+ * nabu_get_crc --
+ *	Extract the CRC from the packet buffer.
+ */
+static inline uint16_t
+nabu_get_crc(const void *vbuf)
+{
+	const uint8_t *buf = vbuf;
+
+	return ((buf[0] ^ 0xff) << 8) | (buf[1] ^ 0xff);
+}
+
+#endif /* NABU_PROTO_INLINES */
 
 #endif /* nabu_proto_h_included */

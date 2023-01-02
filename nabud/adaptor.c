@@ -73,6 +73,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <time.h>
 
+#define	NABU_PROTO_INLINES
+
 #include "adaptor.h"
 #include "conn.h"
 #include "image.h"
@@ -81,48 +83,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;
 static const uint8_t nabu_msg_finished[] = NABU_MSGSEQ_FINISHED;
-
-/*
- * adaptor_get_int16 --
- *	Get a 16-bit integer from the specified buffer.
- */
-static uint16_t
-adaptor_get_int16(const uint8_t *buf)
-{
-	/* little-endian */
-	return buf[0] | (buf[1] << 8);
-}
-
-/*
- * adaptor_get_int24 --
- *	Get a 24-bit integer from the specified buffer.
- */
-static uint32_t
-adaptor_get_int24(const uint8_t *buf)
-{
-	/* little-endian */
-	return buf[0] | (buf[1] << 8) | (buf[2] << 16);
-}
-
-/*
- * adaptor_crc --
- *	Compute the CRC of the provided data buffer.
- */
-static uint16_t
-adaptor_crc(const uint8_t *buf, size_t len)
-{
-	static const uint16_t crctab[] = NABU_CRC_TAB;
-	size_t i;
-	uint16_t crc = 0xffff;
-	uint8_t c;
-
-	for (i = 0; i < len; i++) {
-		c = (crc >> 8) ^ buf[i];
-		crc <<= 8;
-		crc ^= crctab[c];
-	}
-	return crc;
-}
 
 /*
  * adaptor_escape_packet --
@@ -281,9 +241,7 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
 
 	memcpy(pktbuf, img->data + off, len);
 
-	uint16_t crc = adaptor_crc(pktbuf, len - 2);
-	pktbuf[len - 2] = (uint8_t)(crc >> 8) ^ 0xff;	/* CRC MSB */
-	pktbuf[len - 1] = (uint8_t)(crc)      ^ 0xff;	/* CRC LSB */
+	nabu_set_crc(&pktbuf[len - 2], nabu_crc(pktbuf, len - 2));
 
 	log_debug("[%s] Sending segment %u of image %06X%s", conn->name,
 	    segment, img->number, last ? " (last segment)" : "");
@@ -341,30 +299,12 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 	}
 
 	/* 16 bytes of header */
-	pktbuf[i++] = (uint8_t)(img->number >> 16);	/* image MSB */
-	pktbuf[i++] = (uint8_t)(img->number >> 8);
-	pktbuf[i++] = (uint8_t)(img->number);		/* image LSB */
-	pktbuf[i++] = (uint8_t)(segment);		/* segment LSB */
-	pktbuf[i++] = 0x01;				/* owner */
-	pktbuf[i++] = 0x7f;				/* tier MSB */
-	pktbuf[i++] = 0xff;
-	pktbuf[i++] = 0xff;
-	pktbuf[i++] = 0xff;				/* tier LSB */
-	pktbuf[i++] = 0x7f;				/* mystery byte */
-	pktbuf[i++] = 0x80;				/* mystery byte */
-	pktbuf[i++] = (segment == 0 ? 0xa1 : 0x20) |	/* segment type */
-	              (last        ? 0x10 : 0x00);	/* end of image */
-	pktbuf[i++] = (uint8_t)(segment);		/* segment LSB */
-	pktbuf[i++] = (uint8_t)(segment >> 8);		/* segment MSB */
-	pktbuf[i++] = (uint8_t)(off >> 8);		/* offset MSB */
-	pktbuf[i++] = (uint8_t)(off);			/* offset LSB */
+	i += nabu_init_pkthdr(pktbuf, img->number, segment, off, last);
 
 	memcpy(&pktbuf[i], img->data + off, len);	/* payload */
 	i += len;
 
-	uint16_t crc = adaptor_crc(pktbuf, i);
-	pktbuf[i++] = (uint8_t)(crc >> 8) ^ 0xff;	/* CRC MSB */
-	pktbuf[i++] = (uint8_t)(crc)      ^ 0xff;	/* CRC LSB */
+	i += nabu_set_crc(&pktbuf[i], nabu_crc(pktbuf, i));
 	if (i != pktlen) {
 		log_fatal("internal packet length error");
 	}
@@ -400,7 +340,7 @@ adaptor_send_time(struct nabu_connection *conn)
 	buf[0] = 0x02;
 	buf[1] = 0x02;
 	buf[2] = 0x02;
-	buf[3] = 0x54;		/* 1984 */
+	buf[3] = 84;		/* as in 1984 */
 	buf[4] = tm->tm_mon + 1;
 	buf[5] = tm->tm_mday;
 	buf[6] = tm->tm_hour;
@@ -556,7 +496,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 	}
 
 	uint16_t segment = msg[0];
-	uint32_t image = adaptor_get_int24(&msg[1]);
+	uint32_t image = nabu_get_uint24(&msg[1]);
 	log_debug("[%s] NABU requested segment %u of image %06X.",
 	    conn->name, segment, image);
 
@@ -609,7 +549,7 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 		return;
 	}
 
-	int16_t channel = (int16_t)adaptor_get_int16(msg);
+	int16_t channel = (int16_t)nabu_get_uint16(msg);
 	log_info("[%s] NABU selected channel 0x%04x.", conn->name, channel);
 
 	image_channel_select(conn, channel);
@@ -714,8 +654,8 @@ adaptor_msg_rn_store_get_data(struct nabu_connection *conn)
 		return;
 	}
 
-	offset = adaptor_get_int16(&msg[1]);
-	length = adaptor_get_int16(&msg[3]);
+	offset = nabu_get_uint16(&msg[1]);
+	length = nabu_get_uint16(&msg[3]);
 	resid = length;
 
 	log_debug("[%s] Requesting %zu bytes from slot %u at offset %zu.",
