@@ -241,7 +241,7 @@ adaptor_send_packet(struct nabu_connection *conn, uint8_t *buf, size_t len)
  *	Extract the specified segment from a pre-prepared image pak
  *	and send it to the NABU.
  */
-static void
+static bool
 adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
     struct nabu_image *img)
 {
@@ -255,7 +255,7 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
 		    "[%s] PAK %s: offset %zu exceeds pak size %zu",
 		    conn->name, img->name, off, img->length);
 		adaptor_send_unauthorized(conn);
-		return;
+		return false;
 	}
 
 	if (off + len >= img->length) {
@@ -268,14 +268,14 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
 		    "[%s] PAK %s: offset %zu length %zu is nonsensical",
 		    conn->name, img->name, off, len);
 		adaptor_send_unauthorized(conn);
-		return;
+		return last;
 	}
 
 	pktbuf = malloc(len);
 	if (pktbuf == NULL) {
 		log_error("unable to allocate %zu byte packet buffer", len);
 		adaptor_send_unauthorized(conn);
-		return;
+		return last;
 	}
 
 	memcpy(pktbuf, img->data + off, len);
@@ -288,10 +288,7 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
 	    segment, img->number, last ? " (last segment)" : "");
 
 	adaptor_send_packet(conn, pktbuf, len);
-
-	if (last) {
-		image_done(conn, img);
-	}
+	return last;
 }
 
 /*
@@ -299,7 +296,7 @@ adaptor_send_pak(struct nabu_connection *conn, uint16_t segment,
  *	Wrap the region specified by segment in the provided image
  *	buffer in a properly structured packet and send it to the NABU.
  */
-static void
+static bool
 adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
     struct nabu_image *img)
 {
@@ -315,8 +312,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 	 * that.
 	 */
 	if (img->channel != NULL && img->channel->type == IMAGE_CHANNEL_PAK) {
-		adaptor_send_pak(conn, segment, img);
-		return;
+		return adaptor_send_pak(conn, segment, img);
 	}
 
 	if (off >= img->length) {
@@ -324,7 +320,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 		    "image %u: segment %u offset %zu exceeds image size %zu",
 		    img->number, segment, off, img->length);
 		adaptor_send_unauthorized(conn);
-		return;
+		return false;
 	}
 
 	if (off + len >= img->length) {
@@ -340,7 +336,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 		log_error("unable to allocate %zu byte packet buffer",
 		    pktlen);
 		adaptor_send_unauthorized(conn);
-		return;
+		return last;
 	}
 
 	/* 16 bytes of header */
@@ -375,10 +371,7 @@ adaptor_send_image(struct nabu_connection *conn, uint16_t segment,
 	log_debug("[%s] Sending segment %u of image %06X%s", conn->name,
 	    segment, img->number, last ? " (last segment)" : "");
 	adaptor_send_packet(conn, pktbuf, pktlen);
-
-	if (last) {
-		image_done(conn, img);
-	}
+	return last;
 }
 
 /*
@@ -592,7 +585,9 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 
 	log_debug("[%s] Sending segment %u of image %06X.",
 	    conn->name, segment, image);
-	adaptor_send_image(conn, segment, img);
+	if (adaptor_send_image(conn, segment, img)) {
+		image_done(conn, img);
+	}
 }
 
 /*
