@@ -232,12 +232,6 @@ showing the messages you will typically see:
 
 ## Changes
 
-### nabud-0.8 (in development on main branch)
-* Support for the NabuRetroNet blob store extensions to the Adaptor protocol.  These extensions
-allow programs running on the NABU to access up to 256 "slots" of cloud storage that are cached
-in the server.  This opens up a lot of exciting opportunities for things like downloadable game
-levels, music tracks, etc.
-
 ### nabud-0.7.1
 * Fix a compiler warning that was happening with some versions of Xcode on macOS.
 
