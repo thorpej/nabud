@@ -622,6 +622,112 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 }
 
 /*
+ * adaptor_msg_rn_store_http_get --
+ *	Handle the RN_STORE_HTTP_GET message.
+ */
+static void
+adaptor_msg_rn_store_http_get(struct nabu_connection *conn)
+{
+	uint8_t msg[2];
+	char *url = NULL;
+
+	log_debug("[%s] Expecting NABU to send slot and URL length.",
+	   conn->name);
+	if (! conn_recv(conn, msg, sizeof(msg))) {
+		log_error("[%s] NABU failed to send slot and URL length.",
+		    conn->name);
+		conn->state = CONN_STATE_ABORTED;
+		return;
+	}
+
+	url = calloc(1, msg[1] + 1);
+	if (url == NULL) {
+		log_error("[%s] Failed to allocate %u bytes for URL.",
+		    conn->name, msg[1] + 1);
+		conn->state = CONN_STATE_ABORTED;
+		return;
+	}
+
+	if (! conn_recv(conn, (uint8_t *)url, msg[1])) {
+		log_error("[%s] NABU failed to send URL.", conn->name);
+		conn->state = CONN_STATE_ABORTED;
+		return;
+	}
+
+	log_debug("[%s] Slot %u <- %s", conn->name, msg[0], url);
+
+	/* XXX Fetch URL into store. */
+	free(url);
+
+	log_debug("[%s] Sending FALSE.", conn->name);
+	conn_send_byte(conn, 0);
+}
+
+/*
+ * adaptor_msg_rn_store_get_size --
+ *	Handle the RN_STORE_GET_SIZE message.
+ */
+static void
+adaptor_msg_rn_store_get_size(struct nabu_connection *conn)
+{
+	uint8_t msg[2];
+
+	log_debug("[%s] Expecting NABU to send slot.", conn->name);
+	if (! conn_recv_byte(conn, msg)) {
+		log_error("[%s] NABU failed to send slot.", conn->name);
+		conn->state = CONN_STATE_ABORTED;
+		return;
+	}
+
+	log_debug("[%s] Requesting size for slot %u.", conn->name, msg[0]);
+
+	/* XXX Fetch size from store. */
+
+	log_debug("[%s] Sending 0x0000.", conn->name);
+	msg[0] = msg[1] = 0;
+	conn_send(conn, msg, sizeof(msg));
+}
+
+/*
+ * adaptor_msg_rn_store_get_data --
+ *	Handle the RN_STORE_GET_DATA message.
+ */
+static void
+adaptor_msg_rn_store_get_data(struct nabu_connection *conn)
+{
+	uint8_t msg[5];
+	uint16_t offset, length;
+	size_t resid;
+
+	log_debug("[%s] Expecting NABU to send slot, offset, and langth.",
+	    conn->name);
+	if (! conn_recv(conn, (uint8_t *)msg, sizeof(msg))) {
+		log_error("[%s] NABU failed to send slot, offset, and length.",
+		    conn->name);
+		conn->state = CONN_STATE_ABORTED;
+		return;
+	}
+
+	offset = adaptor_get_int16(&msg[1]);
+	length = adaptor_get_int16(&msg[3]);
+
+	resid = length;
+
+	log_debug("[%s] Requesting %u bytes from slot %u at offset %u.",
+	    conn->name, length, msg[0], offset);
+
+	/* XXX Fetch data from store. */
+
+	if (resid != 0) {
+		log_debug("[%s] Padding response with %zu byte%s of 0.",
+		    conn->name, resid, resid == 1 ? "" : "s");
+		for (size_t i = 0; i < resid; i++) {
+			conn_send_byte(conn, 0);
+		}
+	}
+}
+
+/*
  * adaptor_event_loop --
  *	Main event loop for the Adaptor emulation.
  */
@@ -707,6 +813,24 @@ adaptor_event_loop(struct nabu_connection *conn)
 			log_debug("[%s] Got NABU_MSG_CHANGE_CHANNEL.",
 			    conn->name);
 			adaptor_msg_change_channel(conn);
+			continue;
+
+		case NABU_MSG_RN_STORE_HTTP_GET:
+			log_debug("[%s] Got NABU_MSG_RN_STORE_HTTP_GET.",
+			    conn->name);
+			adaptor_msg_rn_store_http_get(conn);
+			continue;
+
+		case NABU_MSG_RN_STORE_GET_SIZE:
+			log_debug("[%s] Got NABU_MSG_RN_STORE_GET_SIZE.",
+			    conn->name);
+			adaptor_msg_rn_store_get_size(conn);
+			continue;
+
+		case NABU_MSG_RN_STORE_GET_DATA:
+			log_debug("[%s] Got NABU_MSG_RN_STORE_GET_DATA.",
+			    conn->name);
+			adaptor_msg_rn_store_get_data(conn);
 			continue;
 		}
 	}
