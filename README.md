@@ -187,7 +187,14 @@ In order to download from remote sources, such as NabuRetroNet, an SSL library i
 SSL libraries are currently supported:
 
 * SecureTransport (the native API on macOS)
-* OpenSSL.  
+* OpenSSL
+
+Because an effort has been made to keep nabud fairly self-contained and reliant only on APIs provided by
+the operating system, building it just requires a toolchain.  For the BSDs and Linux, it's probably already
+installed on your system, but if it's not, then doing so is left as an exercise for the reader.  For macOS,
+you will need to install the [Xcode Developer Tools](https://apps.apple.com/us/app/xcode/id497799835) and
+then launch Xcode to perform the "first launch" task that takes care of setting up the command-line tools
+that nabud uses to build.
 
 ## Running nabud
 
@@ -245,6 +252,6 @@ for the NABU Adaptor protocol.  The _nabu_proto.h_ file was derived directly fro
 _adaptor.c_ was partially derived from his work.
 * David Kuder's [nabu-tftp](https://github.com/dkgrizzly/nabu-tftp) gateway for the Raspberry Pi PICO
 also served to clarify some bits of the Adaptor protocol.
-* Alistair Crooks' "Minimal JSON" (_mj.c_, _mj.h_, and _mj_defs.h_) was used to build the configuraiton file parser.
-* [The NetBSD Project](https://www.netbsd.org) is where the file _nbsd_queue.h_ comes from (_<sys/queue.h>_ from BSD
-is one of the handiest system header files in existence and I wish it were available everywhere).
+* Alistair Crooks' "Minimal JSON" (_libmj_) was used to build the configuraiton file parser.
+* [The NetBSD Project](https://www.netbsd.org) is where the file _nbsd_queue.h_ comes from.  _<sys/queue.h>_ from BSD
+is one of the handiest system header files in existence and I wish it were available everywhere.
