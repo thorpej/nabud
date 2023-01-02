@@ -44,10 +44,7 @@ Channel can be served by any source.
 Each Source has 3 properies:
 * Name: a string that idenfies the source.  It's meant both for human consumption
 as well as for specifying which Source provides a Channel.
-* Type: a string that specifies the type of the source.  Currently, the only
-valid value for this property is "local".
-* Location: a string that varies depending on Type:
-    * Local - a path on the system where nabud is running that contains the content channels.
+* Location: a URL string that specifies the root of the source.
 
 ### Channels
 
@@ -82,9 +79,13 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
     {
       "Sources": [
         {
-          "Name": "KTNet",
+          "Name": "Local",
           "Type": "local",
           "Location": "/home/nabu",
+        },
+        {
+          "Name": "NabuRetroNet",
+          "Location": "https://cloud.nabu.ca",
         }
       ],
       "Channels": [
@@ -92,11 +93,30 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Name": "cycle1",
           "Number": 1,
           "Type": "pak",
+          "Source": "NabuRetroNet"
+        },
+        {
+          "Name": "cycle2",
+          "Number": 2,
+          "Type": "pak",
+          "Source": "NabuRetroNet",
+        },
+        {
+          "Name": "HomeBrew",
+          "Path": "HomeBrew/titles",
+          "Number": 3,
+          "Type": "nabu",
+          "Source": "NabuRetroNet",
+        },
+        {
+          "Name": "cycle1",
+          "Number": 11,
+          "Type": "pak",
           "Source": "KTNet",
         },
         {
           "Name": "homebrew",
-          "Number": 2,
+          "Number": 12,
           "Type": "nabu",
           "Source": "KTNet",
         }
@@ -105,7 +125,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
         {
           "Type": "serial",
           "Port": "/dev/tty-uftdi-A10MHWD6-0",
-          "Channel": 1,
+          "Channel": 11,
         },
         {
           "Type": "tcp",
@@ -116,6 +136,11 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "tcp",
           "Port": "5002",
           "Channel": 2,
+        },
+        {
+          "Type": "tcp",
+          "Port": "5003",
+          "Channel": 3,
         }
       ]
     }
@@ -150,13 +175,18 @@ many software packages.  Most people will only need to do:
 
 nabud uses POSIX threads, which must be provided by your system.
 
-nabud also requires a cryptographic library
-to handle _pak_ files; MD5 is used to generate _pak_ file names and DES is used to decrypt them.  The following
-cryptographic libraries are currently supported:
+In order to handle _pak_ files, a cryptographic library is required; MD5 is used to generate _pak_ file names
+and DES is used to decrypt them.  The following cryptographic libraries are currently supported:
 
 * CommonCrypto (the native API on macOS)
 * OpenSSL's _libcrypto_.  This is the native API already provided by many Unix-like systems, so it's unlikely
 that you'll have to go find and install it.
+
+In order to download from remote sources, such as NabuRetroNet, an SSL library is required.  The following
+SSL libraries are currently supported:
+
+* SecureTransport (the native API on macOS)
+* OpenSSL.  
 
 ## Running nabud
 
