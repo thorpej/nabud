@@ -108,7 +108,8 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_nabud_OBJECTS = nabud-adaptor.$(OBJEXT) nabud-conn.$(OBJEXT) \
 	nabud-fileio.$(OBJEXT) nabud-image.$(OBJEXT) \
-	nabud-log.$(OBJEXT) nabud-main.$(OBJEXT)
+	nabud-log.$(OBJEXT) nabud-main.$(OBJEXT) \
+	nabud-retronet.$(OBJEXT)
 nabud_OBJECTS = $(am_nabud_OBJECTS)
 am__DEPENDENCIES_1 =
 nabud_DEPENDENCIES = ../libfetch/libfetch.la ../libmj/libmj.la \
@@ -137,7 +138,7 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/nabud-adaptor.Po \
 	./$(DEPDIR)/nabud-conn.Po ./$(DEPDIR)/nabud-fileio.Po \
 	./$(DEPDIR)/nabud-image.Po ./$(DEPDIR)/nabud-log.Po \
-	./$(DEPDIR)/nabud-main.Po
+	./$(DEPDIR)/nabud-main.Po ./$(DEPDIR)/nabud-retronet.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -326,7 +327,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(PTHREAD_CFLAGS) $(WARNCFLAGS)
-nabud_SOURCES = adaptor.c conn.c fileio.c image.c log.c main.c
+nabud_SOURCES = adaptor.c conn.c fileio.c image.c log.c main.c \
+			  retronet.c
+
 nabud_CPPFLAGS = $(SSL_INCLUDES) $(PAK_INCLUDES)
 nabud_LDADD = ../libfetch/libfetch.la \
 			  ../libmj/libmj.la \
@@ -433,6 +436,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-image.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-log.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-main.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-retronet.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -544,6 +548,20 @@ nabud-main.obj: main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='main.c' object='nabud-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-main.obj `if test -f 'main.c'; then $(CYGPATH_W) 'main.c'; else $(CYGPATH_W) '$(srcdir)/main.c'; fi`
+
+nabud-retronet.o: retronet.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-retronet.o -MD -MP -MF $(DEPDIR)/nabud-retronet.Tpo -c -o nabud-retronet.o `test -f 'retronet.c' || echo '$(srcdir)/'`retronet.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-retronet.Tpo $(DEPDIR)/nabud-retronet.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='retronet.c' object='nabud-retronet.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-retronet.o `test -f 'retronet.c' || echo '$(srcdir)/'`retronet.c
+
+nabud-retronet.obj: retronet.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-retronet.obj -MD -MP -MF $(DEPDIR)/nabud-retronet.Tpo -c -o nabud-retronet.obj `if test -f 'retronet.c'; then $(CYGPATH_W) 'retronet.c'; else $(CYGPATH_W) '$(srcdir)/retronet.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-retronet.Tpo $(DEPDIR)/nabud-retronet.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='retronet.c' object='nabud-retronet.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-retronet.obj `if test -f 'retronet.c'; then $(CYGPATH_W) 'retronet.c'; else $(CYGPATH_W) '$(srcdir)/retronet.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -683,6 +701,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/nabud-image.Po
 	-rm -f ./$(DEPDIR)/nabud-log.Po
 	-rm -f ./$(DEPDIR)/nabud-main.Po
+	-rm -f ./$(DEPDIR)/nabud-retronet.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -734,6 +753,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/nabud-image.Po
 	-rm -f ./$(DEPDIR)/nabud-log.Po
 	-rm -f ./$(DEPDIR)/nabud-main.Po
+	-rm -f ./$(DEPDIR)/nabud-retronet.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

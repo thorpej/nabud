@@ -77,6 +77,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "conn.h"
 #include "image.h"
 #include "log.h"
+#include "retronet.h"
 
 static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;
 static const uint8_t nabu_msg_finished[] = NABU_MSGSEQ_FINISHED;
@@ -652,11 +653,10 @@ adaptor_msg_rn_store_http_get(struct nabu_connection *conn)
 
 	log_debug("[%s] Slot %u <- %s", conn->name, msg[0], url);
 
-	/* XXX Fetch URL into store. */
-	free(url);
+	msg[0] = rn_store_http_get(conn, url, msg[0]);
 
-	log_debug("[%s] Sending FALSE.", conn->name);
-	conn_send_byte(conn, 0);
+	log_debug("[%s] Sending %s.", conn->name, msg[0] ? "TRUE" : "FALSE");
+	conn_send_byte(conn, msg[0]);
 }
 
 /*
@@ -666,6 +666,7 @@ adaptor_msg_rn_store_http_get(struct nabu_connection *conn)
 static void
 adaptor_msg_rn_store_get_size(struct nabu_connection *conn)
 {
+	size_t length;
 	uint8_t msg[2];
 
 	log_debug("[%s] Expecting NABU to send slot.", conn->name);
@@ -677,10 +678,19 @@ adaptor_msg_rn_store_get_size(struct nabu_connection *conn)
 
 	log_debug("[%s] Requesting size for slot %u.", conn->name, msg[0]);
 
-	/* XXX Fetch size from store. */
+	length = rn_store_get_size(conn, msg[0]);
+	if (length > 0xffff) {
+		/* Saturate the value. Should not ever happen, tho. */
+		log_error("[%s] Data size for slot %u is what %zu bytes??",
+		    conn->name, msg[0], length);
+		length = 0xffff;
+	}
 
-	log_debug("[%s] Sending 0x0000.", conn->name);
-	msg[0] = msg[1] = 0;
+	/* little-endian */
+	msg[0] = (uint8_t)(length);
+	msg[1] = (uint8_t)(length >> 8);
+	log_debug("[%s] Sending %zu (0x%02X 0x%02X).", conn->name,
+	    length, msg[0], msg[1]);
 	conn_send(conn, msg, sizeof(msg));
 }
 
@@ -692,8 +702,8 @@ static void
 adaptor_msg_rn_store_get_data(struct nabu_connection *conn)
 {
 	uint8_t msg[5];
-	uint16_t offset, length;
-	size_t resid;
+	size_t offset, length, resid;
+	const uint8_t *data;
 
 	log_debug("[%s] Expecting NABU to send slot, offset, and langth.",
 	    conn->name);
@@ -706,14 +716,18 @@ adaptor_msg_rn_store_get_data(struct nabu_connection *conn)
 
 	offset = adaptor_get_int16(&msg[1]);
 	length = adaptor_get_int16(&msg[3]);
-
 	resid = length;
 
-	log_debug("[%s] Requesting %u bytes from slot %u at offset %u.",
+	log_debug("[%s] Requesting %zu bytes from slot %u at offset %zu.",
 	    conn->name, length, msg[0], offset);
 
-	/* XXX Fetch data from store. */
-
+	data = rn_store_get_data(conn, msg[0], offset, &length);
+	if (length != 0) {
+		log_debug("[%s] Sending %zu bytes of data.", conn->name,
+		    length);
+		conn_send(conn, data, length);
+		resid -= length;
+	}
 	if (resid != 0) {
 		log_debug("[%s] Padding response with %zu byte%s of 0.",
 		    conn->name, resid, resid == 1 ? "" : "s");

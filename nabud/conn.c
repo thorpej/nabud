@@ -53,6 +53,7 @@
 #include "conn.h"
 #include "image.h"
 #include "log.h"
+#include "retronet.h"
 
 /* Huh, some platforms don't define INFTIM. */
 #ifndef INFTIM
@@ -473,6 +474,7 @@ conn_destroy(struct nabu_connection *conn)
 	conn_remove(conn);
 
 	image_release(conn_set_last_image(conn, NULL));
+	rn_store_clear(conn);
 
 	pthread_mutex_destroy(&conn->mutex);
 

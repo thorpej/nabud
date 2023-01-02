@@ -81,6 +81,9 @@ struct nabu_connection {
 	uint8_t		pktbuf[NABU_MAXPACKETSIZE * 2];
 	size_t		pktlen;
 
+	/* RetroNet blob store. */
+	LIST_HEAD(, rn_blob) rn_store;
+
 	/* Lock that protects the data below. */
 	pthread_mutex_t mutex;
 
