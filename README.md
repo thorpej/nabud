@@ -238,6 +238,9 @@ allow programs running on the NABU to access up to 256 "slots" of cloud storage 
 in the server.  This opens up a lot of exciting opportunities for things like downloadable game
 levels, music tracks, etc.
 
+### nabud-0.7.1
+* Fix a compiler warning that was happening with some versions of Xcode on macOS.
+
 ### nabud-0.7
 * Support for remote sources, including NabuRetroNet, althrough NabuRetroNet's "HomeBrew"
 channel does not work due to how the data is vended by that channel.
