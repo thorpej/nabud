@@ -371,7 +371,8 @@ mj_parse(mj_t *atom, const char *s, int *from, int *to, int *tok)
 	case MJ_OPEN_BRACE:
 		mj_create(atom, "object");
 		ALLOC(mj_t, atom->value.v, atom->size, atom->c, 10, 10, "mj_parse()", return 0);
-		for (i = 0 ; mj_parse(&atom->value.v[atom->c++], s, from, to, tok) >= 0 && *tok != MJ_CLOSE_BRACE ; i++) {
+		for (i = 0 ; mj_parse(&atom->value.v[atom->c], s, from, to, tok) >= 0 && *tok != MJ_CLOSE_BRACE ; i++) {
+			atom->c++;
 			if (((i % 2) == 0 && *tok != MJ_COLON) || ((i % 2) == 1 && *tok != MJ_COMMA)) {
 				(void) fprintf(stderr, "2. expected comma (got %d) at '%s'\n", *tok, &s[*from]);
 				break;
