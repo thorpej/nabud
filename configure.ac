@@ -53,10 +53,12 @@ esac
 
 AC_SUBST([WARNCFLAGS])
 
+# Check for some common system headers.
 #
+AC_CHECK_HEADERS([inttypes.h])
+
 # Deal with the crypto libraries we need.
 #
-
 WITH_SSL=no
 WITH_PAK=no
 

@@ -12774,10 +12774,18 @@ esac
 
 
 
+# Check for some common system headers.
 #
+ac_fn_c_check_header_compile "$LINENO" "inttypes.h" "ac_cv_header_inttypes_h" "$ac_includes_default"
+if test "x$ac_cv_header_inttypes_h" = xyes
+then :
+  printf "%s\n" "#define HAVE_INTTYPES_H 1" >>confdefs.h
+
+fi
+
+
 # Deal with the crypto libraries we need.
 #
-
 WITH_SSL=no
 WITH_PAK=no
 

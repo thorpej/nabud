@@ -78,7 +78,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#if defined(HAVE_INTTYPES_H) || defined(NETBSD)
+#if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
 #endif
 #include <stdarg.h>

@@ -47,7 +47,7 @@
 
 #include <ctype.h>
 #include <errno.h>
-#if defined(HAVE_INTTYPES_H) || defined(NETBSD)
+#if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
 #endif
 #ifndef NETBSD
