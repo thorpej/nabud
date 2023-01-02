@@ -178,6 +178,8 @@ conn_create_common(char *name, int fd, unsigned int channel,
 	conn->fd = fd;
 	conn->cancel_fds[0] = conn->cancel_fds[1] = -1;
 
+	pthread_mutex_init(&conn->mutex, NULL);
+
 	assert(name != NULL);
 	conn->name = name;
 
@@ -313,6 +315,7 @@ static void *
 conn_tcp_thread(void *arg)
 {
 	struct nabu_connection *conn = arg;
+	struct image_channel *chan;
 	char host[NI_MAXHOST];
 	struct sockaddr_storage peerss;
 	socklen_t peersslen;
@@ -360,8 +363,12 @@ conn_tcp_thread(void *arg)
 		log_info("[%s] Creating TCP connection for %s.",
 		    conn->name, host);
 
-		conn_create_common(strdup(host), sock, conn->channel->number,
-		    conn_thread);
+		pthread_mutex_lock(&conn->mutex);
+		chan = conn->l_channel;
+		pthread_mutex_unlock(&conn->mutex);
+
+		conn_create_common(strdup(host), sock,
+		    chan != NULL ? chan->number : 0, conn_thread);
 	}
 
 	/* Error on the listen socket -- He's dead, Jim. */
@@ -463,8 +470,17 @@ conn_add_tcp(char *portstr, unsigned int channel)
 void
 conn_destroy(struct nabu_connection *conn)
 {
+	struct nabu_image *img;
+
 	conn_remove(conn);
-	image_done(conn, conn->last_image);
+
+	pthread_mutex_lock(&conn->mutex);
+	img = conn->l_last_image;
+	pthread_mutex_unlock(&conn->mutex);
+
+	image_done(conn, img);
+
+	pthread_mutex_destroy(&conn->mutex);
 
 	/* close the writer first because SIGPIPE is super annoying. */
 	if (conn->cancel_fds[1] != -1) {
@@ -483,6 +499,91 @@ conn_destroy(struct nabu_connection *conn)
 	}
 
 	free(conn);
+}
+
+/*
+ * conn_get_last_image --
+ *	Return the last image used by the connection.
+ */
+struct nabu_image *
+conn_get_last_image(struct nabu_connection *conn)
+{
+	struct nabu_image *img;
+
+	pthread_mutex_lock(&conn->mutex);
+	img = conn->l_last_image;
+	pthread_mutex_unlock(&conn->mutex);
+
+	return img;
+}
+
+/*
+ * conn_set_last_image --
+ *	Set the specified image as the most-recent.  Returns
+ *	the old value.
+ */
+struct nabu_image *
+conn_set_last_image(struct nabu_connection *conn, struct nabu_image *img)
+{
+	struct nabu_image *oimg;
+
+	pthread_mutex_lock(&conn->mutex);
+	oimg = conn->l_last_image;
+	conn->l_last_image = img;
+	pthread_mutex_unlock(&conn->mutex);
+
+	return oimg;
+}
+
+/*
+ * conn_set_last_image_if --
+ *	Like conn_set_last_image(), but only if the last image
+ *	matches the specified match value.
+ */
+struct nabu_image *
+conn_set_last_image_if(struct nabu_connection *conn, struct nabu_image *match,
+    struct nabu_image *img)
+{
+	struct nabu_image *oimg;
+
+	pthread_mutex_lock(&conn->mutex);
+	if (conn->l_last_image == match) {
+		oimg = conn->l_last_image;
+		conn->l_last_image = img;
+	} else {
+		oimg = NULL;
+	}
+	pthread_mutex_unlock(&conn->mutex);
+
+	return oimg;
+}
+
+/*
+ * conn_get_channel --
+ *	Return the connection's currently-selected channel.
+ */
+struct image_channel *
+conn_get_channel(struct nabu_connection *conn)
+{
+	struct image_channel *chan;
+
+	pthread_mutex_lock(&conn->mutex);
+	chan = conn->l_channel;
+	pthread_mutex_unlock(&conn->mutex);
+
+	return chan;
+}
+
+/*
+ * conn_set_channel --
+ *	Set the specified channel as the connection's selected channel.
+ */
+void
+conn_set_channel(struct nabu_connection *conn, struct image_channel *chan)
+{
+	pthread_mutex_lock(&conn->mutex);
+	conn->l_channel = chan;
+	pthread_mutex_unlock(&conn->mutex);
 }
 
 /*

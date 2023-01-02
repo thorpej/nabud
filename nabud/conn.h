@@ -74,9 +74,6 @@ struct nabu_connection {
 	 */
 	int		cancel_fds[2];
 
-	/* Selected channel. */
-	struct image_channel *channel;
-
 	/*
 	 * The packet being sent is buffered here.  We double the
 	 * size in case every byte needs to be escaped.
@@ -84,8 +81,14 @@ struct nabu_connection {
 	uint8_t		pktbuf[NABU_MAXPACKETSIZE * 2];
 	size_t		pktlen;
 
+	/* Lock that protects the data below. */
+	pthread_mutex_t mutex;
+
 	/* Last image used. */
-	struct nabu_image *last_image;
+	struct nabu_image *l_last_image;
+
+	/* Selected channel. */
+	struct image_channel *l_channel;
 };
 
 extern unsigned int conn_count;
@@ -93,6 +96,16 @@ extern unsigned int conn_count;
 void	conn_add_serial(char *, unsigned int);
 void	conn_add_tcp(char *, unsigned int);
 void	conn_destroy(struct nabu_connection *);
+
+struct nabu_image *conn_get_last_image(struct nabu_connection *);
+struct nabu_image *conn_set_last_image(struct nabu_connection *,
+				       struct nabu_image *);
+struct nabu_image *conn_set_last_image_if(struct nabu_connection *,
+				       struct nabu_image *,
+				       struct nabu_image *);
+
+struct image_channel *conn_get_channel(struct nabu_connection *);
+void	conn_set_channel(struct nabu_connection *, struct image_channel *);
 
 void	conn_cancel(struct nabu_connection *);
 void	conn_shutdown(void);

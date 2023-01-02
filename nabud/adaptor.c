@@ -465,7 +465,9 @@ adaptor_msg_mystery(struct nabu_connection *conn)
 static void
 adaptor_msg_channel_status(struct nabu_connection *conn)
 {
-	if (conn->channel != NULL) {
+	struct image_channel *chan = conn_get_channel(conn);
+
+	if (chan != NULL) {
 		log_debug("[%s] Sending HAVE_CHANNEL.",
 		    conn->name);
 		conn_send_byte(conn, NABU_MSG_HAVE_CHANNEL);

@@ -533,7 +533,8 @@ image_channel_select(struct nabu_connection *conn, int16_t channel)
 
 	log_info("[%s] Selected channel %u (%s on %s).",
 	    conn->name, chan->number, chan->name, chan->source->name);
-	conn->channel = chan;
+
+	conn_set_channel(conn, chan);
 }
 
 /*
@@ -544,8 +545,13 @@ image_channel_select(struct nabu_connection *conn, int16_t channel)
 static void
 image_use(struct nabu_connection *conn, struct nabu_image *img)
 {
-	image_done(conn, conn->last_image);
-	conn->last_image = img;
+	struct nabu_image *oimg;
+
+	oimg = conn_set_last_image(conn, img);
+	if (oimg != NULL) {
+		image_done(conn, oimg);
+	}
+
 	log_info("[%s] Using image %s from Channel %u.",
 	    conn->name, img->name, img->channel->number);
 }
@@ -558,10 +564,12 @@ image_use(struct nabu_connection *conn, struct nabu_image *img)
 void
 image_done(struct nabu_connection *conn, struct nabu_image *img)
 {
-	if (conn->last_image != NULL && conn->last_image == img) {
-		log_info("[%s] Done with image %s.", conn->name,
-		    img->name);
-		conn->last_image = NULL;
+	struct nabu_image *oimg;
+
+	oimg = conn_set_last_image_if(conn, img, NULL);
+
+	if (oimg != NULL) {
+		log_info("[%s] Done with image %s.", conn->name, img->name);
 		image_release(img);
 	}
 }
@@ -576,29 +584,32 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	char *fname, *image_url = NULL;
 	const char *imgtype;
 	struct nabu_image *img;
+	struct image_channel *chan;
 
-	if ((img = conn->last_image) != NULL && img->number == image) {
+	img = conn_get_last_image(conn);
+	if (img != NULL && img->number == image) {
 		/* Cache hit! */
 		log_debug("[%s] Connection cache hit for image %06X: %s",
 		    conn->name, image, img->name);
 		return img;
 	}
 
-	if (conn->channel == NULL) {
+	chan = conn_get_channel(conn);
+	if (chan == NULL) {
 		log_error("[%s] No channel selected.", conn->name);
 		return NULL;
 	}
 
-	if ((img = image_cache_lookup(conn->channel, image)) != NULL) {
+	if ((img = image_cache_lookup(chan, image)) != NULL) {
 		/* Cache hit! */
 		log_debug("Channel %u cache hit for image %06X: %s",
-		    conn->channel->number, image, img->name);
+		    chan->number, image, img->name);
 		image_use(conn, img);
 		return img;
 	}
 
 #ifndef NO_PAK_FILE_SUPPORT
-	if (conn->channel->type == IMAGE_CHANNEL_PAK) {
+	if (chan->type == IMAGE_CHANNEL_PAK) {
 		fname = image_pak_name(image);
 		imgtype = "pak";
 	} else
@@ -608,19 +619,18 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		imgtype = "nabu";
 	}
 
-	asprintf(&image_url, "%s/%s", conn->channel->path, fname);
+	asprintf(&image_url, "%s/%s", chan->path, fname);
 	assert(image_url != NULL);
 	log_debug("[%s] Loading %s-%06X from %s", conn->name, imgtype, image,
 	    image_url);
 	free(fname);
 
-	img = image_load_image_from_url(conn->channel, image, image_url);
+	img = image_load_image_from_url(chan, image, image_url);
 	free(image_url);
 	if (img != NULL) {
-		img = image_cache_insert(conn->channel, img);
+		img = image_cache_insert(chan, img);
 		image_use(conn, img);
-		return img;
 	}
 
-	return NULL;
+	return img;
 }
