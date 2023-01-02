@@ -2,7 +2,7 @@ AM_CFLAGS		= $(WARNCFLAGS)
 
 noinst_LTLIBRARIES	= libfetch.la
 
-libfetch_la_CPPFLAGS	= -DNETBSD -DFTP_COMBINE_CWDS -DINET6 $(SSL_INCLUDES)
+libfetch_la_CPPFLAGS	= -DFTP_COMBINE_CWDS -DINET6 $(SSL_INCLUDES)
 
 libfetch_la_SOURCES	= fetch.c common.c ftp.c http.c file.c
 

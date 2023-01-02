@@ -33,9 +33,6 @@
 #if HAVE_CONFIG_H
 #include "config.h"
 #endif
-#ifndef NETBSD
-#include <nbcompat.h>
-#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -50,11 +47,7 @@
 #if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
 #endif
-#ifndef NETBSD
-#include <nbcompat/netdb.h>
-#else
 #include <netdb.h>
-#endif
 #include <pwd.h>
 #include <stdarg.h>
 #include <stdlib.h>
