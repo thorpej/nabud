@@ -3,7 +3,7 @@ CC			= $(PTHREAD_CC)
 
 bin_PROGRAMS		= nabud
 
-nabud_SOURCES		= adaptor.c conn.c image.c log.c main.c
+nabud_SOURCES		= adaptor.c conn.c fileio.c image.c log.c main.c
 
 nabud_CPPFLAGS		= $(SSL_INCLUDES) $(PAK_INCLUDES)
 

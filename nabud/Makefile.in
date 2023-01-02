@@ -107,7 +107,8 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_nabud_OBJECTS = nabud-adaptor.$(OBJEXT) nabud-conn.$(OBJEXT) \
-	nabud-image.$(OBJEXT) nabud-log.$(OBJEXT) nabud-main.$(OBJEXT)
+	nabud-fileio.$(OBJEXT) nabud-image.$(OBJEXT) \
+	nabud-log.$(OBJEXT) nabud-main.$(OBJEXT)
 nabud_OBJECTS = $(am_nabud_OBJECTS)
 am__DEPENDENCIES_1 =
 nabud_DEPENDENCIES = ../libfetch/libfetch.la ../libmj/libmj.la \
@@ -134,8 +135,9 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/nabud-adaptor.Po \
-	./$(DEPDIR)/nabud-conn.Po ./$(DEPDIR)/nabud-image.Po \
-	./$(DEPDIR)/nabud-log.Po ./$(DEPDIR)/nabud-main.Po
+	./$(DEPDIR)/nabud-conn.Po ./$(DEPDIR)/nabud-fileio.Po \
+	./$(DEPDIR)/nabud-image.Po ./$(DEPDIR)/nabud-log.Po \
+	./$(DEPDIR)/nabud-main.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -324,7 +326,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(PTHREAD_CFLAGS) $(WARNCFLAGS)
-nabud_SOURCES = adaptor.c conn.c image.c log.c main.c
+nabud_SOURCES = adaptor.c conn.c fileio.c image.c log.c main.c
 nabud_CPPFLAGS = $(SSL_INCLUDES) $(PAK_INCLUDES)
 nabud_LDADD = ../libfetch/libfetch.la \
 			  ../libmj/libmj.la \
@@ -427,6 +429,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-adaptor.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-conn.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-fileio.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-image.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-log.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-main.Po@am__quote@ # am--include-marker
@@ -485,6 +488,20 @@ nabud-conn.obj: conn.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conn.c' object='nabud-conn.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-conn.obj `if test -f 'conn.c'; then $(CYGPATH_W) 'conn.c'; else $(CYGPATH_W) '$(srcdir)/conn.c'; fi`
+
+nabud-fileio.o: fileio.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-fileio.o -MD -MP -MF $(DEPDIR)/nabud-fileio.Tpo -c -o nabud-fileio.o `test -f 'fileio.c' || echo '$(srcdir)/'`fileio.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-fileio.Tpo $(DEPDIR)/nabud-fileio.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fileio.c' object='nabud-fileio.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-fileio.o `test -f 'fileio.c' || echo '$(srcdir)/'`fileio.c
+
+nabud-fileio.obj: fileio.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-fileio.obj -MD -MP -MF $(DEPDIR)/nabud-fileio.Tpo -c -o nabud-fileio.obj `if test -f 'fileio.c'; then $(CYGPATH_W) 'fileio.c'; else $(CYGPATH_W) '$(srcdir)/fileio.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-fileio.Tpo $(DEPDIR)/nabud-fileio.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fileio.c' object='nabud-fileio.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-fileio.obj `if test -f 'fileio.c'; then $(CYGPATH_W) 'fileio.c'; else $(CYGPATH_W) '$(srcdir)/fileio.c'; fi`
 
 nabud-image.o: image.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-image.o -MD -MP -MF $(DEPDIR)/nabud-image.Tpo -c -o nabud-image.o `test -f 'image.c' || echo '$(srcdir)/'`image.c
@@ -662,6 +679,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
 distclean: distclean-am
 		-rm -f ./$(DEPDIR)/nabud-adaptor.Po
 	-rm -f ./$(DEPDIR)/nabud-conn.Po
+	-rm -f ./$(DEPDIR)/nabud-fileio.Po
 	-rm -f ./$(DEPDIR)/nabud-image.Po
 	-rm -f ./$(DEPDIR)/nabud-log.Po
 	-rm -f ./$(DEPDIR)/nabud-main.Po
@@ -712,6 +730,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/nabud-adaptor.Po
 	-rm -f ./$(DEPDIR)/nabud-conn.Po
+	-rm -f ./$(DEPDIR)/nabud-fileio.Po
 	-rm -f ./$(DEPDIR)/nabud-image.Po
 	-rm -f ./$(DEPDIR)/nabud-log.Po
 	-rm -f ./$(DEPDIR)/nabud-main.Po
