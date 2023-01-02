@@ -80,7 +80,7 @@ AC_CHECK_HEADER([Security/SecureTransport.h],
 
 # Check for OpenSSL
 #
-m4_include([ax_check_openssl.m4])
+m4_include([m4/ax_check_openssl.m4])
 AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL], [1],
 			    [Define to 1 if you have OpenSSL.])]
 		 WITH_OPENSSL="OpenSSL")
@@ -120,7 +120,7 @@ AC_SUBST([PAK_INCLUDES])
 
 # Check for POSIX threads
 #
-m4_include([ax_pthread.m4])
+m4_include([m4/ax_pthread.m4])
 AX_PTHREAD([],
 	[AC_MSG_ERROR([Missing POSIX threads])])
 
