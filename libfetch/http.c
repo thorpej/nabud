@@ -597,13 +597,12 @@ http_base64(const char *src)
 	    "0123456789+/";
 	char *str, *dst;
 	size_t l;
-	unsigned int t, r;
+	unsigned int t;
 
 	l = strlen(src);
 	if ((str = malloc(((l + 2) / 3) * 4 + 1)) == NULL)
 		return (NULL);
 	dst = str;
-	r = 0;
 
 	while (l >= 3) {
 		t = (src[0] << 16) | (src[1] << 8) | src[2];
@@ -612,7 +611,7 @@ http_base64(const char *src)
 		dst[2] = base64[(t >> 6) & 0x3f];
 		dst[3] = base64[(t >> 0) & 0x3f];
 		src += 3; l -= 3;
-		dst += 4; r += 4;
+		dst += 4;
 	}
 
 	switch (l) {
@@ -623,7 +622,6 @@ http_base64(const char *src)
 		dst[2] = base64[(t >> 6) & 0x3f];
 		dst[3] = '=';
 		dst += 4;
-		r += 4;
 		break;
 	case 1:
 		t = src[0] << 16;
@@ -631,7 +629,6 @@ http_base64(const char *src)
 		dst[1] = base64[(t >> 12) & 0x3f];
 		dst[2] = dst[3] = '=';
 		dst += 4;
-		r += 4;
 		break;
 	case 0:
 		break;
