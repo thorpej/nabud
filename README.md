@@ -14,6 +14,7 @@ and _daemon(3)_.
 ## Features
 
 * Define up to 254 content channels (numbered 1-255) from an arbitrary number of sources.
+* Sources can be local or remote (such as NabuRetroNet).
 * Serve an arbitrary number of NABU PCs:
     * As many RS422 serial ports as you can connect to your system for real NABU hardware.
     * Support for connections from NABU emulators (such as MAME) over TCP.
@@ -22,12 +23,12 @@ and _daemon(3)_.
 * High-performance; nabud implements a content cache to optimize common access patterns and avoid redundant I/O.
 * Small footprint; it can run on small machines. The only thing it throws memory at is the content cache.
 
-Currently, only local sources are supported.  Support for directly vending NabuRetroNet
-content via HTTP is planned and is pretty high on the priority list.  Even with this
-limitation, I wanted to get this out into the world for people to play with, especially
-folks who are interested in serving their NABUs from other retro or machines or small
-single-board computers that can't easily (or at all) run some of the other Adaptor
-emulators that are already out in the wild.
+The NabuRetroNet _HomeBrew_ channel does not currently work with nabud.  This is because
+the NABU always requests image 000001 when it boots, and DJ's Internet adapter application
+presents a drop-down menu to select the image to be vended when 000001 is requested.  I plan
+to introduce an interactive command-line tool that will allow nabud users to dynamically
+select an image from the list and pin it to the connection, as well as allow for the connection's
+channel to be changed dynamically without having to edit the config file or restart nabud.
 
 ## Configuration
 
