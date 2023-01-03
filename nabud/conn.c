@@ -757,6 +757,12 @@ conn_send(struct nabu_connection *conn, const uint8_t *buf, size_t len)
 	conn_io_deadline(conn, &deadline);
 
 	for (;;) {
+		/* Wait for the connection to accept writes. */
+		if (! conn_io_wait(conn, &deadline, false)) {
+			/* Error already logged. */
+			return;
+		}
+
 		actual = write(conn->fd, curptr, resid);
 		if (actual < 0 && errno != EAGAIN) {
 			log_error("[%s] write() failed: %s", conn->name,
@@ -773,12 +779,6 @@ conn_send(struct nabu_connection *conn, const uint8_t *buf, size_t len)
 		resid -= actual;
 		curptr += actual;
 		if (resid == 0) {
-			return;
-		}
-
-		/* Wait for the connection to accept writes again. */
-		if (! conn_io_wait(conn, &deadline, false)) {
-			/* Error already logged. */
 			return;
 		}
 	}
@@ -818,6 +818,12 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 	conn_io_deadline(conn, &deadline);
 
 	for (;;) {
+		/* Wait for the connection to be ready for reads. */
+		if (! conn_io_wait(conn, &deadline, true)) {
+			/* Error already logged. */
+			return false;
+		}
+
 		actual = read(conn->fd, curptr, resid);
 		if (actual < 0 && errno != EAGAIN) {
 			log_error("[%s] read() failed: %s", conn->name,
@@ -835,12 +841,6 @@ conn_recv(struct nabu_connection *conn, uint8_t *buf, size_t len)
 		curptr += actual;
 		if (resid == 0) {
 			return true;
-		}
-
-		/* Wait for the connection to be ready for reads again. */
-		if (! conn_io_wait(conn, &deadline, true)) {
-			/* Error already logged. */
-			return false;
 		}
 	}
 }
