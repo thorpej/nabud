@@ -131,6 +131,7 @@ AC_CONFIG_FILES([
 	libfetch/Makefile
 	libmj/Makefile
 	nabud/Makefile
+	nabuclient/Makefile
 ])
 
 AC_OUTPUT

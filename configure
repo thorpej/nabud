@@ -14144,7 +14144,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 # Generate the Makefiles
 #
-ac_config_files="$ac_config_files Makefile libfetch/Makefile libmj/Makefile nabud/Makefile"
+ac_config_files="$ac_config_files Makefile libfetch/Makefile libmj/Makefile nabud/Makefile nabuclient/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -15162,6 +15162,7 @@ do
     "libfetch/Makefile") CONFIG_FILES="$CONFIG_FILES libfetch/Makefile" ;;
     "libmj/Makefile") CONFIG_FILES="$CONFIG_FILES libmj/Makefile" ;;
     "nabud/Makefile") CONFIG_FILES="$CONFIG_FILES nabud/Makefile" ;;
+    "nabuclient/Makefile") CONFIG_FILES="$CONFIG_FILES nabuclient/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
