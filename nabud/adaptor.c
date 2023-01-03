@@ -542,6 +542,8 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	log_debug("[%s] Sending MABU_MSGSEQ_ACK.", conn->name);
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
 
+	log_debug("[%s] Wating for NABU to send channel code.",
+	    conn->name);
 	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send channel code.",
 		    conn->name);
@@ -692,6 +694,7 @@ adaptor_event_loop(struct nabu_connection *conn)
 		/* We want to block "forever" waiting for requests. */
 		conn_stop_watchdog(conn);
 
+		log_debug("[%s] Waiting for NABU.", conn->name);
 		if (! conn_recv_byte(conn, &msg)) {
 			if (conn->state == CONN_STATE_EOF) {
 				log_info("[%s] Peer disconnected.",
