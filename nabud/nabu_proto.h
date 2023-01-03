@@ -58,6 +58,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef nabu_proto_h_included
 #define	nabu_proto_h_included
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /*
