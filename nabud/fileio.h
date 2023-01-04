@@ -27,6 +27,38 @@
 #ifndef fileio_h_included
 #define	fileio_h_included
 
-void	*fileio_load_from_url(const char *, size_t, size_t *);
+#include <stdbool.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
+
+struct fileio;
+
+struct fileio_attrs {
+	off_t	size;
+	time_t	mtime;		/* mod time */
+	time_t	btime;		/* birth time */
+	bool	is_directory;
+	bool	is_writable;
+	bool	is_seekable;
+};
+
+struct fileio *	fileio_open(const char *, int, struct fileio_attrs *);
+void		fileio_close(struct fileio *);
+ssize_t		fileio_read(struct fileio *, void *, size_t);
+ssize_t		fileio_write(struct fileio *, const void *, size_t);
+ssize_t		fileio_pread(struct fileio *, void *, size_t, off_t);
+ssize_t		fileio_pwrite(struct fileio *, const void *, size_t, off_t);
+bool		fileio_getattr(struct fileio *, struct fileio_attrs *);
+const char *	fileio_location(struct fileio *);
+
+#define	FILEIO_O_RDONLY		0x00
+#define	FILEIO_O_RDWR		0x01
+
+void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
+			  size_t, size_t *filesizep);
+
+void	*fileio_load_file_from_location(const char *, size_t, size_t,
+					size_t *);
 
 #endif /* fileio_h_included */

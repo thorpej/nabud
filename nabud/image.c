@@ -511,7 +511,8 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 	uint8_t *filebuf;
 	size_t filesize;
 
-	filebuf = fileio_load_from_url(url, NABU_MAXSEGMENTSIZE, &filesize);
+	filebuf = fileio_load_file_from_location(url, 0, NABU_MAXSEGMENTSIZE,
+	    &filesize);
 	if (filebuf == NULL) {
 		/* Error already logged. */
 		return NULL;
