@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -99,20 +99,40 @@ fileio_io_ok(struct fileio *f, bool writing)
 static bool
 fileio_local_io_open(struct fileio *f, const char *location)
 {
-	/* Strip file:// if it's there. */
+	bool is_absolute = false;
+
+	/*
+	 * Strip file:// if it's there.  Note that we treat these as
+	 * absolute paths and thus want to keep one leading /, so we
+	 * strip off one less character.
+	 */
 	if (strncmp(location, FILE_PREFIX, strlen(FILE_PREFIX)) == 0) {
-		location += strlen(FILE_PREFIX);
-	} else {
-		/* Require absolute path. */
-		if (*location != '/') {
+		location += strlen(FILE_PREFIX) - 1;
+		is_absolute = true;
+	}
+
+	/*
+	 * If we have an absolute path, strip off any extra / characters.
+	 */
+	if (location[0] == '/') {
+		while (location[1] == '/') {
+			location++;
+		}
+	} else if (f->flags & FILEIO_O_ABSOLUTE) {
+		/* Not an abolute path, but one was required by the caller. */
+		errno = EINVAL;
+		return false;
+	}
+
+	if (f->flags & FILEIO_O_NO_DOTDOT) {
+		/*
+		 * Caller has requested no upward path traversals.
+		 */
+		if (strncmp(location, "../", strlen("../")) == 0 ||
+		    strstr(location, "/../") != NULL) {
 			errno = EINVAL;
 			return false;
 		}
-	}
-
-	/* Now strip all leading / characters. */
-	while (*location == '/') {
-		location++;
 	}
 
 	if (strlen(location) == 0) {
@@ -120,27 +140,17 @@ fileio_local_io_open(struct fileio *f, const char *location)
 		return false;
 	}
 
-	/* Make a writable copy with one leading /. */
-	size_t len = strlen(location) + 2 /* / + NUL */;
-	char *cp = malloc(len);
-	if (cp == NULL) {
+	/* Everything looks good; make our own copy now. */
+	f->location = strdup(location);
+	if (f->location == NULL) {
 		errno = ENOMEM;
 		return false;
 	}
-	snprintf(cp, len, "/%s", location);
-
-	/* Disallow going backwards in the path. */
-	if (strstr(cp, "/../") != NULL) {
-		errno = EINVAL;
-		free(cp);
-		return false;
-	}
-	f->location = cp;
+	/* If open fails, caller will free f->location. */
 
 	f->local.fd = open(f->location,
 	    (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY);
 	if (f->local.fd < 0) {
-		free(f->location);
 		return false;
 	}
 
@@ -230,16 +240,15 @@ fileio_remote_io_open(struct fileio *f, const char *location)
 		errno = ENOMEM;
 		return NULL;
 	}
+	/* If open fails, caller will free f->location. */
 
 	f->remote.fio = fetchXGetURL(f->location, &f->remote.ust, "");
 	if (f->remote.fio == NULL) {
-		free(f->location);
 		return false;
 	}
 
 	if (f->remote.ust.size < 0) {	/* XXX */
 		fetchIO_close(f->remote.fio);
-		free(f->location);
 		return false;
 	}
 

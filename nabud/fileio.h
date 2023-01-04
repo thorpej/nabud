@@ -54,6 +54,8 @@ const char *	fileio_location(struct fileio *);
 
 #define	FILEIO_O_RDONLY		0x00
 #define	FILEIO_O_RDWR		0x01
+#define	FILEIO_O_ABSOLUTE	0x02	/* allow only absolute paths */
+#define	FILEIO_O_NO_DOTDOT	0x04	/* disallow upward traversal */
 
 void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 			  size_t, size_t *filesizep);
