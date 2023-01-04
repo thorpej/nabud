@@ -28,6 +28,7 @@
  * Support for NabuRetroNet features / extensions.
  */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -37,157 +38,98 @@
 #include "log.h"
 #include "retronet.h"
 
+#if 0
 /*
- * rn_store_blob_free --
- *	Free a blob.
+ * rn_file_insert --
+ *	Insert a file into the list, allocating a slot number if
+ *	necessary.  This always succeeds, and returns the old
+ *	file object that needs to be freed if there's a collision.
  */
-static void
-rn_store_blob_free(struct rn_blob *blob)
+static bool
+rn_file_insert(struct nabu_connection *conn, struct rn_file *f,
+    uint8_t reqslot, struct rn_file **oldfp)
 {
-	free(blob->url);
-	free(blob->data);
-	free(blob);
-}
+	struct rn_file *lf, *prevf = NULL;
+	uint8_t slot;
 
-/*
- * rn_store_get_slot --
- *	Get the blob from a blob store slot.
- */
-static struct rn_blob *
-rn_store_get_slot(struct nabu_connection *conn, uint8_t slot)
-{
-	struct rn_blob *blob;
+	*oldfp = NULL;
+
+	if (reqslot == 0xff) {
+		/*
+		 * We're being asked to allocate a slot #.  Find the
+		 * lowest slot number and use that.
+		 */
+		slot = 0;
+		LIST_FOREACH(lf, &conn->rn_files, link) {
+			assert(lf->slot != 0xff);
+			assert(slot <= lf->slot);
+			if (slot < lf->slot) {
+				f->slot = slot;
+				LIST_INSERT_BEFORE(lf, f, link);
+				return true;
+			}
+			slot = lf->slot + 1;
+			if (slot == 0xff) {
+				/*
+				 * The connection is using 255 slots
+				 * slots.  The protocol has no provision
+				 * for failure, but this situation is
+				 * absurd.  Instead, this implementation
+				 * treats this situation as a failure
+				 * and treats slot 255 as a dead file.
+				 */
+				return false;
+			}
+			prev = lf;
+		}
+		goto insert_after;
+	}
 
 	/*
-	 * No need to hold the connection mutex or track references -- the
-	 * blobs are only ever referenced by the thread that owns the
-	 * connection.
+	 * We're being asked to allocate a specific slot, possibly
+	 * replacing another file.
 	 */
-	LIST_FOREACH(blob, &conn->rn_store, link) {
-		if (blob->slot == slot) {
-			break;
+	slot = reqslot;
+	LIST_FOREACH(lf, &conn->rn_files, link) {
+		if (slot > lf->slot) {
+			prevf = lf;
+			continue;
+		}
+		if (slot == lf->slot) {
+			LIST_REMOVE(lf, link);
+			*oldfp = lf;
+			if (prevf != NULL) {
+				LIST_INSERT_AFTER(prevf, f, link);
+			} else {
+				LIST_INSERT_HEAD(&conn->rn_files, f, link);
+				assert((lf = LIST_NEXT(f, link)) == NULL ||
+				       lf->slot > f->slot);
+			}
+			return true;
+		}
+		if (slot < lf->slot) {
+			f->slot = slot;
+			LIST_INSERT_BEFORE(lf, f, link);
+			return true;
 		}
 	}
-	return blob;
-}
-
-/*
- * rn_store_set_slot --
- *	Set the a blob store slot.
- */
-static void
-rn_store_set_slot(struct nabu_connection *conn, uint8_t slot,
-    struct rn_blob *blob)
-{
-	struct rn_blob *oblob;
-
-	/* See note in rn_store_get_slot(). */
-
-	oblob = rn_store_get_slot(conn, slot);
-	if (oblob) {
-		LIST_REMOVE(oblob, link);
-		rn_store_blob_free(oblob);
+ insert_after:
+	f->slot = slot;
+	if (prevf != NULL) {
+		LIST_INSERT_AFTER(prevf, f, link);
+	} else {
+		LIST_INSERT_HEAD(&conn->rn_files, f, link);
 	}
-	LIST_INSERT_HEAD(&conn->rn_store, blob, link);
-}
-
-/*
- * rn_store_clear --
- *	Clear out the blob store.
- */
-void
-rn_store_clear(struct nabu_connection *conn)
-{
-	struct rn_blob *blob;
-
-	/* See note in rn_store_get_slot(). */
-
-	while ((blob = LIST_FIRST(&conn->rn_store)) != NULL) {
-		LIST_REMOVE(blob, link);
-		rn_store_blob_free(blob);
-	}
-}
-
-/* 
- * rn_store_http_get --
- *	Get the blob at the specified URL and insert it into
- *	the connection's blob store.
- */
-bool
-rn_store_http_get(struct nabu_connection *conn, char *url, uint8_t slot)
-{
-	struct rn_blob *blob;
-	size_t filesize;
-	uint8_t *data;
-
-	/*
-	 * Download the file before we do anything.  Note that we
-	 * ALWAYS download, even if we already have a blob at the
-	 * same URL in this slot, because the content may have
-	 * changed.
-	 *
-	 * Cap the size at NABU_MAXSEGMENTSIZE for now (the
-	 * GetDataSize request only has a 16-bit size return).
-	 */
-	data = fileio_load_from_url(url, NABU_MAXSEGMENTSIZE, &filesize);
-	if (data == NULL) {
-		/* Error already logged. Clear out existing slot. */
-		rn_store_set_slot(conn, slot, NULL);
-		free(url);
-		return false;
-	}
-
-	blob = calloc(1, sizeof(*blob));
-	if (blob == NULL) {
-		log_error("[%s] Unable to allocate RN blob descriptor "
-		    "for slot %u.", conn->name, slot);
-		free(data);
-		free(url);
-	}
-
-	blob->url = url;
-	blob->data = data;
-	blob->length = filesize;
-	blob->slot = slot;
-
-	log_info("[%s] Storing %zu bytes of data from %s in slot %u.",
-	    conn->name, filesize, url, slot);
-
-	rn_store_set_slot(conn, slot, blob);
+	assert((lf = LIST_NEXT(f, link)) == NULL || lf->slot > f->slot);
 	return true;
 }
+#endif
 
 /*
- * rn_store_get_size --
- *	Get the size of the data at the specified slot.  If there is
- *	no blob stored at that slot, return 0.
+ * rn_file_closeall --
+ *	Close all files associated with this connection.
  */
-size_t
-rn_store_get_size(struct nabu_connection *conn, uint8_t slot)
+void
+rn_file_closeall(struct nabu_connection *conn)
 {
-	struct rn_blob *blob;
-
-	blob = rn_store_get_slot(conn, slot);
-	return blob != NULL ? blob->length : 0;
-}
-
-/*
- * rn_store_get_data --
- *	Get the data at the specified offset of the specified slot.
- *	Returns the amount of valid data in *datalenp.
- */
-const uint8_t *
-rn_store_get_data(struct nabu_connection *conn, uint8_t slot, size_t offset,
-    size_t *datalenp)
-{
-	struct rn_blob *blob;
-
-	blob = rn_store_get_slot(conn, slot);
-	if (blob == NULL || offset >= blob->length) {
-		*datalenp = 0;
-		return NULL;
-	}
-
-	*datalenp = blob->length - offset;
-	return blob->data + offset;
 }

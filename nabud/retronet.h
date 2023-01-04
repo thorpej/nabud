@@ -32,20 +32,14 @@
 
 #include "nbsd_queue.h"
 
-struct rn_blob {
-	LIST_ENTRY(rn_blob) link;
-	char		*url;
-	uint8_t		*data;
-	size_t		length;
+struct rn_file {
+	LIST_ENTRY(rn_file) link;
+	struct fileio	*file;
 	uint8_t		slot;
 };
 
 struct nabu_connection;
 
-bool	rn_store_http_get(struct nabu_connection *, char *, uint8_t);
-size_t	rn_store_get_size(struct nabu_connection *, uint8_t);
-const uint8_t *rn_store_get_data(struct nabu_connection *, uint8_t, size_t,
-				 size_t *);
-void	rn_store_clear(struct nabu_connection *);
+void	rn_file_closeall(struct nabu_connection *);
 
 #endif /* retronet_h_included */
