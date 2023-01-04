@@ -240,7 +240,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * ->	No return
  *
- * NABU_MSG_RN_FH_TRUNCATE	0xb0	/* DJ calls this "empty file" */
+ * NABU_MSG_RN_FH_TRUNCATE	0xb0		DJ calls this "empty file"
  *	uint8_t			fileHandle
  *
  * ->	No return
@@ -302,6 +302,32 @@ struct nabu_pkthdr {
 	uint8_t		type;		/* packet type / flags */
 	uint8_t		segment[2];	/* segment number; little-endian */
 	uint8_t		offset[2];	/* offset; big-endian */
+};
+
+/*
+ * NabuRetroNet file details structure.
+ */
+struct rn_file_details {
+	uint8_t		file_size[4];
+#define	NR_ISDIR	((uint32_t)-1)
+#define	NR_NOENT	((uint32_t)-2)
+
+	uint8_t		c_year[2];
+	uint8_t		c_month;
+	uint8_t		c_day;
+	uint8_t		c_hour;
+	uint8_t		c_minute;
+	uint8_t		c_second;
+
+	uint8_t		m_year[2];
+	uint8_t		m_month;
+	uint8_t		m_day;
+	uint8_t		m_hour;
+	uint8_t		m_minute;
+	uint8_t		m_second;
+
+	uint8_t		name_length;
+	uint8_t		name[64];
 };
 
 #ifdef NABU_PROTO_INLINES
