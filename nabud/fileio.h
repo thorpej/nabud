@@ -51,6 +51,7 @@ ssize_t		fileio_write(struct fileio *, const void *, size_t);
 ssize_t		fileio_pread(struct fileio *, void *, size_t, off_t);
 ssize_t		fileio_pwrite(struct fileio *, const void *, size_t, off_t);
 bool		fileio_getattr(struct fileio *, struct fileio_attrs *);
+bool		fileio_truncate(struct fileio *, off_t);
 const char *	fileio_location(struct fileio *);
 
 #define	FILEIO_O_RDONLY		0x00
