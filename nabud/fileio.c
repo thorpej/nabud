@@ -58,6 +58,8 @@ struct fileio_ops {
 	bool		(*io_getattr)(struct fileio *, struct fileio_attrs *);
 	void		(*io_close)(struct fileio *);
 
+	off_t		(*io_seek)(struct fileio *, off_t, int);
+
 	ssize_t		(*io_read)(struct fileio *, void *, size_t);
 	ssize_t		(*io_pread)(struct fileio *, void *, size_t, off_t);
 
@@ -193,6 +195,12 @@ fileio_local_io_close(struct fileio *f)
 	}
 }
 
+static off_t
+fileio_local_io_seek(struct fileio *f, off_t offset, int whence)
+{
+	return lseek(f->local.fd, offset, whence);
+}
+
 static ssize_t
 fileio_local_io_read(struct fileio *f, void *buf, size_t len)
 {
@@ -223,6 +231,7 @@ static const struct fileio_ops fileio_local_ops = {
 	.io_ok		=	fileio_local_io_ok,
 	.io_getattr	=	fileio_local_io_getattr,
 	.io_close	=	fileio_local_io_close,
+	.io_seek	=	fileio_local_io_seek,
 	.io_read	=	fileio_local_io_read,
 	.io_write	=	fileio_local_io_write,
 	.io_pread	=	fileio_local_io_pread,
@@ -398,6 +407,23 @@ fileio_getattr(struct fileio *f, struct fileio_attrs *attrs)
 		rv = (*f->ops->io_getattr)(f, attrs);
 	}
 	return rv;
+}
+
+/*
+ * fileio_seek --
+ *	Seek to a position in a file.
+ */
+off_t
+fileio_seek(struct fileio *f, off_t offset, int whence)
+{
+	off_t pos = -1;
+
+	if (f->ops->io_seek == NULL) {
+		errno = ENOTSUP;
+	} else if ((*f->ops->io_ok)(f, false)) {
+		pos = (*f->ops->io_seek)(f, offset, whence);
+	}
+	return pos;
 }
 
 /*

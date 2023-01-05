@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,6 +45,7 @@ struct fileio_attrs {
 
 struct fileio *	fileio_open(const char *, int, struct fileio_attrs *);
 void		fileio_close(struct fileio *);
+off_t		fileio_seek(struct fileio *, off_t, int);
 ssize_t		fileio_read(struct fileio *, void *, size_t);
 ssize_t		fileio_write(struct fileio *, const void *, size_t);
 ssize_t		fileio_pread(struct fileio *, void *, size_t, off_t);
