@@ -337,6 +337,19 @@ fileio_free(struct fileio *f)
 	free(f);
 }
 
+static const struct fileio_scheme_ops *
+fileio_ops_for_location(const char *location)
+{
+	const struct fileio_scheme_ops *fso;
+
+	for (fso = fileio_scheme_ops; fso->scheme != NULL; fso++) {
+		if (strncmp(location, fso->scheme, strlen(fso->scheme)) == 0) {
+			break;
+		}
+	}
+	return fso;
+}
+
 /*
  * fileio_open --
  *	Open a file.
@@ -347,11 +360,7 @@ fileio_open(const char *location, int flags, struct fileio_attrs *attrs)
 	const struct fileio_scheme_ops *fso;
 	struct fileio *f;
 
-	for (fso = fileio_scheme_ops; fso->scheme != NULL; fso++) {
-		if (strncmp(location, fso->scheme, strlen(fso->scheme)) == 0) {
-			break;
-		}
-	}
+	fso = fileio_ops_for_location(location);
 
 	if (fso->ops->io_write == NULL && (flags & FILEIO_O_RDWR) != 0) {
 		errno = ENOTSUP;
