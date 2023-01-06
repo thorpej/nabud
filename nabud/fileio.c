@@ -53,7 +53,8 @@
 #define	FILE_PREFIX	SCHEME_FILE "://"
 
 struct fileio_ops {
-	bool		(*io_open)(struct fileio *, const char *);
+	bool		(*io_open)(struct fileio *, const char *,
+			    const char *);
 	bool		(*io_ok)(struct fileio *, bool);
 	bool		(*io_getattr)(struct fileio *, struct fileio_attrs *);
 	void		(*io_close)(struct fileio *);
@@ -99,10 +100,172 @@ fileio_io_ok(struct fileio *f, bool writing)
 /*
  * Local wrappers.
  */
+
+typedef enum {
+	Initial,
+	Base,
+	Have_Dot,
+	Have_DotDot,
+	Have_Slash,
+	Have_SlashDot,
+	Have_SlashDotDot,
+} escape_check_state;
+
 static bool
-fileio_local_io_open(struct fileio *f, const char *location)
+check_local_root_escape(const char *location)
 {
-	bool is_absolute = false;
+	int depth = 0;
+	escape_check_state state;
+
+	/* Consume leading / characters. */
+	while (*location == '/') {
+		location++;
+	}
+
+	/* Set up the iniital state. */
+	switch (*location) {
+	case '.':	/* bare ".." is a bit of a special case. */
+		location++;
+		if (*location == '.') {
+			state = Have_DotDot;
+			location++;
+			if (*location == '\0') {
+				return true;
+			}
+		} else {
+			state = Have_Dot;
+		}
+		break;
+
+	default:
+		state = Initial;
+		break;
+	}
+
+	for (depth = 0; *location != '\0'; location++) {
+		switch (state) {
+		case Initial:
+			switch (*location) {
+			case '/':
+				depth++;
+				state = Have_Slash;
+				break;
+			}
+			continue;
+
+		case Base:
+			switch (*location) {
+			case '/':
+				state = Have_Slash;
+				break;
+			}
+			continue;
+
+		case Have_Dot:
+			switch (*location) {
+			case '.':
+				state = Have_DotDot;
+				break;
+
+			case '/':
+				/* "./" does not increase depth */
+				state = Have_Slash;
+				break;
+
+			default:
+				state = Base;
+				break;
+			}
+			continue;
+
+		case Have_SlashDot:
+			switch (*location) {
+			case '.':
+				state = Have_SlashDotDot;
+				break;
+
+			case '/':
+				/* "./" does not increase depth */
+				state = Have_Slash;
+				break;
+
+			default:
+				state = Base;
+				break;
+			}
+			continue;
+
+		case Have_DotDot:
+			switch (*location) {
+			case '/':
+				depth--;
+				state = Have_Slash;
+				if (depth < 0) {
+					goto out;
+				}
+				break;
+
+			default:
+				state = Base;
+				break;
+			}
+			continue;
+
+		case Have_SlashDotDot:
+			switch (*location) {
+			case '/':
+				depth--;
+				state = Have_Slash;
+				if (depth < 0) {
+					goto out;
+				}
+				break;
+
+			default:
+				state = Base;
+				break;
+			}
+			continue;
+
+		case Have_Slash:
+			switch (*location) {
+			case '.':
+				state = Have_SlashDot;
+				break;
+
+			case '/':
+				break;
+
+			default:
+				depth++;
+				state = Base;
+				break;
+			}
+			continue;
+
+		default:
+			abort();
+		}
+	}
+
+	/*
+	 * Have_SlashDotDot ("some/path/.."), that decreases depth.
+	 */
+	if (state == Have_SlashDotDot) {
+		depth--;
+	}
+ out:
+	return depth < 0;
+}
+
+static bool
+fileio_local_io_open(struct fileio *f, const char *location,
+    const char *local_root)
+{
+	if ((f->flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
+		errno = EINVAL;
+		return false;
+	}
 
 	/*
 	 * Strip file:// if it's there.  Note that we treat these as
@@ -111,7 +274,6 @@ fileio_local_io_open(struct fileio *f, const char *location)
 	 */
 	if (strncmp(location, FILE_PREFIX, strlen(FILE_PREFIX)) == 0) {
 		location += strlen(FILE_PREFIX) - 1;
-		is_absolute = true;
 	}
 
 	/*
@@ -121,21 +283,6 @@ fileio_local_io_open(struct fileio *f, const char *location)
 		while (location[1] == '/') {
 			location++;
 		}
-	} else if (f->flags & FILEIO_O_ABSOLUTE) {
-		/* Not an abolute path, but one was required by the caller. */
-		errno = EINVAL;
-		return false;
-	}
-
-	if (f->flags & FILEIO_O_NO_DOTDOT) {
-		/*
-		 * Caller has requested no upward path traversals.
-		 */
-		if (strncmp(location, "../", strlen("../")) == 0 ||
-		    strstr(location, "/../") != NULL) {
-			errno = EINVAL;
-			return false;
-		}
 	}
 
 	if (strlen(location) == 0) {
@@ -143,8 +290,29 @@ fileio_local_io_open(struct fileio *f, const char *location)
 		return false;
 	}
 
-	/* Everything looks good; make our own copy now. */
-	f->location = strdup(location);
+	if (local_root != NULL) {
+		/* The local root must be an absolute path. */
+		if (*local_root != '/') {
+			errno = EINVAL;
+			return false;
+		}
+		if (check_local_root_escape(location)) {
+			errno = EPERM;
+			return false;
+		}
+		/* local_root/location\0 */
+		f->location = malloc(strlen(local_root) + 1 +
+		    strlen(location) + 1);
+		if (f->location != NULL) {
+			sprintf(f->location, "%s/%s", local_root, location);
+		}
+	} else {
+		if (f->flags & FILEIO_O_LOCAL_ROOT) {
+			errno = EPERM;
+			return false;
+		}
+		f->location = strdup(location);
+	}
 	if (f->location == NULL) {
 		errno = ENOMEM;
 		return false;
@@ -154,6 +322,13 @@ fileio_local_io_open(struct fileio *f, const char *location)
 	f->local.fd = open(f->location,
 	    (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY);
 	if (f->local.fd < 0) {
+		return false;
+	}
+
+	/* Allow only regular files. */
+	struct stat sb;
+	if (fstat(f->local.fd, &sb) < 0 || !S_ISREG(sb.st_mode)) {
+		close(f->local.fd);
 		return false;
 	}
 
@@ -250,7 +425,8 @@ static const struct fileio_ops fileio_local_ops = {
  * Remote wrappers.
  */
 static bool
-fileio_remote_io_open(struct fileio *f, const char *location)
+fileio_remote_io_open(struct fileio *f, const char *location,
+    const char *local_root)
 {
 	f->location = strdup(location);
 	if (f->location == NULL) {
@@ -355,7 +531,8 @@ fileio_ops_for_location(const char *location)
  *	Open a file.
  */
 struct fileio *
-fileio_open(const char *location, int flags, struct fileio_attrs *attrs)
+fileio_open(const char *location, int flags, const char *local_root,
+    struct fileio_attrs *attrs)
 {
 	const struct fileio_scheme_ops *fso;
 	struct fileio *f;
@@ -376,7 +553,7 @@ fileio_open(const char *location, int flags, struct fileio_attrs *attrs)
 	f->flags = flags;
 
 	/* back-end sets up f->location */
-	if ((*f->ops->io_open)(f, location)) {
+	if ((*f->ops->io_open)(f, location, local_root)) {
 		if (attrs == NULL ||
 		    (*f->ops->io_getattr)(f, attrs)) {
 			return f;
@@ -424,6 +601,25 @@ fileio_getattr(struct fileio *f, struct fileio_attrs *attrs)
 		rv = (*f->ops->io_getattr)(f, attrs);
 	}
 	return rv;
+}
+
+/*
+ * fileio_truncate --
+ *	Truncate a file.
+ */
+bool
+fileio_truncate(struct fileio *f, off_t size)
+{
+	if (size < 0) {
+		return false;
+	}
+	if (f->ops->io_truncate == NULL) {
+		errno = ENOTSUP;
+		return false;
+	} else if (! (*f->ops->io_ok)(f, true)) {
+		return false;
+	}
+	return (*f->ops->io_truncate)(f, size);
 }
 
 /*
@@ -574,7 +770,7 @@ fileio_load_file_from_location(const char *location, size_t extra,
 	uint8_t *filebuf;
 	struct fileio *f;
 
-	f = fileio_open(location, FILEIO_O_RDONLY, &attrs);
+	f = fileio_open(location, FILEIO_O_RDONLY, NULL, &attrs);
 	if (f == NULL) {
 		log_error("Unable to open %s", location);
 		return NULL;

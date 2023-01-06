@@ -43,7 +43,8 @@ struct fileio_attrs {
 	bool	is_seekable;
 };
 
-struct fileio *	fileio_open(const char *, int, struct fileio_attrs *);
+struct fileio *	fileio_open(const char *, int, const char *,
+			    struct fileio_attrs *);
 void		fileio_close(struct fileio *);
 off_t		fileio_seek(struct fileio *, off_t, int);
 ssize_t		fileio_read(struct fileio *, void *, size_t);
@@ -56,8 +57,7 @@ const char *	fileio_location(struct fileio *);
 
 #define	FILEIO_O_RDONLY		0x00
 #define	FILEIO_O_RDWR		0x01
-#define	FILEIO_O_ABSOLUTE	0x02	/* allow only absolute paths */
-#define	FILEIO_O_NO_DOTDOT	0x04	/* disallow upward traversal */
+#define	FILEIO_O_LOCAL_ROOT	0x02	/* require a local root */
 
 void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 			  size_t, size_t *filesizep);
