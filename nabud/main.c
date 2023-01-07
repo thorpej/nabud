@@ -69,9 +69,10 @@ config_error(const char *preamble, mj_t *atom)
 static void
 config_load_channel(mj_t *atom)
 {
-	mj_t *name_atom, *number_atom, *type_atom, *source_atom, *path_atom;
+	mj_t *name_atom, *number_atom, *type_atom, *source_atom, *path_atom,
+	    *list_url_atom, *default_file_atom;
 	char *name = NULL, *number = NULL, *type = NULL, *source = NULL,
-	    *path = NULL;
+	    *path = NULL, *list_url = NULL, *default_file = NULL;
 	image_channel_type ictype;
 	long val;
 
@@ -134,9 +135,28 @@ config_load_channel(mj_t *atom)
 		mj_asprint(&path, path_atom, MJ_HUMAN);
 	}
 
-	image_add_channel(ictype, name, source, path, val);
+	/*
+	 * Optional ListURL -- specifies a file list for the
+	 * channel.  This is used by NabuRetroNet.
+	 */
+	list_url_atom = mj_get_atom(atom, "ListURL");
+	if (VALID_ATOM(list_url_atom, MJ_STRING)) {
+		mj_asprint(&list_url, list_url_atom, MJ_HUMAN);
+	}
+
+	/*
+	 * Optional DefaultFile -- specifies the default file that
+	 * will be vended when the NABU requests image 000001.
+	 */
+	default_file_atom = mj_get_atom(atom, "DefaultFile");
+	if (VALID_ATOM(default_file_atom, MJ_STRING)) {
+		mj_asprint(&default_file, default_file_atom, MJ_HUMAN);
+	}
+
+	image_add_channel(ictype, name, source, path, list_url, default_file,
+	    val);
 	/* image_add_channel() owns these */
-	name = source = NULL;
+	name = source = list_url = default_file = NULL;
 
  out:
 	if (name != NULL) {
@@ -153,6 +173,9 @@ config_load_channel(mj_t *atom)
 	}
 	if (path != NULL) {
 		free(path);
+	}
+	if (list_url != NULL) {
+		free(list_url);
 	}
 }
 

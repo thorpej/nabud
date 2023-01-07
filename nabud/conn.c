@@ -583,6 +583,68 @@ conn_set_channel(struct nabu_connection *conn, struct image_channel *chan)
 }
 
 /*
+ * conn_selected_file --
+ *	Return the selected file on this connection, or NULL if
+ *	no file is selected.  Caller must free the returned string.
+ */
+static const char *
+conn_get_selected_file(struct nabu_connection *conn)
+{
+	if (conn->l_channel != NULL) {
+		return conn->l_channel->default_file;
+	}
+	return NULL;
+}
+
+char *
+conn_selected_file(struct nabu_connection *conn)
+{
+	size_t len;
+	const char *sel;
+	char *cp;
+
+	for (cp = NULL, len = 0;;) {
+		/*
+		 * Avoid allocating memory while holding the
+		 * channel lock.  First, figure out what selection
+		 * we're going to use and drop the lock.  Then,
+		 * allocate space for the name, re-acquire the
+		 * lock, and determine the selection again.  If
+		 * the selection will still fit, copy the string
+		 * and return.  Otherwise, try again.
+		 */
+
+		pthread_mutex_lock(&conn->mutex);
+		sel = conn_get_selected_file(conn);
+		if (sel != NULL) {
+			len = strlen(sel);
+		}
+		pthread_mutex_unlock(&conn->mutex);
+		if (sel == NULL) {
+			return NULL;
+		}
+
+		cp = malloc(len + 1);
+		if (cp == NULL) {
+			return NULL;
+		}
+
+		pthread_mutex_lock(&conn->mutex);
+		sel = conn_get_selected_file(conn);
+		if (sel != NULL && strlen(sel) <= len) {
+			strcpy(cp, sel);
+		} else {
+			sel = NULL;
+		}
+		pthread_mutex_unlock(&conn->mutex);
+		if (sel != NULL) {
+			return cp;
+		}
+		free(cp);
+	}
+}
+
+/*
  * conn_cancel --
  *	Cancel a connection.
  */

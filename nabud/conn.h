@@ -110,6 +110,7 @@ struct nabu_image *conn_set_last_image_if(struct nabu_connection *,
 
 struct image_channel *conn_get_channel(struct nabu_connection *);
 void	conn_set_channel(struct nabu_connection *, struct image_channel *);
+char	*conn_selected_file(struct nabu_connection *);
 
 void	conn_cancel(struct nabu_connection *);
 void	conn_shutdown(void);

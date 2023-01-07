@@ -44,12 +44,16 @@ typedef enum {
 	IMAGE_CHANNEL_NABU	=	2,
 } image_channel_type;
 
+#define	IMAGE_NUMBER_NAMED	((uint32_t)-1)
+
 struct image_channel {
 	TAILQ_ENTRY(image_channel) link;
 	struct image_source *source;
 	image_channel_type type;
 	char		*name;
 	char		*path;
+	char		*list_url;
+	char		*default_file;
 	unsigned int	number;
 	LIST_HEAD(, nabu_image) image_cache;
 };
@@ -68,7 +72,7 @@ struct nabu_connection;
 
 void	image_add_source(char *, char *);
 void	image_add_channel(image_channel_type, char *, char *, const char *,
-	    unsigned int);
+	    char *, char *, unsigned int);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);

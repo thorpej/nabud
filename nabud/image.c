@@ -197,7 +197,8 @@ image_channel_lookup(unsigned int number)
  */
 void
 image_add_channel(image_channel_type type, char *name, char *source,
-    const char *relpath, unsigned int number)
+    const char *relpath, char *list_url, char *default_file,
+    unsigned int number)
 {
 	struct image_channel *chan = NULL;
 	size_t pathlen;
@@ -249,12 +250,22 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	chan->type = type;
 	chan->name = name;
 	chan->path = pathstr;
+	chan->list_url = list_url;
+	chan->default_file = default_file;
 	chan->number = number;
 	TAILQ_INSERT_TAIL(&image_channels, chan, link);
 	image_channel_count++;
 	log_info("Adding %s channel %u (%s on %s) at %s",
 	    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu",
 	    chan->number, chan->name, chan->source->name, chan->path);
+	if (chan->list_url != NULL) {
+		log_info("Channel %u has a listing at: %s",
+		    chan->number, chan->list_url);
+	}
+	if (chan->default_file != NULL) {
+		log_info("Channel %u will default to '%s' for image 000001.",
+		    chan->number, chan->default_file);
+	}
 	return;
  bad:
 	if (chan != NULL) {
@@ -270,7 +281,7 @@ image_add_channel(image_channel_type type, char *name, char *source,
 /*
  * image_cache_lookup_locked --
  *	Look up an image in the channel's image cache.  Gains a retain
- *	on the image, of found.
+ *	on the image, if found.
  */
 static struct nabu_image *
 image_cache_lookup_locked(struct image_channel *chan, uint32_t image)
@@ -278,6 +289,9 @@ image_cache_lookup_locked(struct image_channel *chan, uint32_t image)
 	struct nabu_image *img;
 
 	LIST_FOREACH(img, &chan->image_cache, link) {
+		if (img->number == IMAGE_NUMBER_NAMED) {
+			continue;
+		}
 		if (img->number == image) {
 			image_retain_locked(img);
 			return img;
@@ -287,10 +301,34 @@ image_cache_lookup_locked(struct image_channel *chan, uint32_t image)
 }
 
 /*
- * image_cache_insert_locked --
+ * image_cache_lookup_named_locked --
+ *	Look up an image in the channel's image cache by name.
+ *	This is used for named file selections.  Gains a retain
+ *	on the image, if found.
+ */
+static struct nabu_image *
+image_cache_lookup_named_locked(struct image_channel *chan,
+    const char *name)
+{
+	struct nabu_image *img;
+
+	LIST_FOREACH(img, &chan->image_cache, link) {
+		if (img->number != IMAGE_NUMBER_NAMED) {
+			continue;
+		}
+		if (strcmp(img->name, name) == 0) {
+			image_retain_locked(img);
+			return img;
+		}
+	}
+	return NULL;
+}
+
+/*
+ * image_cache_insert_common_locked --
  *	Insert an image into the image cache.  If the image
- *	already exists, we release the new one and return
- *	the one from the cache.
+ *	already exists, we end up releasing the new one and
+ *	using the one from the cache.
  *
  *	The image returned has 2 retains:
  *
@@ -305,14 +343,16 @@ image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 {
 	struct nabu_image *img;
 
-	img = image_cache_lookup_locked(chan, newimg->number);
+	if (newimg->number == IMAGE_NUMBER_NAMED) {
+		img = image_cache_lookup_named_locked(chan, newimg->name);
+	} else {
+		img = image_cache_lookup_locked(chan, newimg->number);
+	}
 	if (img == NULL) {
 		image_retain_locked(newimg);
 		LIST_INSERT_HEAD(&chan->image_cache, newimg, link);
 		image_cache_size += newimg->length;
-	}
 
-	if (img == NULL) {
 		log_info("Cached %s on Channel %u; "
 		    "total cache size: %zu", newimg->name, chan->number,
 		        image_cache_size);
@@ -375,12 +415,16 @@ image_pak_name(uint32_t image)
  *	Create an image descriptor from the provided NABU file buffer.
  */
 static struct nabu_image *
-image_from_nabu(struct image_channel *chan, uint32_t image, uint8_t *filebuf,
-    size_t filesize)
+image_from_nabu(struct image_channel *chan, uint32_t image,
+    const char *image_name, uint8_t *filebuf, size_t filesize)
 {
-	char image_name[sizeof("nabu-000001")];
+	char image_name_buf[sizeof("nabu-000001")];
 
-	snprintf(image_name, sizeof(image_name), "nabu-%06X", image);
+	if (image_name == NULL) {
+		snprintf(image_name_buf, sizeof(image_name_buf),
+		    "nabu-%06X", image);
+		image_name = image_name_buf;
+	}
 
 	struct nabu_image *img = calloc(1, sizeof(*img));
 	if (img == NULL) {
@@ -455,11 +499,15 @@ image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
  */
 static struct nabu_image *
 image_from_pak(struct image_channel *chan, uint32_t image,
-    const uint8_t *pakbuf, size_t paklen)
+    const char *image_name, const uint8_t *pakbuf, size_t paklen)
 {
-	char image_name[sizeof("pak-000001")];
+	char image_name_buf[sizeof("pak-000001")];
 
-	snprintf(image_name, sizeof(image_name), "pak-%06X", image);
+	if (image_name == NULL) {
+		snprintf(image_name_buf, sizeof(image_name_buf),
+		    "pak-%06X", image);
+		image_name = image_name_buf;
+	}
 
 	if ((paklen % 8) != 0) {	/* XXX magic number */
 		log_error("%s size %zu is not a multiple of DES block size.",
@@ -505,7 +553,7 @@ image_from_pak(struct image_channel *chan, uint32_t image,
  */
 static struct nabu_image *
 image_load_image_from_url(struct image_channel *chan, uint32_t image,
-    const char *url)
+    const char *image_name, const char *url)
 {
 	struct nabu_image *img;
 	uint8_t *filebuf;
@@ -520,12 +568,14 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 
 #ifndef NO_PAK_FILE_SUPPORT
 	if (chan->type == IMAGE_CHANNEL_PAK) {
-		img = image_from_pak(chan, image, filebuf, filesize);
+		img = image_from_pak(chan, image, image_name, filebuf,
+		    filesize);
 		free(filebuf);
 	} else
 #endif /* ! NO_PAK_FILE_SUPPORT */
 	{
-		img = image_from_nabu(chan, image, filebuf, filesize);
+		img = image_from_nabu(chan, image, image_name, filebuf,
+		    filesize);
 	}
 
 	return img;
@@ -566,28 +616,55 @@ image_channel_select(struct nabu_connection *conn, int16_t channel)
 struct nabu_image *
 image_load(struct nabu_connection *conn, uint32_t image)
 {
-	char *fname, *image_url = NULL;
-	const char *imgtype;
-	struct nabu_image *img;
+	char *image_url = NULL;
+	struct nabu_image *img = NULL;
 	struct image_channel *chan;
+	char *selected_name = NULL;
+
+	assert(image != IMAGE_NUMBER_NAMED);
+
+	/*
+	 * If the NABU is requesting image 000001, then we
+	 * substitute a named file, if one is selected.
+	 */
+	if (image == 1) {
+		selected_name = conn_selected_file(conn);
+		if (selected_name != NULL) {
+			image = IMAGE_NUMBER_NAMED;
+		}
+	}
 
 	pthread_mutex_lock(&image_cache_lock);
 
 	img = conn_get_last_image(conn);
-	if (img != NULL && img->number == image) {
-		/* Cache hit! */
-		log_debug("[%s] Connection cache hit for image %06X: %s",
-		    conn->name, image, img->name);
+	if (img != NULL) {
+		/* Maybe a cache hit. */
+		if (image == IMAGE_NUMBER_NAMED &&
+		    strcmp(img->name, selected_name) == 0) {
+			/* Cache hit! */
+			log_debug("[%s] Connection cache hit for named "
+			    "image: %s", conn->name, img->name);
+		} else if (image != IMAGE_NUMBER_NAMED &&
+			   img->number == image) {
+			/* Cache hit! */
+			log_debug("[%s] Connection cache hit for "
+			    "image %06X: %s", conn->name, image, img->name);
+		} else {
+			/* Boo, cache miss. */
+			img = NULL;
+		}
+	}
+	if (img != NULL) {
 		image_retain_locked(img);
 		pthread_mutex_unlock(&image_cache_lock);
-		return img;
+		goto out;
 	}
 
 	chan = conn_get_channel(conn);
 	if (chan == NULL) {
 		log_error("[%s] No channel selected.", conn->name);
 		pthread_mutex_unlock(&image_cache_lock);
-		return NULL;
+		goto out;
 	}
 
 	if ((img = image_cache_lookup_locked(chan, image)) != NULL) {
@@ -603,29 +680,38 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		oimg = image_release_locked(oimg);
 		pthread_mutex_unlock(&image_cache_lock);
 		image_free(oimg);
-		return img;
+		goto out;
 	}
 
 	pthread_mutex_unlock(&image_cache_lock);
 
+	if (selected_name != NULL) {
+		asprintf(&image_url, "%s/%s", chan->path, selected_name);
+		assert(image_url != NULL);
+		log_debug("[%s] Loading '%s' from %s", conn->name,
+		    selected_name, image_url);
+	} else {
+		const char *imgtype;
+		char *fname;
 #ifndef NO_PAK_FILE_SUPPORT
-	if (chan->type == IMAGE_CHANNEL_PAK) {
-		fname = image_pak_name(image);
-		imgtype = "pak";
-	} else
+		if (chan->type == IMAGE_CHANNEL_PAK) {
+			fname = image_pak_name(image);
+			imgtype = "pak";
+		} else
 #endif /* ! NO_PAK_FILE_SUPPORT */
-	{
-		fname = image_nabu_name(image);
-		imgtype = "nabu";
+		{
+			fname = image_nabu_name(image);
+			imgtype = "nabu";
+		}
+
+		asprintf(&image_url, "%s/%s", chan->path, fname);
+		assert(image_url != NULL);
+		log_debug("[%s] Loading %s-%06X from %s", conn->name, imgtype,
+		    image, image_url);
+		free(fname);
 	}
 
-	asprintf(&image_url, "%s/%s", chan->path, fname);
-	assert(image_url != NULL);
-	log_debug("[%s] Loading %s-%06X from %s", conn->name, imgtype, image,
-	    image_url);
-	free(fname);
-
-	img = image_load_image_from_url(chan, image, image_url);
+	img = image_load_image_from_url(chan, image, selected_name, image_url);
 	free(image_url);
 	if (img != NULL) {
 		struct nabu_image *oimg, *using_img;
@@ -645,8 +731,12 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		pthread_mutex_unlock(&image_cache_lock);
 		image_free(oimg);
 		image_free(img);
-		return using_img;
+		img = using_img;
 	}
 
-	return NULL;
+ out:
+	if (selected_name != NULL) {
+		free(selected_name);
+	}
+	return img;
 }
