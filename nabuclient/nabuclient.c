@@ -346,21 +346,176 @@ command_change_channel(int argc, char *argv[])
 	return false;
 }
 
-static bool
-command_store_http_get(int argc, char *argv[])
+static uint8_t
+rn_parse_slot(const char *cp)
 {
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 255) {
+		printf("'%s' invalid; must be between 0 - 255\n", cp);
+		THROW();
+	}
+	return (uint8_t)val;
+}
+
+static uint32_t
+rn_parse_offset(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 0xffffffff) {
+		printf("'%s' invalid offset\n", cp);
+		THROW();
+	}
+	return (uint32_t)val;
+}
+
+static uint16_t
+rn_parse_length(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 0xffff) {
+		printf("'%s' invalid length\n", cp);
+		THROW();
+	}
+	return (uint16_t)val;
+}
+
+static bool
+command_rn_file_open(int argc, char *argv[])
+{
+	uint8_t namelen;
+	uint8_t flags[2];
+	uint8_t slot;
+
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		THROW();
+	}
+
+	if (strlen(argv[1]) > 255) {
+		printf("File name too long: %s\n", argv[1]);
+		THROW();
+	}
+	namelen = strlen(argv[1]);
+
+	if (strcmp(argv[2], "ro") == 0) {
+		nabu_set_uint16(flags, 0);
+	} else if (strcmp(argv[2], "rw") == 0) {
+		nabu_set_uint16(flags, RN_FILE_OPEN_RW);
+	} else {
+		printf("'%s' invalid; must be 'ro' or 'rw'\n",
+		    argv[2]);
+		THROW();
+	}
+
+	if (argc > 3) {
+		slot = rn_parse_slot(argv[3]);
+	} else {
+		slot = 255;
+	}
+
+	printf("Sending: NABU_MSG_RN_FILE_OPEN.\n");
+	nabu_send_byte(NABU_MSG_RN_FILE_OPEN);
+	printf("Sending: fileNameLen $%02X\n", namelen);
+	nabu_send_byte(namelen);
+	printf("Sending: fileName: '%s'\n", argv[1]);
+	nabu_send(argv[1], namelen);
+	printf("Sending: fileFlag: $%02X $%02X\n", flags[0], flags[1]);
+	nabu_send(flags, 2);
+	printf("Sending: reqSlot: $%02X\n", slot);
+	nabu_send_byte(slot);
+
+	printf("Expecting: slot.\n");
+	nabu_recv(flags, 1);
+	print_reply(flags, 1);
+
 	return false;
 }
 
 static bool
-command_store_get_size(int argc, char *argv[])
+command_rn_fh_size(int argc, char *argv[])
 {
+	uint8_t msg[4];
+	uint8_t slot;
+
+	if (argc != 2) {
+		printf("Args, bro.\n");
+		THROW();
+	}
+
+	slot = rn_parse_slot(argv[1]);
+	printf("Sending: NABU_MSG_RN_FH_SIZE.\n");
+	nabu_send_byte(NABU_MSG_RN_FH_SIZE);
+	printf("Sending: slot: $%02X\n", slot);
+	nabu_send_byte(slot);
+
+	printf("Expecting: size.\n");
+	nabu_recv(msg, 4);
+	print_reply(msg, 4);
+	printf("Size: %d\n", (int)nabu_get_uint32(msg));
+
 	return false;
 }
 
 static bool
-command_store_get_data(int argc, char *argv[])
+command_rn_fh_read(int argc, char *argv[])
 {
+	uint32_t offset;
+	uint16_t length;
+	uint8_t msg[7];
+	uint8_t buf[65536];
+
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		THROW();
+	}
+
+	msg[0] = rn_parse_slot(argv[1]);
+	nabu_set_uint32(&msg[1], (offset = rn_parse_offset(argv[2])));
+	nabu_set_uint16(&msg[5], (length = rn_parse_length(argv[3])));
+
+	printf("Sending: NABU_MSG_RN_FH_READ.\n");
+	nabu_send_byte(NABU_MSG_RN_FH_READ);
+	printf("Sending: slot: $%02X offset: $%02X $%02X $%02X $%02X "
+	    "langth: $%02X $%02X\n", msg[0],
+	    msg[1], msg[2], msg[3], msg[4],
+	    msg[5], msg[6]);
+	nabu_send(msg, sizeof(msg));
+
+	printf("Expecting: data.\n");
+	nabu_recv(buf, length);
+
+	if (argc >= 5) {
+		FILE *fp = fopen(argv[4], "wb");
+		if (fp == NULL) {
+			printf("Can't open '%s' for saving data.\n", argv[4]);
+			THROW();
+		}
+		printf("Writing data to '%s'.\n", argv[4]);
+		fwrite(buf, length, 1, fp);
+		fclose(fp);
+	}
+
+	return false;
+}
+
+static bool
+command_rn_fh_close(int argc, char *argv[])
+{
+	uint8_t slot;
+
+	if (argc != 2) {
+		printf("Args, bro.\n");
+		THROW();
+	}
+
+	slot = rn_parse_slot(argv[1]);
+	printf("Sending: NABU_MSG_RN_FH_CLOSE.\n");
+	nabu_send_byte(NABU_MSG_RN_FH_CLOSE);
+	printf("Sending: slot: $%02X\n", slot);
+	nabu_send_byte(slot);
+
+	/* No reply! */
+
 	return false;
 }
 
@@ -384,9 +539,10 @@ static const struct cmdtab {
 	{ .name = "get-image",		.func = command_get_image },
 
 	/* NabuRetroNet extensions */
-	{ .name = "store-http-get",	.func = command_store_http_get },
-	{ .name = "store-get-size",	.func = command_store_get_size },
-	{ .name = "store-get-data",	.func = command_store_get_data },
+	{ .name = "file-open",		.func = command_rn_file_open },
+	{ .name = "fh-size",		.func = command_rn_fh_size },
+	{ .name = "fh-read",		.func = command_rn_fh_read },
+	{ .name = "fh-close",		.func = command_rn_fh_close },
 
 	{ .name = NULL }
 };
