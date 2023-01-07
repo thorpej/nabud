@@ -319,8 +319,12 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	}
 	/* If open fails, caller will free f->location. */
 
-	f->local.fd = open(f->location,
-	    (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY);
+	int open_flags = (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY;
+	if (f->flags & FILEIO_O_CREAT) {
+		open_flags |= O_CREAT;
+	}
+
+	f->local.fd = open(f->location, open_flags);
 	if (f->local.fd < 0) {
 		return false;
 	}
