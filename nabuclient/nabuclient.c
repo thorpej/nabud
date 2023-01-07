@@ -394,10 +394,10 @@ command_start_up(int argc, char *argv[])
 	return false;
 }
 
-static bool
-command_get_time(int argc, char *argv[])
+static void *
+send_packet_request(uint16_t segment, uint32_t image,
+    struct nabu_pkthdr *pkthdr, size_t *payload_lenp)
 {
-	struct nabu_pkthdr pkthdr;
 	uint8_t reply[2];
 	uint8_t msg[4];
 
@@ -409,7 +409,7 @@ command_get_time(int argc, char *argv[])
 	print_reply(reply, sizeof(reply));
 	check_ack(reply);
 
-	printf("Requesting: segment 0 of image %06X\n", NABU_IMAGE_TIME);
+	printf("Requesting: segment %u of image %06X\n", segment, image);
 	msg[0] = 0;
 	nabu_set_uint24(&msg[1], NABU_IMAGE_TIME);
 	nabu_send(msg, sizeof(msg));
@@ -425,13 +425,23 @@ command_get_time(int argc, char *argv[])
 	check_authorized(reply);
 
 	printf("Expecing: packet header.\n");
-	nabu_recv(&pkthdr, sizeof(pkthdr));
-	print_pkthdr(&pkthdr);
+	nabu_recv(pkthdr, sizeof(*pkthdr));
+	print_pkthdr(pkthdr);
+
+	uint16_t hdr_crc = nabu_crc_update(pkthdr, sizeof(*pkthdr), 0xffff);
 
 	printf("Expecting: Payload.\n");
+	return nabu_recv_packet_data(payload_lenp, hdr_crc);
+}
+
+static bool
+command_get_time(int argc, char *argv[])
+{
+	struct nabu_pkthdr pkthdr;
 	size_t payload_len;
-	struct nabu_time *t = nabu_recv_packet_data(&payload_len,
-	    nabu_crc_update(&pkthdr, sizeof(pkthdr), 0xffff));
+
+	struct nabu_time *t = send_packet_request(0, NABU_IMAGE_TIME,
+	    &pkthdr, &payload_len);
 	if (payload_len != NABU_TIMESTAMPSIZE) {
 		printf("Unexpected %u byte reply: ", NABU_TIMESTAMPSIZE);
 		print_octets(t, payload_len);
