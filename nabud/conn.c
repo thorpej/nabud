@@ -509,13 +509,16 @@ conn_set_channel(struct nabu_connection *conn, struct image_channel *chan)
 }
 
 /*
- * conn_selected_file --
+ * conn_get_selected_file --
  *	Return the selected file on this connection, or NULL if
  *	no file is selected.  Caller must free the returned string.
  */
 static const char *
 conn_get_selected_file_logic(struct nabu_connection *conn)
 {
+	if (conn->l_selected_file != NULL) {
+		return conn->l_selected_file;
+	}
 	if (conn->l_channel != NULL) {
 		return conn->l_channel->default_file;
 	}
@@ -567,5 +570,25 @@ conn_get_selected_file(struct nabu_connection *conn)
 			return cp;
 		}
 		free(cp);
+	}
+}
+
+/*
+ * conn_set_selected_file --
+ *	Set the selected file for the connection.
+ */
+void
+conn_set_selected_file(struct nabu_connection *conn, const char *name)
+{
+	char *cp = name == NULL ? NULL : strdup(name);
+	char *oname;
+
+	pthread_mutex_lock(&conn->mutex);
+	oname = conn->l_selected_file;
+	conn->l_selected_file = cp;
+	pthread_mutex_unlock(&conn->mutex);
+
+	if (oname != NULL) {
+		free(oname);
 	}
 }
