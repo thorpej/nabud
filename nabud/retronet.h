@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,10 +36,29 @@ struct rn_file {
 	LIST_ENTRY(rn_file) link;
 	struct fileio	*file;
 	uint8_t		slot;
+
+	uint8_t		*shadow_data;
+	size_t		shadow_len;
 };
 
 struct nabu_connection;
 
-void	rn_file_closeall(struct nabu_connection *);
+uint8_t		rn_api_file_open(struct nabu_connection *, const char *,
+				 uint16_t, uint8_t);
+void		rn_api_fh_close(struct nabu_connection *, uint8_t);
+int32_t		rn_api_fh_size(struct nabu_connection *, uint8_t);
+void		rn_api_fh_read(struct nabu_connection *, uint8_t,
+			       void *, uint32_t, uint16_t);
+void		rn_api_fh_append(struct nabu_connection *, uint8_t,
+				 void *, uint16_t);
+void		rn_api_fh_replace(struct nabu_connection *, uint8_t,
+				  void *, uint32_t, uint16_t);
+void		rn_api_fh_insert(struct nabu_connection *, uint8_t,
+				 void *, uint32_t, uint16_t);
+void		rn_api_fh_delete_range(struct nabu_connection *, uint8_t,
+				       uint32_t, uint16_t);
+void		rn_api_fh_truncate(struct nabu_connection *, uint8_t);
+
+void		rn_file_closeall(struct nabu_connection *);
 
 #endif /* retronet_h_included */

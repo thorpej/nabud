@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
