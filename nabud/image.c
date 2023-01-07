@@ -325,7 +325,7 @@ image_cache_lookup_named_locked(struct image_channel *chan,
 }
 
 /*
- * image_cache_insert_common_locked --
+ * image_cache_insert_locked --
  *	Insert an image into the image cache.  If the image
  *	already exists, we end up releasing the new one and
  *	using the one from the cache.
