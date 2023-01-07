@@ -74,6 +74,8 @@ server_disconnected(void)
 	QUIT();
 }
 
+static const uint8_t ack_seq[] = NABU_MSGSEQ_ACK;
+
 static void
 nabu_send(const void *vbuf, size_t len)
 {
@@ -102,6 +104,12 @@ nabu_send_byte(uint8_t val)
 }
 
 static void
+nabu_send_ack(void)
+{
+	nabu_send(ack_seq, sizeof(ack_seq));
+}
+
+static void
 nabu_recv(void *vbuf, size_t len)
 {
 	uint8_t *buf = vbuf;
@@ -120,6 +128,59 @@ nabu_recv(void *vbuf, size_t len)
 		buf += actual;
 		resid -= actual;
 	}
+}
+
+static void *
+nabu_recv_packet_data(size_t *lenp, uint16_t crc)
+{
+	uint8_t *pktbuf;
+	size_t pktidx = 0;
+	uint8_t c;
+	uint16_t recv_crc, comp_crc;
+	bool have_escape = false;
+
+	pktbuf = malloc(NABU_MAXPACKETSIZE);
+	assert(pktbuf != NULL);
+
+	while (pktidx < NABU_MAXPACKETSIZE) {
+		nabu_recv(&c, 1);
+		if (have_escape) {
+			have_escape = false;
+			if (c == NABU_MSG_ESCAPE) {
+				pktbuf[pktidx++] = NABU_MSG_ESCAPE;
+			} else if (c == NABU_MSG_DONE) {
+				break;
+			} else {
+				printf("Received unknown escape byte: $%02X\n",
+				    c);
+			}
+		} else if (c == NABU_MSG_ESCAPE) {
+			have_escape = true;
+		} else {
+			pktbuf[pktidx++] = c;
+		}
+	}
+	if (pktidx < NABU_FOOTERSIZE) {
+		printf("RUNT PACKET! (%zu bytes)\n", pktidx);
+		goto bad;
+	}
+	if (pktidx >= NABU_MAXPACKETSIZE) {
+		printf("WARNING: SERVER IS AT MAX PACKET SIZE!\n");
+	}
+
+	recv_crc = nabu_get_crc(&pktbuf[pktidx - NABU_FOOTERSIZE]);
+	comp_crc = nabu_crc_final(nabu_crc_update(pktbuf,
+						  pktidx - NABU_FOOTERSIZE,
+						  crc));
+	printf("Received: %zu byte payload (R-CRC=$%04X C-CRC=$%04X -> %s).\n",
+	    pktidx - NABU_FOOTERSIZE,
+	    recv_crc, comp_crc, recv_crc == comp_crc ? "OK" : "BAD");
+	*lenp = pktidx - NABU_FOOTERSIZE;
+	return pktbuf;
+
+ bad:
+	free(pktbuf);
+	THROW();
 }
 
 static void
@@ -144,6 +205,24 @@ print_expected(const void *vbuf, size_t len)
 {
 	printf("Expected: ");
 	print_octets(vbuf, len);
+}
+
+static void
+print_pkthdr(const struct nabu_pkthdr *hdr)
+{
+	printf("Packet header:\n");
+	printf("\t      image: %06X\n", nabu_get_uint24_be(hdr->image));
+	printf("\tsegment_lsb: $%02X (%u)\n", hdr->segment_lsb,
+	    hdr->segment_lsb);
+	printf("\t      owner: $%02X (%u)\n", hdr->owner, hdr->owner);
+	printf("\t       tier: $%08X\n", nabu_get_uint32_be(hdr->tier));
+	printf("\t mystery[0]: $%02X\n", hdr->mystery[0]);
+	printf("\t mystery[1]: $%02X\n", hdr->mystery[1]);
+	printf("\t       type: $%02X\n", hdr->type);
+	printf("\t    segment: $%04X (%u)\n", nabu_get_uint16(hdr->segment),
+	    nabu_get_uint16(hdr->segment));
+	printf("\t     offset: $%04X (%u)\n", nabu_get_uint16_be(hdr->offset),
+	    nabu_get_uint16_be(hdr->offset));
 }
 
 static bool
@@ -177,8 +256,6 @@ check_byte(const void *vgot, uint8_t val)
 static bool
 check_ack(const void *vgot)
 {
-	static const uint8_t ack_seq[] = NABU_MSGSEQ_ACK;
-
 	return check_sequence(vgot, ack_seq, sizeof(ack_seq));
 }
 
@@ -188,6 +265,27 @@ check_finished(const void *vgot)
 	static const uint8_t finished_seq[] = NABU_MSGSEQ_FINISHED;
 
 	return check_sequence(vgot, finished_seq, sizeof(finished_seq));
+}
+
+static bool
+check_authorized(const void *vgot)
+{
+	const uint8_t *got = vgot;
+
+	if (*got == NABU_MSG_AUTHORIZED) {
+		printf("AUTHORIZED!\n");
+		printf("Sending NABU_MSGSEQ_ACK.\n");
+		nabu_send_ack();
+		return true;
+	}
+	if (*got == NABU_MSG_UNAUTHORIZED) {
+		printf("*** UNAUTHORIZED! ***\n");
+		printf("Sending NABU_MSGSEQ_ACK.\n");
+		nabu_send_ack();
+		THROW();
+	}
+	printf("*** Unexpected reply ***\n");
+	return false;
 }
 
 static bool
@@ -299,6 +397,56 @@ command_start_up(int argc, char *argv[])
 static bool
 command_get_time(int argc, char *argv[])
 {
+	struct nabu_pkthdr pkthdr;
+	uint8_t reply[2];
+	uint8_t msg[4];
+
+	printf("Sending: NABU_MSG_PACKET_REQUEST.\n");
+	nabu_send_byte(NABU_MSG_PACKET_REQUEST);
+
+	printf("Expecting: NABU_MSGSEQ_ACK.\n");
+	nabu_recv(reply, sizeof(reply));
+	print_reply(reply, sizeof(reply));
+	check_ack(reply);
+
+	printf("Requesting: segment 0 of image %06X\n", NABU_IMAGE_TIME);
+	msg[0] = 0;
+	nabu_set_uint24(&msg[1], NABU_IMAGE_TIME);
+	nabu_send(msg, sizeof(msg));
+
+	printf("Expecting: NABU_MSG_CONFIRMED.\n");
+	nabu_recv(reply, 1);
+	print_reply(reply, 1);
+	check_byte(reply, NABU_MSG_CONFIRMED);
+
+	printf("Expecting: authorization byte.\n");
+	nabu_recv(reply, 1);
+	print_reply(reply, 1);
+	check_authorized(reply);
+
+	printf("Expecing: packet header.\n");
+	nabu_recv(&pkthdr, sizeof(pkthdr));
+	print_pkthdr(&pkthdr);
+
+	printf("Expecting: Payload.\n");
+	size_t payload_len;
+	struct nabu_time *t = nabu_recv_packet_data(&payload_len,
+	    nabu_crc_update(&pkthdr, sizeof(pkthdr), 0xffff));
+	if (payload_len != NABU_TIMESTAMPSIZE) {
+		printf("Unexpected %u byte reply: ", NABU_TIMESTAMPSIZE);
+		print_octets(t, payload_len);
+	}
+	printf("Server time:\n");
+	printf("\t  mystery[0]: $%02X\n", t->mystery[0]);
+	printf("\t  mystery[1]: $%02X\n", t->mystery[1]);
+	printf("\t  mystery[2]: $%02X\n", t->mystery[2]);
+	printf("\t       month: %u\n", t->month);
+	printf("\tday of month: %u\n", t->month_day);
+	printf("\t        year: %u\n", t->year);
+	printf("\t        hour: %u\n", t->hour);
+	printf("\t      minute: %u\n", t->minute);
+	printf("\t      second: %u\n", t->second);
+
 	return false;
 }
 
