@@ -401,6 +401,15 @@ send_packet_request(uint16_t segment, uint32_t image,
 	uint8_t reply[2];
 	uint8_t msg[4];
 
+	if (segment > 0xff) {
+		printf("WOAH! There is only 1 byte for the segment number!\n");
+		THROW();
+	}
+	if (image > 0x00FFFFFF) {
+		printf("WOAH! There are only 3 bytes for the image number!\n");
+		THROW();
+	}
+
 	printf("Sending: NABU_MSG_PACKET_REQUEST.\n");
 	nabu_send_byte(NABU_MSG_PACKET_REQUEST);
 
@@ -410,8 +419,8 @@ send_packet_request(uint16_t segment, uint32_t image,
 	check_ack(reply);
 
 	printf("Requesting: segment %u of image %06X\n", segment, image);
-	msg[0] = 0;
-	nabu_set_uint24(&msg[1], NABU_IMAGE_TIME);
+	msg[0] = (uint8_t)segment;
+	nabu_set_uint24(&msg[1], image);
 	nabu_send(msg, sizeof(msg));
 
 	printf("Expecting: NABU_MSG_CONFIRMED.\n");
@@ -463,6 +472,65 @@ command_get_time(int argc, char *argv[])
 static bool
 command_get_image(int argc, char *argv[])
 {
+	struct nabu_pkthdr pkthdr;
+	size_t payload_len;
+	size_t current_offset;
+	uint16_t segment;
+	uint32_t image;
+	long val;
+	void *payload;
+
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		THROW();
+	}
+
+	val = strtol(argv[1], NULL, 16);
+	if (val < 0 || val > 0x00ffffff) {
+		printf("'%s' invalid; must be between 0 - 00FFFFFF\n", argv[1]);
+		THROW();
+	}
+	image = (uint32_t)val;
+
+	for (current_offset = 0, segment = 0;; segment++) {
+		payload = send_packet_request(segment, image,
+		    &pkthdr, &payload_len);
+		free(payload);
+
+		/*
+		 * Sanity check the packet header.
+		 */
+		if (nabu_get_uint24_be(pkthdr.image) != image) {
+			printf("*** pkthdr.image %06X != %06X\n",
+			    nabu_get_uint24_be(pkthdr.image), image);
+		}
+		if (pkthdr.segment_lsb != (segment & 0xff)) {
+			printf("*** pkthdr.segment_lsb %u != %u\n",
+			    pkthdr.segment_lsb, (segment & 0xff));
+		}
+#if 0
+		/*
+		 * These clearly have different meanings than what
+		 * think they do.  Do "get-image 000001" on cycle1
+		 * and look what happens to various fields at segment
+		 * 16.
+		 */
+		if (nabu_get_uint16(pkthdr.segment) != segment) {
+			printf("*** pkthdr.segment $%04X != $%04X\n",
+			    nabu_get_uint16(pkthdr.segment), segment);
+		}
+		if (nabu_get_uint16_be(pkthdr.offset) != current_offset) {
+			printf("*** pkthdr.offset %u != expected %zu\n",
+			    nabu_get_uint16_be(pkthdr.offset), current_offset);
+		}
+#endif
+		if (pkthdr.type & 0x10) {
+			printf("*** LAST PACKET!\n");
+			break;
+		}
+		current_offset += payload_len;
+	}
+
 	return false;
 }
 
