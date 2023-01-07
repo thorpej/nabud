@@ -262,7 +262,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	NABU_MSG_RN_FILE_OPEN	0xa3
 #define	NABU_MSG_RN_FH_SIZE	0xa4
 #define	NABU_MSG_RN_FH_READ	0xa5
-#define	NABU_MSG_RN_FILE_CLOSE	0xa7
+#define	NABU_MSG_RN_FH_CLOSE	0xa7
 #define	NABU_MSG_RN_FILE_SIZE	0xa8
 #define	NABU_MSG_RN_FH_APPEND	0xa9
 #define	NABU_MSG_RN_FH_INSERT	0xaa
@@ -355,6 +355,17 @@ nabu_get_uint24(const uint8_t *buf)
 }
 
 /*
+ * nabu_get_uint32 --
+ *	Get a 32-bit integer from the specified buffer.
+ */
+static inline uint32_t
+nabu_get_uint32(const uint8_t *buf)
+{
+	/* little-endian */
+	return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+}
+
+/*
  * nabu_set_uint16 --
  *	Set a 16-bit integer in the specified buffer.
  */
@@ -387,6 +398,19 @@ nabu_set_uint24_be(uint8_t *buf, uint32_t val)
 	buf[0] = (uint8_t)(val >> 16);
 	buf[1] = (uint8_t)(val >> 8);
 	buf[2] = (uint8_t)(val);
+}
+
+/*
+ * nabu_set_uint32 --
+ *	Set a 32-bit big-endian integer in the specified buffer.
+ */
+static inline void
+nabu_set_uint32(uint8_t *buf, uint32_t val)
+{
+	buf[0] = (uint8_t)(val);
+	buf[1] = (uint8_t)(val >> 8);
+	buf[2] = (uint8_t)(val >> 16);
+	buf[3] = (uint8_t)(val >> 24);
 }
 
 /*
