@@ -304,6 +304,16 @@ struct nabu_pkthdr {
 	uint8_t		offset[2];	/* offset; big-endian */
 };
 
+struct nabu_time {
+	uint8_t		mystery[3];
+	uint8_t		year;
+	uint8_t		month;
+	uint8_t		month_day;
+	uint8_t		hour;
+	uint8_t		minute;
+	uint8_t		second;
+};
+
 /*
  * NabuRetroNet file details structure.
  */
@@ -344,6 +354,16 @@ nabu_get_uint16(const uint8_t *buf)
 }
 
 /*
+ * nabu_get_uint16_be --
+ *	Get a 16-bit big-endian integer from the specified buffer.
+ */
+static inline uint16_t
+nabu_get_uint16_be(const uint8_t *buf)
+{
+	return (buf[0] << 8) | buf[1];
+}
+
+/*
  * nabu_get_uint24 --
  *	Get a 24-bit integer from the specified buffer.
  */
@@ -355,6 +375,16 @@ nabu_get_uint24(const uint8_t *buf)
 }
 
 /*
+ * nabu_get_uint24_be --
+ *	Get a 24-bit big-endian integer from the specified buffer.
+ */
+static inline uint32_t
+nabu_get_uint24_be(const uint8_t *buf)
+{
+	return (buf[0] << 16) | (buf[1] << 8) | buf[2];
+}
+
+/*
  * nabu_get_uint32 --
  *	Get a 32-bit integer from the specified buffer.
  */
@@ -363,6 +393,16 @@ nabu_get_uint32(const uint8_t *buf)
 {
 	/* little-endian */
 	return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+}
+
+/*
+ * nabu_get_uint32_be --
+ *	Get a 32-bit big-endian integer from the specified buffer.
+ */
+static inline uint32_t
+nabu_get_uint32_be(const uint8_t *buf)
+{
+	return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
 }
 
 /*
@@ -389,6 +429,19 @@ nabu_set_uint16_be(uint8_t *buf, uint16_t val)
 }
 
 /*
+ * nabu_set_uint24 --
+ *	Set a 24-bit integer in the specified buffer.
+ */
+static inline void
+nabu_set_uint24(uint8_t *buf, uint32_t val)
+{
+	/* little-endian */
+	buf[0] = (uint8_t)(val);
+	buf[1] = (uint8_t)(val >> 8);
+	buf[2] = (uint8_t)(val >> 16);
+}
+
+/*
  * nabu_set_uint24_be --
  *	Set a 24-bit big-endian integer in the specified buffer.
  */
@@ -402,7 +455,7 @@ nabu_set_uint24_be(uint8_t *buf, uint32_t val)
 
 /*
  * nabu_set_uint32 --
- *	Set a 32-bit big-endian integer in the specified buffer.
+ *	Set a 32-bit integer in the specified buffer.
  */
 static inline void
 nabu_set_uint32(uint8_t *buf, uint32_t val)
@@ -455,12 +508,11 @@ nabu_init_pkthdr(void *vbuf, uint32_t image, uint16_t segment,
  *	Compute the CRC of the provided data buffer.
  */
 static inline uint16_t
-nabu_crc(const void *vbuf, size_t len)
+nabu_crc_update(const void *vbuf, size_t len, uint16_t crc)
 {
 	static const uint16_t crctab[] = NABU_CRC_TAB;
 	const uint8_t *buf = vbuf;
 	size_t i;
-	uint16_t crc = 0xffff;
 	uint8_t c;
 
 	for (i = 0; i < len; i++) {
@@ -469,6 +521,18 @@ nabu_crc(const void *vbuf, size_t len)
 		crc ^= crctab[c];
 	}
 	return crc;
+}
+
+static inline uint16_t
+nabu_crc_final(uint16_t crc)
+{
+	return crc ^ 0xffff;
+}
+
+static inline uint16_t
+nabu_crc(const void *vbuf, size_t len)
+{
+	return nabu_crc_final(nabu_crc_update(vbuf, len, 0xffff));
 }
 
 /*
@@ -480,8 +544,8 @@ nabu_set_crc(void *vbuf, uint16_t crc)
 {
 	uint8_t *buf = vbuf;
 
-	buf[0] = (uint8_t)(crc >> 8) ^ 0xff;	/* CRC MSB */
-	buf[1] = (uint8_t)(crc)      ^ 0xff;	/* CRC LSB */
+	buf[0] = (uint8_t)(crc >> 8);	/* CRC MSB */
+	buf[1] = (uint8_t)(crc);	/* CRC LSB */
 
 	return sizeof(crc);
 }
@@ -495,7 +559,7 @@ nabu_get_crc(const void *vbuf)
 {
 	const uint8_t *buf = vbuf;
 
-	return ((buf[0] ^ 0xff) << 8) | (buf[1] ^ 0xff);
+	return (buf[0] << 8) | buf[1];
 }
 
 #endif /* NABU_PROTO_INLINES */

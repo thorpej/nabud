@@ -325,7 +325,6 @@ adaptor_send_time(struct nabu_connection *conn)
 	static char time_image_name[] = "TimeImage";
 	struct tm tm_store, *tm;
 	time_t now;
-	uint8_t buf[NABU_TIMESTAMPSIZE];
 
 	now = time(NULL);
 	if (now == (time_t)-1) {
@@ -337,20 +336,24 @@ adaptor_send_time(struct nabu_connection *conn)
 		tm = localtime_r(&now, &tm_store);
 	}
 
-	buf[0] = 0x02;
-	buf[1] = 0x02;
-	buf[2] = 0x02;
-	buf[3] = 84;		/* as in 1984 */
-	buf[4] = tm->tm_mon + 1;
-	buf[5] = tm->tm_mday;
-	buf[6] = tm->tm_hour;
-	buf[7] = tm->tm_min;
-	buf[8] = tm->tm_sec;
+	struct nabu_time t = {
+		.mystery = {
+			[0] = 0x02,
+			[1] = 0x02,
+			[2] = 0x02,
+		},
+		.year      = 84,		/* as in 1984 */
+		.month     = tm->tm_mon + 1,
+		.month_day = tm->tm_mday,
+		.hour      = tm->tm_hour,
+		.minute    = tm->tm_min,
+		.second    = tm->tm_sec,
+	};
 
 	struct nabu_image img = {
 		.name = time_image_name,
-		.data = buf,
-		.length = sizeof(buf),
+		.data = (void *)&t,
+		.length = sizeof(t),
 		.number = NABU_IMAGE_TIME,
 	};
 	adaptor_send_image(conn, 0, &img);
