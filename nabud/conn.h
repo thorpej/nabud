@@ -66,6 +66,15 @@ struct nabu_connection {
 	LIST_HEAD(, rn_file) rn_files;
 	char		*rn_file_root;
 
+	/*
+	 * This is set if we're being enumerated.  If we are,
+	 * then we have to wait until the enumeration is complete
+	 * before we can be removed from the connection list.
+	 *
+	 * This field is protected by the connection list mutex.
+	 */
+	uint32_t	enum_count;
+
 	/* Lock that protects the data below. */
 	pthread_mutex_t mutex;
 
@@ -84,6 +93,8 @@ extern unsigned int conn_count;
 void	conn_add_serial(char *, unsigned int);
 void	conn_add_tcp(char *, unsigned int);
 void	conn_destroy(struct nabu_connection *);
+
+bool	conn_enumerate(bool (*)(struct nabu_connection *, void *), void *);
 
 struct nabu_image *conn_get_last_image(struct nabu_connection *);
 struct nabu_image *conn_set_last_image(struct nabu_connection *,

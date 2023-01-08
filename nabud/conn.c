@@ -56,6 +56,7 @@
 #include "retronet.h"
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t conn_list_enum_cv = PTHREAD_COND_INITIALIZER;
 static LIST_HEAD(, nabu_connection) conn_list =
     LIST_HEAD_INITIALIZER(conn_list);
 unsigned int conn_count;
@@ -77,11 +78,46 @@ conn_remove(struct nabu_connection *conn)
 {
 	if (conn->on_list) {
 		pthread_mutex_lock(&conn_list_mutex);
+		while (conn->enum_count != 0) {
+			pthread_cond_wait(&conn_list_enum_cv,
+			    &conn_list_mutex);
+		}
 		LIST_REMOVE(conn, link);
 		conn->on_list = false;
 		conn_count--;
 		pthread_mutex_unlock(&conn_list_mutex);
 	}
+}
+
+/*
+ * conn_enumerate --
+ *	Enumerate all of the connections.
+ */
+bool
+conn_enumerate(bool (*func)(struct nabu_connection *, void *), void *ctx)
+{
+	struct nabu_connection *conn;
+	bool rv = true;
+
+	pthread_mutex_lock(&conn_list_mutex);
+	LIST_FOREACH(conn, &conn_list, link) {
+		conn->enum_count++;
+		assert(conn->enum_count != 0);
+		pthread_mutex_unlock(&conn_list_mutex);
+		if (! (*func)(conn, ctx)) {
+			rv = false;
+		}
+		pthread_mutex_lock(&conn_list_mutex);
+		assert(conn->enum_count != 0);
+		conn->enum_count--;
+		pthread_cond_broadcast(&conn_list_enum_cv);
+		if (rv == false) {
+			break;
+		}
+	}
+	pthread_mutex_unlock(&conn_list_mutex);
+
+	return rv;
 }
 
 /*
