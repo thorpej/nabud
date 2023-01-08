@@ -198,7 +198,7 @@ image_channel_lookup(unsigned int number)
 bool
 image_channel_enumerate(bool (*func)(struct image_channel *, void *), void *ctx)
 {
-	struct image_chnnel *chan;
+	struct image_channel *chan;
 
 	TAILQ_FOREACH(chan, &image_channels, link) {
 		if (! (*func)(chan, ctx)) {
