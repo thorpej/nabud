@@ -173,6 +173,38 @@ conn_io_fini(struct conn_io *conn)
 }
 
 /*
+ * conn_io_accept --
+ *	Wait for a connection and accept it.
+ */
+bool
+conn_io_accept(struct conn_io *conn, struct sockaddr *peersa,
+    socklen_t *peersalenp, int *sockp)
+{
+	/* Never a deadline for these. */
+	static const struct timespec deadline = { 0, 0 };
+
+ again:
+	if (! conn_io_wait(conn, &deadline, true)) {
+		if (conn_io_state(conn) == CONN_STATE_CANCELLED) {
+			log_info("[%s] Received cancellation request.",
+			    conn_io_name(conn));
+		}
+		return false;
+	}
+	*sockp = accept(conn->fd, peersa, peersalenp);
+	if (*sockp < 0) {
+		if (errno != EAGAIN) {
+			log_error("[%s] accept() failed: %s",
+			    conn_io_name(conn), strerror(errno));
+			conn_io_set_state(conn, CONN_STATE_ABORTED);
+			return false;
+		}
+		goto again;
+	}
+	return true;
+}
+
+/*
  * conn_io_deadline --
  *	Calculate the deadline for an I/O transaction.
  */

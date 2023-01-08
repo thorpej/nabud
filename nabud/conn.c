@@ -136,7 +136,7 @@ conn_thread(void *arg)
  *	Common connection-creation duties.
  */
 static void
-conn_create_common(char *name, int fd, unsigned int channel,
+conn_create_common(char *name, int fd, unsigned int channel, conn_type type,
     void *(*func)(void *))
 {
 	struct nabu_connection *conn;
@@ -149,6 +149,7 @@ conn_create_common(char *name, int fd, unsigned int channel,
 		return;
 	}
 
+	conn->type = type;
 	pthread_mutex_init(&conn->mutex, NULL);
 
 	if (! conn_io_init(&conn->io, name, fd, func)) {
@@ -240,7 +241,7 @@ conn_add_serial(char *path, unsigned int channel)
 		}
 	}
 
-	conn_create_common(path, fd, channel, conn_thread);
+	conn_create_common(path, fd, channel, CONN_TYPE_SERIAL, conn_thread);
  	return;
  bad:
 	close(fd);
@@ -261,29 +262,12 @@ conn_tcp_thread(void *arg)
 	socklen_t peersslen;
 	int sock, v;
 
-	/* Never a deadline for these. */
-	struct timespec deadline = { 0, 0 };
-
 	for (;;) {
-		if (! conn_io_wait(&conn->io, &deadline, true)) {
-			if (conn_state(conn) == CONN_STATE_CANCELLED) {
-				log_info("[%s] Received cancellation request.",
-				    conn_name(conn));
-				break;
-			}
-			break;
-		}
 		peersslen = sizeof(peerss);
-		sock = accept(conn->io.fd, (struct sockaddr *)&peerss,
-		    &peersslen);
-		if (sock < 0) {
-			if (errno != EAGAIN) {
-				log_error("[%s] accept() failed: %s",
-				    conn_name(conn), strerror(errno));
-				conn_set_state(conn, CONN_STATE_ABORTED);
-				break;
-			}
-			continue;
+		if (! conn_io_accept(&conn->io, (struct sockaddr *)&peerss,
+				     &peersslen, &sock)) {
+			/* Error already logged. */
+			break;
 		}
 
 		/* Disable Nagle. */
@@ -309,7 +293,8 @@ conn_tcp_thread(void *arg)
 		pthread_mutex_unlock(&conn->mutex);
 
 		conn_create_common(strdup(host), sock,
-		    chan != NULL ? chan->number : 0, conn_thread);
+		    chan != NULL ? chan->number : 0, CONN_TYPE_TCP,
+		    conn_thread);
 	}
 
 	/* Error on the listen socket -- He's dead, Jim. */
@@ -352,7 +337,7 @@ conn_add_tcp(char *portstr, unsigned int channel)
 		if (bind(sock, (struct sockaddr *)&sin, sizeof(sin)) == 0) {
 			if (listen(sock, 8) == 0) {
 				conn_create_common(strdup(name), sock, channel,
-				    conn_tcp_thread);
+				    CONN_TYPE_LISTENER, conn_tcp_thread);
 				sock = -1;
 			} else {
 				log_error("Unable to listen on IPv4 socket: %s",
@@ -384,7 +369,7 @@ conn_add_tcp(char *portstr, unsigned int channel)
 		if (bind(sock, (struct sockaddr *)&sin6, sizeof(sin6)) == 0) {
 			if (listen(sock, 8) == 0) {
 				conn_create_common(strdup(name), sock, channel,
-				    conn_tcp_thread);
+				    CONN_TYPE_LISTENER, conn_tcp_thread);
 				sock = -1;
 			} else {
 				log_error("Unable to listen on IPv6 socket: %s",

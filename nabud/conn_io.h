@@ -27,6 +27,7 @@
 #ifndef conn_io_h_included
 #define	conn_io_h_included
 
+#include <sys/socket.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -75,6 +76,9 @@ int	conn_io_polltimo(struct conn_io *conn, const struct timespec *deadline,
 	    bool is_recv);
 bool	conn_io_wait(struct conn_io *, const struct timespec *deadline,
 	    bool is_recv);
+
+bool	conn_io_accept(struct conn_io *, struct sockaddr *, socklen_t *,
+	    int *);
 
 void	conn_io_send(struct conn_io *, const uint8_t *, size_t);
 void	conn_io_send_byte(struct conn_io *, uint8_t);

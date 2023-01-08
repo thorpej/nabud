@@ -37,8 +37,9 @@
 
 typedef enum {
 	CONN_TYPE_INVALID	=	0,
-	CONN_TYPE_SERIAL	=	1,
-	CONN_TYPE_TCP		=	2,
+	CONN_TYPE_LISTENER	=	1,
+	CONN_TYPE_SERIAL	=	2,
+	CONN_TYPE_TCP		=	3,
 } conn_type;
 
 struct nabu_segment;
@@ -50,6 +51,9 @@ struct nabu_connection {
 	/* Link on the list of connections. */
 	LIST_ENTRY(nabu_connection) link;
 	bool		on_list;
+
+	/* Type of this connection. */
+	conn_type	type;
 
 	/*
 	 * The packet being sent is buffered here.  We double the
