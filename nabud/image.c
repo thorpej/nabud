@@ -192,6 +192,23 @@ image_channel_lookup(unsigned int number)
 }
 
 /*
+ * image_channel_enumerate --
+ *	Enumerate all of the channels.
+ */
+bool
+image_channel_enumerate(bool (*func)(struct image_channel *, void *), void *ctx)
+{
+	struct image_chnnel *chan;
+
+	TAILQ_FOREACH(chan, &image_channels, link) {
+		if (! (*func)(chan, ctx)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
  * image_add_channel --
  *	Add a channel.
  */
