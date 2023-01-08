@@ -57,11 +57,11 @@
 #endif
 
 /*
- * conn_set_nbio --
+ * conn_io_set_nbio --
  *	Set non-blocking I/O on the specified file descriptor.
  */
 static bool
-conn_set_nbio(struct conn_io *conn, const char *which, int fd)
+conn_io_set_nbio(struct conn_io *conn, const char *which, int fd)
 {
 	int flags;
 
