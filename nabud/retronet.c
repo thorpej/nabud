@@ -162,7 +162,7 @@ rn_file_closeall(struct nabu_connection *conn)
 	struct rn_file *f;
 
 	while ((f = LIST_FIRST(&conn->rn_files)) != NULL) {
-		log_debug("[%s] Freeing file at slot %u.", conn->name,
+		log_debug("[%s] Freeing file at slot %u.", conn_name(conn),
 		    f->slot);
 		LIST_REMOVE(f, link);
 		rn_file_free(f);
@@ -186,7 +186,7 @@ rn_api_file_open(struct nabu_connection *conn,
 	f = calloc(1, sizeof(*f));
 	if (f == NULL) {
 		log_error("[%s] Unable to allocate RN file object for %s",
-		    conn->name, filename);
+		    conn_name(conn), filename);
 		goto out;
 	}
 
@@ -194,7 +194,7 @@ rn_api_file_open(struct nabu_connection *conn,
 	fileio_rwflags =
 	    (open_flags & RN_FILE_OPEN_RW) ? FILEIO_O_RDWR : FILEIO_O_RDONLY;
 
-	log_debug("[%s] Opening %s", conn->name, filename);
+	log_debug("[%s] Opening %s", conn_name(conn), filename);
 	f->file = fileio_open(filename, fileio_oflags | fileio_rwflags,
 	    conn->rn_file_root, &attrs);
 	if (f->file == NULL && (open_flags & RN_FILE_OPEN_RW)) {
@@ -207,12 +207,12 @@ rn_api_file_open(struct nabu_connection *conn,
 		    conn->rn_file_root, &attrs);
 		if (f->file != NULL) {
 			log_debug("[%s] Need R/W shadow file for %s",
-			    conn->name, filename);
+			    conn_name(conn), filename);
 			need_shadow = true;
 		}
 	}
 	if (f->file == NULL) {
-		log_error("[%s] Unable to open file %s: %s", conn->name,
+		log_error("[%s] Unable to open file %s: %s", conn_name(conn),
 		    filename, strerror(errno));
 		/*
 		 * The RetroNet API has no provision for "opening a file
@@ -224,7 +224,7 @@ rn_api_file_open(struct nabu_connection *conn,
 	/* Opening directories is not allowed. */
 	if (attrs.is_directory) {
 		log_error("[%s] %s: Opening directories is not permitted.",
-		    conn->name, fileio_location(f->file));
+		    conn_name(conn), fileio_location(f->file));
 		goto out;
 	}
 
@@ -235,7 +235,7 @@ rn_api_file_open(struct nabu_connection *conn,
 	 */
 	if (! attrs.is_seekable) {
 		log_debug("[%s] Need seekable shadow file for %s",
-		    conn->name, fileio_location(f->file));
+		    conn_name(conn), fileio_location(f->file));
 		need_shadow = true;
 	}
 
@@ -250,7 +250,7 @@ rn_api_file_open(struct nabu_connection *conn,
 
 	if (! rn_file_insert(conn, f, reqslot, &of)) {
 		log_error("[%s] Unable to insert %s at requsted slot %u.",
-		    conn->name, filename, reqslot);
+		    conn_name(conn), filename, reqslot);
 		goto out;
 	}
 	slot = f->slot;
@@ -277,10 +277,10 @@ rn_api_fh_close(struct nabu_connection *conn, uint8_t slot)
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return;
 	}
-	log_debug("[%s] Freeing file at slot %d.", conn->name, slot);
+	log_debug("[%s] Freeing file at slot %d.", conn_name(conn), slot);
 	LIST_REMOVE(f, link);
 	rn_file_free(f);
 }
@@ -297,7 +297,7 @@ rn_api_fh_size(struct nabu_connection *conn, uint8_t slot)
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return -1;
 	}
 
@@ -308,13 +308,13 @@ rn_api_fh_size(struct nabu_connection *conn, uint8_t slot)
 
 		if (! fileio_getattr(f->file, &attrs)) {
 			log_error("[%s] slot %u: fileio_getattr(): %s",
-			    conn->name, slot, strerror(errno));
+			    conn_name(conn), slot, strerror(errno));
 			filesize = -1;
 		} else {
 			filesize = (int32_t)attrs.size;
 		}
 	}
-	log_debug("[%s] slot %u: file size: %zd.", conn->name,
+	log_debug("[%s] slot %u: file size: %zd.", conn_name(conn),
 	    slot, (ssize_t)filesize);
 	return filesize;
 }
@@ -335,14 +335,14 @@ rn_api_fh_read(struct nabu_connection *conn,
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return;
 	}
 
 	if (f->shadow_data != NULL) {
 		if (offset >= f->shadow_len) {
 			log_debug("[%s] slot %u: offset %u >= length %zu.",
-			    conn->name, slot, offset, f->shadow_len);
+			    conn_name(conn), slot, offset, f->shadow_len);
 			return;
 		}
 		uint16_t copylen = length;
@@ -350,7 +350,8 @@ rn_api_fh_read(struct nabu_connection *conn,
 			copylen = f->shadow_len - offset;
 		}
 		log_debug("[%s] slot %u: Copying %zu bytes from shadow "
-		    "offset %u.", conn->name, slot, (size_t)copylen, offset);
+		    "offset %u.", conn_name(conn), slot, (size_t)copylen,
+		    offset);
 		memcpy(buf, &f->shadow_data[offset], copylen);
 	} else if (f->file != NULL) {
 		ssize_t actual;
@@ -358,11 +359,12 @@ rn_api_fh_read(struct nabu_connection *conn,
 		actual = fileio_pread(f->file, buf, length, offset);
 		if (actual < 0) {
 			log_error("[%s] slot %u: fileio_pread(%zu @ %u): %s",
-			    conn->name, slot, (size_t)length, offset,
+			    conn_name(conn), slot, (size_t)length, offset,
 			    strerror(errno));
 		} else {
 			log_debug("[%s] slot %u: fileio_pread(%zu @ %u) -> %zd",
-			    conn->name, slot, (size_t)length, offset, actual);
+			    conn_name(conn), slot, (size_t)length, offset,
+			    actual);
 		}
 	}
 }
@@ -380,7 +382,7 @@ rn_api_fh_append(struct nabu_connection *conn,
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return;
 	}
 
@@ -389,7 +391,8 @@ rn_api_fh_append(struct nabu_connection *conn,
 		    f->shadow_len + length);
 		if (newdata == NULL) {
 			log_error("[%s] slot %u: unable to allocate %zu bytes"
-			    "for append.", conn->name, slot, (size_t)length);
+			    "for append.", conn_name(conn), slot,
+			    (size_t)length);
 			return;
 		}
 
@@ -404,14 +407,15 @@ rn_api_fh_append(struct nabu_connection *conn,
 
 		if (fileio_seek(f->file, 0, SEEK_END) < 0) {
 			log_error("[%s] Failed to seek to end of file in "
-			    "slot %u: %s", conn->name, slot, strerror(errno));
+			    "slot %u: %s", conn_name(conn), slot,
+			    strerror(errno));
 			return;
 		}
 		actual = fileio_write(f->file, buf, length);
 		if (actual != (ssize_t)length) {
 			log_error("[%s] slot %u: "
 			    "fileio_write(%zu @ EOF) -> %zd%s%s",
-			    conn->name, slot, (size_t)length, actual,
+			    conn_name(conn), slot, (size_t)length, actual,
 			    actual == -1 ? " " : "",
 			    actual == -1 ? strerror(errno) : "");
 		}
@@ -433,7 +437,7 @@ rn_api_fh_replace(struct nabu_connection *conn,
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return;
 	}
 
@@ -445,8 +449,8 @@ rn_api_fh_replace(struct nabu_connection *conn,
 			newdata = realloc(f->shadow_data, newlen);
 			if (newdata == NULL) {
 				log_error("[%s] slot %u: unable to allocate "
-				    "%zu bytes to extend.", conn->name, slot,
-				    f->shadow_len - newlen);
+				    "%zu bytes to extend.", conn_name(conn),
+				    slot, f->shadow_len - newlen);
 
 				/* Truncate the write. */
 				length -= newlen - f->shadow_len;
@@ -474,7 +478,8 @@ rn_api_fh_replace(struct nabu_connection *conn,
 		if (actual != (ssize_t)length) {
 			log_error("[%s] slot %u: "
 			    "fileio_write(%zu @ %u) -> %zd%s%s",
-			    conn->name, slot, (size_t)length, offset, actual,
+			    conn_name(conn), slot, (size_t)length, offset,
+			    actual,
 			    actual == -1 ? " " : "",
 			    actual == -1 ? strerror(errno) : "");
 		}
@@ -494,7 +499,7 @@ rn_api_fh_insert(struct nabu_connection *conn,
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return;
 	}
 
@@ -515,7 +520,7 @@ rn_api_fh_insert(struct nabu_connection *conn,
 
 		if (! fileio_getattr(f->file, &attrs)) {
 			log_error("[%s] slot %u: fileio_getattr(): %s",
-			    conn->name, slot, strerror(errno));
+			    conn_name(conn), slot, strerror(errno));
 			return;
 		}
 
@@ -526,7 +531,7 @@ rn_api_fh_insert(struct nabu_connection *conn,
 		 */
 		if (offset >= attrs.size) {
 			log_debug("[%s] slot %u: Redirecting to "
-			    "rn_api_fh_replace().", conn->name, slot);
+			    "rn_api_fh_replace().", conn_name(conn), slot);
 			rn_api_fh_replace(conn, slot, vbuf, offset, length);
 			return;
 		}
@@ -536,14 +541,14 @@ rn_api_fh_insert(struct nabu_connection *conn,
 		    0, &filesize);
 		if (filedata == NULL) {
 			log_error("[%s] slot %u: fileio_load_file(): %s",
-			    conn->name, slot, strerror(errno));
+			    conn_name(conn), slot, strerror(errno));
 			return;
 		}
 	} else {
 		/* As above. */
 		if (offset >= f->shadow_len) {
 			log_debug("[%s] slot %u: Redirecting to "
-			    "rn_api_fh_replace().", conn->name, slot);
+			    "rn_api_fh_replace().", conn_name(conn), slot);
 			rn_api_fh_replace(conn, slot, vbuf, offset, length);
 			return;
 		}
@@ -552,7 +557,7 @@ rn_api_fh_insert(struct nabu_connection *conn,
 		filedata = realloc(f->shadow_data, filesize + length);
 		if (filedata == NULL) {
 			log_error("[%s] slot %u: unable to allocate %zu bytes "
-			    "for insertion.", conn->name, slot,
+			    "for insertion.", conn_name(conn), slot,
 			    filesize + length);
 			return;
 		}
@@ -575,7 +580,7 @@ rn_api_fh_insert(struct nabu_connection *conn,
 		if (fileio_pwrite(f->file, filedata, newsize,
 				  0) != (ssize_t)newsize) {
 			log_error("[%s] %u: fileio_pwrite(): %s",
-			    conn->name, slot, strerror(errno));
+			    conn_name(conn), slot, strerror(errno));
 		}
 		free(filedata);
 	} else {
@@ -599,7 +604,7 @@ rn_api_fh_delete_range(struct nabu_connection *conn,
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return;
 	}
 
@@ -629,7 +634,7 @@ rn_api_fh_delete_range(struct nabu_connection *conn,
 
 		if (! fileio_getattr(f->file, &attrs)) {
 			log_error("[%s] slot %u: fileio_getattr(): %s",
-			    conn->name, slot, strerror(errno));
+			    conn_name(conn), slot, strerror(errno));
 			return;
 		}
 
@@ -649,7 +654,8 @@ rn_api_fh_delete_range(struct nabu_connection *conn,
 		uint8_t *buf = malloc(copysize);
 		if (buf == NULL) {
 			log_error("[%s] slot %u: unable to allocate %zu bytes "
-			    "for temp buffer.", conn->name, slot, copysize);
+			    "for temp buffer.", conn_name(conn), slot,
+			    copysize);
 			return;
 		}
 
@@ -658,7 +664,8 @@ rn_api_fh_delete_range(struct nabu_connection *conn,
 		if (actual != (ssize_t)copysize) {
 			log_error("[%s] slot %u: "
 			    "fileio_pread(%zu @ %u) -> %zd%s%s",
-			    conn->name, slot, copysize, offset + length, actual,
+			    conn_name(conn), slot, copysize, offset + length,
+			    actual,
 			    actual == -1 ? " " : "",
 			    actual == -1 ? strerror(errno) : "");
 			free(buf);
@@ -673,14 +680,15 @@ rn_api_fh_delete_range(struct nabu_connection *conn,
 		if (actual != (ssize_t)copysize) {
 			log_error("[%s] slot %u: "
 			    "fileio_pwrite(%zu @ %u) -> %zd%s%s",
-			    conn->name, slot, copysize, offset, actual,
+			    conn_name(conn), slot, copysize, offset, actual,
 			    actual == -1 ? " " : "",
 			    actual == -1 ? strerror(errno) : "");
 		}
 		free(buf);
 		if (! fileio_truncate(f->file, attrs.size - length)) {
 			log_error("[%s] slot %u: fileio_truncate(%lld): %s",
-			    conn->name, slot, (long long)attrs.size - length,
+			    conn_name(conn), slot,
+			    (long long)attrs.size - length,
 			    strerror(errno));
 		}
 	}
@@ -697,7 +705,7 @@ rn_api_fh_truncate(struct nabu_connection *conn, uint8_t slot)
 
 	f = rn_file_find(conn, slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn->name, slot);
+		log_debug("[%s] No file for slot %d.", conn_name(conn), slot);
 		return;
 	}
 
@@ -707,7 +715,7 @@ rn_api_fh_truncate(struct nabu_connection *conn, uint8_t slot)
 	} else if (f->file != NULL) {
 		if (! fileio_truncate(f->file, 0)) {
 			log_error("[%s] slot %u: fileio_truncate(0): %s",
-			    conn->name, slot, strerror(errno));
+			    conn_name(conn), slot, strerror(errno));
 		}
 	}
 }

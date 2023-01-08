@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,48 +31,25 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "conn_io.h"
 #include "nabu_proto.h"
 #include "nbsd_queue.h"
 
 typedef enum {
 	CONN_TYPE_INVALID	=	0,
 	CONN_TYPE_SERIAL	=	1,
+	CONN_TYPE_TCP		=	2,
 } conn_type;
-
-typedef enum {
-	CONN_STATE_OK		=	0,
-	CONN_STATE_EOF		=	1,
-	CONN_STATE_CANCELLED	=	2,
-	CONN_STATE_ABORTED	=	3,
-} conn_state;
 
 struct nabu_segment;
 
 struct nabu_connection {
+	/* I/O context */
+	struct conn_io	io;
+
 	/* Link on the list of connections. */
 	LIST_ENTRY(nabu_connection) link;
 	bool		on_list;
-
-	/* Display name for this connection. */
-	char		*name;
-
-	/* Thread that owns this connection. */
-	pthread_t	thread;
-
-	/* File descriptor for this connection. */
-	int		fd;
-
-	/* I/O watchdog time. */
-	unsigned int	watchdog;
-
-	/* Our connection state. */
-	conn_state	state;
-
-	/*
-	 * Pipe file descriptors used to wake threads blocked in poll()
-	 * when the connection is cancelled.
-	 */
-	int		cancel_fds[2];
 
 	/*
 	 * The packet being sent is buffered here.  We double the
@@ -93,6 +70,9 @@ struct nabu_connection {
 
 	/* Selected channel. */
 	struct image_channel *l_channel;
+
+	/* Selected file. */
+	char *l_selected_file;
 };
 
 extern unsigned int conn_count;
@@ -110,17 +90,24 @@ struct nabu_image *conn_set_last_image_if(struct nabu_connection *,
 
 struct image_channel *conn_get_channel(struct nabu_connection *);
 void	conn_set_channel(struct nabu_connection *, struct image_channel *);
-char	*conn_selected_file(struct nabu_connection *);
+char	*conn_get_selected_file(struct nabu_connection *);
+void	conn_set_selected_file(struct nabu_connection *, const char *);
 
 void	conn_cancel(struct nabu_connection *);
 void	conn_shutdown(void);
 
-void	conn_send(struct nabu_connection *, const uint8_t *, size_t);
-void	conn_send_byte(struct nabu_connection *, uint8_t);
-bool	conn_recv(struct nabu_connection *, uint8_t *, size_t);
-bool	conn_recv_byte(struct nabu_connection *, uint8_t *);
+#define	conn_name(c)		conn_io_name(&(c)->io)
+#define	conn_state(c)		conn_io_state(&(c)->io)
+#define	conn_set_state(c, s)	conn_io_set_state(&(c)->io, (s))
 
-void	conn_start_watchdog(struct nabu_connection *, unsigned int);
-void	conn_stop_watchdog(struct nabu_connection *);
+#define	conn_send(c, b, l)	conn_io_send(&(c)->io, (b), (l))
+#define	conn_send_byte(c, b)	conn_io_send_byte(&(c)->io, (b))
+#define	conn_recv(c, b, l)	conn_io_recv(&(c)->io, (b), (l))
+#define	conn_recv_byte(c, b)	conn_io_recv_byte(&(c)->io, (b))
+
+#define	conn_start_watchdog(c, t) conn_io_start_watchdog(&(c)->io, (t))
+#define	conn_stop_watchdog(c)	conn_io_stop_watchdog(&(c)->io)
+
+#define	conn_cancel(c)		conn_io_cancel(&(c)->io)
 
 #endif /* conn_h_included */
