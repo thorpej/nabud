@@ -49,10 +49,11 @@
 #include <netinet/tcp.h>
 #include <netdb.h>
 
+#include "libnabud/log.h"
+
 #include "adaptor.h"
 #include "conn.h"
 #include "image.h"
-#include "log.h"
 #include "retronet.h"
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;

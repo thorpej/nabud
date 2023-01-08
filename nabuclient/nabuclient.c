@@ -54,7 +54,7 @@
 
 #define	NABU_PROTO_INLINES
 
-#include "../nabud/nabu_proto.h"
+#include "libnabud/nabu_proto.h"
 
 static int	client_sock;
 static jmp_buf	quit_env;

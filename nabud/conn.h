@@ -31,9 +31,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "conn_io.h"
-#include "nabu_proto.h"
-#include "nbsd_queue.h"
+#include "libnabud/conn_io.h"
+#include "libnabud/nabu_proto.h"
+#include "libnabud/nbsd_queue.h"
 
 typedef enum {
 	CONN_TYPE_INVALID	=	0,

@@ -75,10 +75,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define	NABU_PROTO_INLINES
 
+#include "libnabud/log.h"
+
 #include "adaptor.h"
 #include "conn.h"
 #include "image.h"
-#include "log.h"
 #include "retronet.h"
 
 static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;

@@ -54,10 +54,11 @@
 #define NO_PAK_FILE_SUPPORT
 #endif
 
+#include "libnabud/fileio.h"
+#include "libnabud/log.h"
+
 #include "conn.h"
-#include "fileio.h"
 #include "image.h"
-#include "log.h"
 
 static LIST_HEAD(, image_source) image_sources =
     LIST_HEAD_INITIALIZER(image_sources);

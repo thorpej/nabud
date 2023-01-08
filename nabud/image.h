@@ -30,7 +30,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "nbsd_queue.h"
+#include "libnabud/nbsd_queue.h"
 
 struct image_source {
 	LIST_ENTRY(image_source) link;

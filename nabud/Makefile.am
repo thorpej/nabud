@@ -3,12 +3,12 @@ CC			= $(PTHREAD_CC)
 
 bin_PROGRAMS		= nabud
 
-nabud_SOURCES		= adaptor.c conn.c conn_io.c fileio.c image.c log.c \
-			  main.c retronet.c
+nabud_SOURCES		= adaptor.c conn.c image.c main.c retronet.c
 
 nabud_CPPFLAGS		= $(SSL_INCLUDES) $(PAK_INCLUDES)
 
-nabud_LDADD		= ../libfetch/libfetch.la \
+nabud_LDADD		= ../libnabud/libnabud.la \
+			  ../libfetch/libfetch.la \
 			  ../libmj/libmj.la \
 			  $(SSL_LDFLAGS) $(SSL_LIBS) \
 			  $(PAK_LDFLAGS) $(PAK_LIBS) \

@@ -45,7 +45,7 @@
 #include "fileio.h"
 #include "log.h"
 
-#include "../libfetch/fetch.h"
+#include "libfetch/fetch.h"
 
 #define	HTTP_PREFIX	SCHEME_HTTP "://"
 #define	HTTPS_PREFIX	SCHEME_HTTPS "://"

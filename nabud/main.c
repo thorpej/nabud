@@ -40,11 +40,12 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "libnabud/fileio.h"
+#include "libnabud/log.h"
+
 #include "adaptor.h"
 #include "conn.h"
-#include "fileio.h"
 #include "image.h"
-#include "log.h"
 
 #include "../libmj/mj.h"
 

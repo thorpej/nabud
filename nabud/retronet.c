@@ -35,9 +35,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "libnabud/fileio.h"
+#include "libnabud/log.h"
+
 #include "conn.h"
-#include "fileio.h"
-#include "log.h"
 #include "retronet.h"
 
 /*

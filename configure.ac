@@ -130,6 +130,7 @@ AC_CONFIG_FILES([
 	Makefile
 	libfetch/Makefile
 	libmj/Makefile
+	libnabud/Makefile
 	nabud/Makefile
 	nabuclient/Makefile
 ])
