@@ -56,6 +56,53 @@
 #define	INFTIM		-1
 #endif
 
+static pthread_mutex_t conn_io_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t conn_io_list_cv = PTHREAD_COND_INITIALIZER;
+static LIST_HEAD(, conn_io) conn_io_list = LIST_HEAD_INITIALIZER(conn_io_list);
+
+static void
+conn_io_insert(struct conn_io *conn)
+{
+	assert(! conn->on_list);
+
+	pthread_mutex_lock(&conn_io_list_mutex);
+	LIST_INSERT_HEAD(&conn_io_list, conn, link);
+	conn->on_list = true;
+	pthread_cond_signal(&conn_io_list_cv);
+	pthread_mutex_unlock(&conn_io_list_mutex);
+}
+
+static void
+conn_io_remove(struct conn_io *conn)
+{
+	if (conn->on_list) {
+		pthread_mutex_lock(&conn_io_list_mutex);
+		LIST_REMOVE(conn, link);
+		conn->on_list = false;
+		pthread_cond_signal(&conn_io_list_cv);
+		pthread_mutex_unlock(&conn_io_list_mutex);
+	}
+}
+
+/*
+ * conn_io_shutdown --
+ *	Cancel all connections.
+ */
+void
+conn_io_shutdown(void)
+{
+	struct conn_io *conn, *nconn;
+
+	pthread_mutex_lock(&conn_io_list_mutex);
+	LIST_FOREACH_SAFE(conn, &conn_io_list, link, nconn) {
+		conn_io_cancel(conn);
+	}
+	while (LIST_FIRST(&conn_io_list) != NULL) {
+		pthread_cond_wait(&conn_io_list_cv, &conn_io_list_mutex);
+	}
+	pthread_mutex_unlock(&conn_io_list_mutex);
+}
+
 /*
  * conn_io_set_nbio --
  *	Set non-blocking I/O on the specified file descriptor.
@@ -105,7 +152,7 @@ conn_io_init(struct conn_io *conn, char *name, int fd, void *(*func)(void *))
 		    strerror(errno));
 		goto bad;
 	}
-	if (! conn_set_nbio(conn, "cancel pipe", conn->cancel_fds[0])) {
+	if (! conn_io_set_nbio(conn, "cancel pipe", conn->cancel_fds[0])) {
 		/* Error already logged. */
 		goto bad;
 	}
@@ -113,12 +160,13 @@ conn_io_init(struct conn_io *conn, char *name, int fd, void *(*func)(void *))
 	/*
 	 * Set non-blocking I/O on the connection endpoint descriptor.
 	 */
-	if (! conn_set_nbio(conn, "connection endpoint", conn->fd)) {
+	if (! conn_io_set_nbio(conn, "connection endpoint", conn->fd)) {
 		/* Error already logged. */
 		goto bad;
 	}
 
 	conn->thread_func = func;
+	conn_io_insert(conn);
 	return true;
 
  bad:
@@ -157,6 +205,8 @@ conn_io_start(struct conn_io *conn)
 void
 conn_io_fini(struct conn_io *conn)
 {
+	conn_io_remove(conn);
+
 	/* close the writer first because SIGPIPE is super annoying. */
 	if (conn->cancel_fds[1] != -1) {
 		close(conn->cancel_fds[1]);

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,14 +55,9 @@
 #include "log.h"
 #include "retronet.h"
 
-/* Huh, some platforms don't define INFTIM. */
-#ifndef INFTIM
-#define	INFTIM		-1
-#endif
-
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t conn_list_cv = PTHREAD_COND_INITIALIZER;
-static LIST_HEAD(, nabu_connection) conn_list;
+static LIST_HEAD(, nabu_connection) conn_list =
+    LIST_HEAD_INITIALIZER(conn_list);
 unsigned int conn_count;
 
 static void
@@ -74,7 +69,6 @@ conn_insert(struct nabu_connection *conn)
 	LIST_INSERT_HEAD(&conn_list, conn, link);
 	conn->on_list = true;
 	conn_count++;
-	pthread_cond_signal(&conn_list_cv);
 	pthread_mutex_unlock(&conn_list_mutex);
 }
 
@@ -86,28 +80,8 @@ conn_remove(struct nabu_connection *conn)
 		LIST_REMOVE(conn, link);
 		conn->on_list = false;
 		conn_count--;
-		pthread_cond_signal(&conn_list_cv);
 		pthread_mutex_unlock(&conn_list_mutex);
 	}
-}
-
-/*
- * conn_shutdown --
- *	Cancel down all active connections.
- */
-void
-conn_shutdown(void)
-{
-	struct nabu_connection *conn, *nconn;
-
-	pthread_mutex_lock(&conn_list_mutex);
-	LIST_FOREACH_SAFE(conn, &conn_list, link, nconn) {
-		conn_cancel(conn);
-	}
-	while (conn_count) {
-		pthread_cond_wait(&conn_list_cv, &conn_list_mutex);
-	}
-	pthread_mutex_unlock(&conn_list_mutex);
 }
 
 /*

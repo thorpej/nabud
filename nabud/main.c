@@ -461,7 +461,7 @@ main(int argc, char *argv[])
 	}
 
 	log_info("Received signal %d, shutting down...", sig);
-	conn_shutdown();
+	conn_io_shutdown();
 	log_info("Exiting. Thank you, come again!");
 	log_fini();
 

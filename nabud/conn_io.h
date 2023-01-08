@@ -33,6 +33,8 @@
 #include <stdint.h>
 #include <time.h>
 
+#include "nbsd_queue.h"
+
 typedef enum {
 	CONN_STATE_OK		=	0,
 	CONN_STATE_EOF		=	1,
@@ -41,6 +43,10 @@ typedef enum {
 } conn_state;
 
 struct conn_io {
+	/* Link on the list of connections. */
+	LIST_ENTRY(conn_io) link; 
+	bool		on_list;
+
 	/* The name/label for this connection. */
 	char		*name;
 
@@ -89,5 +95,6 @@ void	conn_io_start_watchdog(struct conn_io *, unsigned int);
 void	conn_io_stop_watchdog(struct conn_io *);
 
 void	conn_io_cancel(struct conn_io *);
+void	conn_io_shutdown(void);
 
 #endif /* conn_io_h_included */
