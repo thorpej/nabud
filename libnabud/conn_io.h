@@ -86,9 +86,9 @@ bool	conn_io_wait(struct conn_io *, const struct timespec *deadline,
 bool	conn_io_accept(struct conn_io *, struct sockaddr *, socklen_t *,
 	    int *);
 
-void	conn_io_send(struct conn_io *, const uint8_t *, size_t);
+void	conn_io_send(struct conn_io *, const void *, size_t);
 void	conn_io_send_byte(struct conn_io *, uint8_t);
-bool	conn_io_recv(struct conn_io *, uint8_t *, size_t);
+bool	conn_io_recv(struct conn_io *, void *, size_t);
 bool	conn_io_recv_byte(struct conn_io *, uint8_t *);
 
 void	conn_io_start_watchdog(struct conn_io *, unsigned int);

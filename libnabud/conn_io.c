@@ -399,8 +399,9 @@ conn_io_wait(struct conn_io *conn, const struct timespec *deadline,
  *	enabled.
  */
 void
-conn_io_send(struct conn_io *conn, const uint8_t *buf, size_t len)
+conn_io_send(struct conn_io *conn, const void *vbuf, size_t len)
 {
+	const uint8_t *buf = vbuf;
 	struct timespec deadline;
 	const uint8_t *curptr;
 	size_t resid;
@@ -460,8 +461,9 @@ conn_io_send_byte(struct conn_io *conn, uint8_t val)
  *	are no partial reads!
  */
 bool
-conn_io_recv(struct conn_io *conn, uint8_t *buf, size_t len)
+conn_io_recv(struct conn_io *conn, void *vbuf, size_t len)
 {
+	uint8_t *buf = vbuf;
 	struct timespec deadline;
 	uint8_t *curptr;
 	size_t resid;
