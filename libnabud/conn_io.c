@@ -134,7 +134,7 @@ conn_io_set_nbio(struct conn_io *conn, const char *which, int fd)
  *	Initialize a conn_io.
  */
 bool
-conn_io_init(struct conn_io *conn, char *name, int fd, void *(*func)(void *))
+conn_io_init(struct conn_io *conn, char *name, int fd)
 {
 	assert(name != NULL);
 	conn->name = name;
@@ -165,7 +165,6 @@ conn_io_init(struct conn_io *conn, char *name, int fd, void *(*func)(void *))
 		goto bad;
 	}
 
-	conn->thread_func = func;
 	conn_io_insert(conn);
 	return true;
 
@@ -179,7 +178,7 @@ conn_io_init(struct conn_io *conn, char *name, int fd, void *(*func)(void *))
  *	Start a conn_io.
  */
 bool
-conn_io_start(struct conn_io *conn)
+conn_io_start(struct conn_io *conn, void *(*func)(void *), void *arg)
 {
 	pthread_attr_t attr;
 	int error;
@@ -189,7 +188,7 @@ conn_io_start(struct conn_io *conn)
 	 */
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	error = pthread_create(&conn->thread, &attr, conn->thread_func, conn);
+	error = pthread_create(&conn->thread, &attr, func, arg);
 	if (error) {
 		log_error("[%s] pthread_create() failed: %s", conn->name,
 		    strerror(error));

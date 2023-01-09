@@ -163,7 +163,7 @@ conn_create_common(char *name, int fd, unsigned int channel, conn_type type,
 	conn->type = type;
 	pthread_mutex_init(&conn->mutex, NULL);
 
-	if (! conn_io_init(&conn->io, name, fd, func)) {
+	if (! conn_io_init(&conn->io, name, fd)) {
 		/* Error already logged. */
 		goto bad;
 	}
@@ -175,7 +175,7 @@ conn_create_common(char *name, int fd, unsigned int channel, conn_type type,
 		image_channel_select(conn, (int16_t)channel);
 	}
 
-	if (! conn_io_start(&conn->io)) {
+	if (! conn_io_start(&conn->io, func, conn)) {
 		/* Error already logged. */
 		goto bad;
 	}

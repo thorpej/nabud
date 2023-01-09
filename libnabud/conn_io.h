@@ -52,7 +52,6 @@ struct conn_io {
 
 	/* Thread that owns this connection. */
 	pthread_t	thread;
-	void		*(*thread_func)(void *);
 
 	/* File descriptor for this connection. */
 	int		fd;
@@ -74,8 +73,8 @@ struct conn_io {
 #define	conn_io_state(c)	(c)->state
 #define	conn_io_set_state(c, s)	(c)->state = (s)
 
-bool	conn_io_init(struct conn_io *, char *, int, void *(*func)(void *));
-bool	conn_io_start(struct conn_io *);
+bool	conn_io_init(struct conn_io *, char *, int);
+bool	conn_io_start(struct conn_io *, void *(*)(void *), void *);
 void	conn_io_fini(struct conn_io *);
 
 int	conn_io_polltimo(struct conn_io *conn, const struct timespec *deadline,
