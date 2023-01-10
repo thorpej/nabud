@@ -180,8 +180,8 @@ In order to handle _pak_ files, a cryptographic library is required; MD5 is used
 and DES is used to decrypt them.  The following cryptographic libraries are currently supported:
 
 * CommonCrypto (the native API on macOS)
-* OpenSSL's _libcrypto_.  This is the native API already provided by many Unix-like systems, so it's unlikely
-that you'll have to go find and install it.
+* OpenSSL's _libcrypto_.  This is the native API already provided by many Unix-like systems, but you may
+have to go and install the "development" portion of the package in order to get the header files.
 
 In order to download from remote sources, such as NabuRetroNet, an SSL library is required.  The following
 SSL libraries are currently supported:
@@ -189,10 +189,15 @@ SSL libraries are currently supported:
 * SecureTransport (the native API on macOS)
 * OpenSSL
 
-On Linux (at least, on the Ubuntu distribution I used), there's a good chance that OpenSSL will not already
-be installed, so you will need to do so yourself.  Because Linux distributions are all different, how to do
-that is left as an exercise for the reader.  However, once it's installed, there is not likely to be any
-additional magic that you need to perform; the configure script will probably find it.
+On Ubuntu, the OpenSSL binaries and shared libraries were installed with the base system, but the header
+files were not.  I installed them on my Ubuntu system like so:
+
+    % sudo apt update
+    % sudo apt install libssl-dev
+
+Linux is, of course, extremely fragmented, so if you have some other distribution, getting OpenSSL installed
+is left as an exercise for the reader.  Once it's installed, there is not likely to be any additional magic
+that you need to perform; the configure script will probably find it.
 
 Because an effort has been made to keep nabud fairly self-contained and reliant only on APIs provided by
 the operating system, building it just requires a toolchain.  For the BSDs and Linux, it's probably already
