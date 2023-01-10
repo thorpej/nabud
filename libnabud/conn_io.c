@@ -183,16 +183,18 @@ conn_io_start(struct conn_io *conn, void *(*func)(void *), void *arg)
 	pthread_attr_t attr;
 	int error;
 
-	/*
-	 * Create the thread that handles the connection.
-	 */
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	error = pthread_create(&conn->thread, &attr, func, arg);
-	if (error) {
-		log_error("[%s] pthread_create() failed: %s", conn->name,
-		    strerror(error));
-		return false;
+	if (func != NULL) {
+		/*
+		 * Create the thread that handles the connection.
+		 */
+		pthread_attr_init(&attr);
+		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+		error = pthread_create(&conn->thread, &attr, func, arg);
+		if (error) {
+			log_error("[%s] pthread_create() failed: %s",
+			    conn->name, strerror(error));
+			return false;
+		}
 	}
 	return true;
 }
