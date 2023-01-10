@@ -237,7 +237,7 @@ image_add_channel(image_channel_type type, char *name, char *source,
 #ifdef NO_PAK_FILE_SUPPORT
 	if (type == IMAGE_CHANNEL_PAK) {
 		log_error("Skipping pak channel %u (%s on %s); "
-		    "no pak file support.");
+		    "no pak file support.", number, name, source);
 		goto bad;
 	}
 #endif /* NO_PAK_FILE_SUPPORT */
