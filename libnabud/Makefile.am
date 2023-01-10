@@ -5,4 +5,4 @@ noinst_LTLIBRARIES	= libnabud.la
 
 #libnabud_la_CPPFLAGS	=
 
-libnabud_la_SOURCES	= atom.c conn_io.c fileio.c log.c
+libnabud_la_SOURCES	= atom.c conn_io.c fileio.c getprogname.c log.c

@@ -37,6 +37,7 @@
 #include <syslog.h>
 
 #include "log.h"
+#include "missing.h"
 
 /* XXX use syslog_r(3) if available. */
 #include <pthread.h>

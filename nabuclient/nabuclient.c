@@ -54,6 +54,7 @@
 
 #define	NABU_PROTO_INLINES
 
+#include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
 
 static int	client_sock;

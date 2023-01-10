@@ -42,6 +42,7 @@
 
 #include "libnabud/fileio.h"
 #include "libnabud/log.h"
+#include "libnabud/missing.h"
 
 #include "adaptor.h"
 #include "conn.h"

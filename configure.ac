@@ -139,6 +139,10 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for some useful BSD functions that, sadly, are not universal.
+#
+AC_CHECK_FUNCS(getprogname)
+
 # Generate the Makefiles
 #
 AC_CONFIG_FILES([

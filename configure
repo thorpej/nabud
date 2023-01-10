@@ -14179,6 +14179,16 @@ printf "%s\n" "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 
+# Check for some useful BSD functions that, sadly, are not universal.
+#
+ac_fn_c_check_func "$LINENO" "getprogname" "ac_cv_func_getprogname"
+if test "x$ac_cv_func_getprogname" = xyes
+then :
+  printf "%s\n" "#define HAVE_GETPROGNAME 1" >>confdefs.h
+
+fi
+
+
 # Generate the Makefiles
 #
 ac_config_files="$ac_config_files Makefile libfetch/Makefile libmj/Makefile libnabud/Makefile nabud/Makefile nabuclient/Makefile"
