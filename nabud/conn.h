@@ -49,7 +49,7 @@ struct nabu_connection {
 	struct conn_io	io;
 
 	/* Link on the list of connections. */
-	LIST_ENTRY(nabu_connection) link;
+	TAILQ_ENTRY(nabu_connection) link;
 	bool		on_list;
 
 	/* Type of this connection. */

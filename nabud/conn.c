@@ -58,8 +58,8 @@
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t conn_list_enum_cv = PTHREAD_COND_INITIALIZER;
-static LIST_HEAD(, nabu_connection) conn_list =
-    LIST_HEAD_INITIALIZER(conn_list);
+static TAILQ_HEAD(, nabu_connection) conn_list =
+    TAILQ_HEAD_INITIALIZER(conn_list);
 unsigned int conn_count;
 
 static void
@@ -68,7 +68,7 @@ conn_insert(struct nabu_connection *conn)
 	assert(! conn->on_list);
 
 	pthread_mutex_lock(&conn_list_mutex);
-	LIST_INSERT_HEAD(&conn_list, conn, link);
+	TAILQ_INSERT_TAIL(&conn_list, conn, link);
 	conn->on_list = true;
 	conn_count++;
 	pthread_mutex_unlock(&conn_list_mutex);
@@ -83,7 +83,7 @@ conn_remove(struct nabu_connection *conn)
 			pthread_cond_wait(&conn_list_enum_cv,
 			    &conn_list_mutex);
 		}
-		LIST_REMOVE(conn, link);
+		TAILQ_REMOVE(&conn_list, conn, link);
 		conn->on_list = false;
 		conn_count--;
 		pthread_mutex_unlock(&conn_list_mutex);
@@ -101,7 +101,7 @@ conn_enumerate(bool (*func)(struct nabu_connection *, void *), void *ctx)
 	bool rv = true;
 
 	pthread_mutex_lock(&conn_list_mutex);
-	LIST_FOREACH(conn, &conn_list, link) {
+	TAILQ_FOREACH(conn, &conn_list, link) {
 		conn->enum_count++;
 		assert(conn->enum_count != 0);
 		pthread_mutex_unlock(&conn_list_mutex);
