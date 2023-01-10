@@ -45,6 +45,7 @@
 
 #include "adaptor.h"
 #include "conn.h"
+#include "control.h"
 #include "image.h"
 
 #include "../libmj/mj.h"
@@ -436,6 +437,9 @@ main(int argc, char *argv[])
 
 	log_info("Welcome to NABU! I'm version %s of your host, %s.",
 	    nabud_version, getprogname());
+
+	/* Set up our control connection. */
+	control_init(NULL);
 
 	/* Load our configuration */
 	config_load(nabud_conf);
