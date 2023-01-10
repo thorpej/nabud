@@ -49,6 +49,11 @@ case "$CANONICAL_TARGET" in
 		# kind of forced to use it regardless.
 		WARNCFLAGS="$WARNCFLAGS -Wno-deprecated-declarations"
 		;;
+
+	*-*-linux*)
+		# Enable _GNU_SOURCE for things like asprintf(3).
+		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
+		;;
 esac
 
 AC_SUBST([WARNCFLAGS])
