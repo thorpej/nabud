@@ -202,7 +202,7 @@ fetch_stat_file(int fd, struct url_stat *us)
 
 int
 /*ARGSUSED*/
-fetchStatFile(struct url *u, struct url_stat *us, const char *flags __unused)
+fetchStatFile(struct url *u, struct url_stat *us, const char *flags __attribute__((__unused__)))
 {
 	char *path;
 	int fd, rv;
@@ -229,7 +229,7 @@ fetchStatFile(struct url *u, struct url_stat *us, const char *flags __unused)
 int
 /*ARGSUSED*/
 fetchListFile(struct url_list *ue, struct url *u, const char *pattern,
-    const char *flags __unused)
+    const char *flags __attribute__((__unused__)))
 {
 	char *path;
 	struct dirent *de;

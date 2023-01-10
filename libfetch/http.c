@@ -1229,7 +1229,7 @@ fetchGetHTTP(struct url *URL, const char *flags)
  */
 fetchIO *
 /*ARGSUSED*/
-fetchPutHTTP(struct url *URL __unused, const char *flags __unused)
+fetchPutHTTP(struct url *URL __attribute__((__unused__)), const char *flags __attribute__((__unused__)))
 {
 	fprintf(stderr, "fetchPutHTTP(): not implemented\n");
 	return (NULL);
@@ -1422,7 +1422,7 @@ static struct http_index_cache *index_cache;
  */
 int
 /*ARGSUSED*/
-fetchListHTTP(struct url_list *ue, struct url *url, const char *pattern __unused, const char *flags)
+fetchListHTTP(struct url_list *ue, struct url *url, const char *pattern __attribute__((__unused__)), const char *flags)
 {
 	fetchIO *f;
 	char buf[2 * PATH_MAX];
