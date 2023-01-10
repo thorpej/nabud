@@ -639,6 +639,7 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	struct nabu_image *img = NULL;
 	struct image_channel *chan;
 	char *selected_name = NULL;
+	int rv;
 
 	assert(image != IMAGE_NUMBER_NAMED);
 
@@ -706,8 +707,8 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	pthread_mutex_unlock(&image_cache_lock);
 
 	if (selected_name != NULL) {
-		asprintf(&image_url, "%s/%s", chan->path, selected_name);
-		assert(image_url != NULL);
+		rv = asprintf(&image_url, "%s/%s", chan->path, selected_name);
+		assert(rv != -1 && image_url != NULL);
 		log_debug("[%s] Loading '%s' from %s", conn_name(conn),
 		    selected_name, image_url);
 	} else {
@@ -724,8 +725,8 @@ image_load(struct nabu_connection *conn, uint32_t image)
 			imgtype = "nabu";
 		}
 
-		asprintf(&image_url, "%s/%s", chan->path, fname);
-		assert(image_url != NULL);
+		rv = asprintf(&image_url, "%s/%s", chan->path, fname);
+		assert(rv != -1 && image_url != NULL);
 		log_debug("[%s] Loading %s-%06X from %s", conn_name(conn),
 		    imgtype, image, image_url);
 		free(fname);

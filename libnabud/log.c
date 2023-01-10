@@ -135,6 +135,7 @@ log_message(log_type type, const char *func, const char *fmt, ...)
 {
 	va_list ap;
 	char *caller_string = NULL;
+	int rv;
 
 	assert(log_type_is_valid(type));
 
@@ -144,8 +145,12 @@ log_message(log_type type, const char *func, const char *fmt, ...)
 	}
 
 	va_start(ap, fmt);
-	vasprintf(&caller_string, fmt, ap);
+	rv = vasprintf(&caller_string, fmt, ap);
 	va_end(ap);
+
+	if (rv == -1) {
+		return;
+	}
 
 	if (log_file) {
 		fprintf(log_file, "%s: %s: %s\n", log_typenames[type],
