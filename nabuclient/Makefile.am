@@ -6,4 +6,4 @@ nabuclient_SOURCES	= nabuclient.c
 
 nabuclient_CPPFLAGS	=
 
-nabuclient_LDADD	=
+nabuclient_LDADD	= ../libnabud/libnabud.la

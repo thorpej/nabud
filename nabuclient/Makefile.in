@@ -108,7 +108,7 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_nabuclient_OBJECTS = nabuclient-nabuclient.$(OBJEXT)
 nabuclient_OBJECTS = $(am_nabuclient_OBJECTS)
-nabuclient_DEPENDENCIES =
+nabuclient_DEPENDENCIES = ../libnabud/libnabud.la
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -319,7 +319,7 @@ top_srcdir = @top_srcdir@
 AM_CFLAGS = $(WARNCFLAGS)
 nabuclient_SOURCES = nabuclient.c
 nabuclient_CPPFLAGS = 
-nabuclient_LDADD = 
+nabuclient_LDADD = ../libnabud/libnabud.la
 all: all-am
 
 .SUFFIXES:
