@@ -43,6 +43,7 @@
 
 #include "libnabud/atom.h"
 #include "libnabud/conn_io.h"
+#include "libnabud/missing.h"
 #include "libnabud/log.h"
 
 #include "conn.h"
@@ -88,7 +89,7 @@ control_serialize_channel(struct image_channel *chan, void *ctx)
 	}
 	rv = rv && atom_list_append_string(list, NABUCTL_CHAN_TYPE, cp);
 
-	rv = rv && atom_list_append_string(list, NABUCTL_CHAN_TYPE,
+	rv = rv && atom_list_append_string(list, NABUCTL_CHAN_SOURCE,
 	    chan->source->name);
 
 	rv = rv && atom_list_append_done(list);
@@ -162,6 +163,42 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 }
 
 /*
+ * control_req_hello --
+ *	Handle a HELLO request.
+ */
+static bool
+control_req_hello(struct conn_io *conn, struct atom *req,
+    struct atom_list *req_list, struct atom_list *reply_list)
+{
+	extern const char nabud_version[];
+	bool rv;
+
+	if (atom_data_type(req) != NABUCTL_TYPE_STRING) {
+		log_error("[%s] Expected %s, got %s",
+		    conn_io_name(conn),
+		    atom_typedesc(NABUCTL_TYPE_STRING),
+		    atom_typedesc(atom_data_type(req)));
+		return false;
+	}
+
+	char *client_version = atom_dataref(req);
+	log_debug("[%s] Client version: %s", conn_io_name(conn),
+	    client_version);
+
+	if (strcmp(client_version, nabud_version) != 0) {
+		log_info("[%s] Client version (%s) does not match %s (%s).",
+		    conn_io_name(conn), client_version, getprogname(),
+		    nabud_version);
+	}
+
+	rv = atom_list_append_string(reply_list, NABUCTL_TYPE_STRING,
+	    nabud_version);
+	rv = rv && atom_list_append_done(reply_list);
+
+	return rv;
+}
+
+/*
  * control_req_list_channels --
  *	Handle a LIST CHANNELS request.
  */
@@ -215,7 +252,7 @@ control_connection_thread(void *arg)
 			break;
 		}
 
-		if (atom_list_count(&req_list)) {
+		if (atom_list_count(&req_list) == 0) {
 			log_error("[%s] Empty request atom list??",
 			    conn_io_name(conn));
 			continue;
@@ -225,6 +262,13 @@ control_connection_thread(void *arg)
 		assert(req != NULL);
 
 		switch (atom_tag(req)) {
+		case NABUCTL_REQ_HELLO:
+			log_debug("[%s] Got NABUCTL_REQ_HELLO.",
+			    conn_io_name(conn));
+			ok = control_req_hello(conn, req,
+			    &req_list, &reply_list);
+			break;
+
 		case NABUCTL_REQ_LIST_CHANNELS:
 			log_debug("[%s] Got NABUCTL_REQ_LIST_CHANNELS.",
 			    conn_io_name(conn));

@@ -106,6 +106,25 @@ struct nabuctl_atom_header {
 		(NABUCTL_TYPE_STRING | NABUCTL_OBJ_CONNECTION | (5U << 8))
 
 /*
+ * NABUCTL_REQ_HELLO
+ *
+ * Arguments: string containing the control client version numnber.
+ *
+ * Returns: string containing the server version numnber.
+ *
+ *	nabuctl -> nabud
+ *		NABUCTL_REQ_HELLO
+ *		[version number string]
+ *		NABUCTL_DONE			done with REQUEST
+ *
+ *	nabuctl <- nabud
+ *		NABUCTL_TYPE_STRING
+ *		[version number string]
+ *		NABUCTL_DONE			done with reply
+ */
+#define	NABUCTL_REQ_HELLO		(NABUCTL_TYPE_STRING | 1)
+
+/*
  * NABUCTL_REQ_LIST_CHANNELS
  *
  * Arguments: none.
@@ -120,12 +139,15 @@ struct nabuctl_atom_header {
  *		NABUCTL_OBJ_CHANNEL
  *		[channel fields]
  *		NABUCTL_DONE			done with CHANNEL
+ *		.
+ *		.
+ *		.
  *		NABUCTL_OBJ_CHANNEL
  *		[channel fields]
  *		NABUCTL_DONE			done with CHANNEL
  *		NABUCTL_DONE			done with reply
  */
-#define	NABUCTL_REQ_LIST_CHANNELS	(NABUCTL_TYPE_VOID | 1)
+#define	NABUCTL_REQ_LIST_CHANNELS	(NABUCTL_TYPE_VOID | 2)
 
 /*
  * NABUCTL_REQ_LIST_CONNECTIONS
@@ -142,12 +164,15 @@ struct nabuctl_atom_header {
  *		NABUCTL_OBJ_CONNECTION
  *		[connection fields]
  *		NABUCTL_DONE			done with CONNECTION
+ *		.
+ *		.
+ *		.
  *		NABUCTL_OBJ_CONNECTION
  *		[connection fields]
  *		NABUCTL_DONE			done with CONNECTION
  *		NABUCTL_DONE			done with reply
  */
-#define	NABUCTL_REQ_LIST_CONNECTIONS	(NABUCTL_TYPE_VOID | 2)
+#define	NABUCTL_REQ_LIST_CONNECTIONS	(NABUCTL_TYPE_VOID | 3)
 
 /*
  * NABUCTL_REQ_CHAN_CLEAR_CACHE

@@ -49,6 +49,10 @@ uint32_t	atom_data_type(struct atom *);
 uint32_t	atom_tag(struct atom *);
 size_t		atom_length(struct atom *);
 void *		atom_consume(struct atom *);
+void *		atom_dataref(struct atom *);
+
+const char *	atom_typedesc(uint32_t);
+const char *	atom_objdesc(uint32_t);
 
 void		atom_list_init(struct atom_list *);
 void		atom_list_free(struct atom_list *);

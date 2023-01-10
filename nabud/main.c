@@ -361,7 +361,7 @@ config_load(const char *path)
 	return ret;
 }
 
-static const char nabud_version[] = VERSION;
+const char nabud_version[] = VERSION;
 
 static void __attribute__((__noreturn__))
 usage(void)

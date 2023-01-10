@@ -75,7 +75,7 @@ atom_free(struct atom *atom)
  * atom_typedesc --
  *	Return a string describing an atom's data type.
  */
-static const char *
+const char *
 atom_typedesc(uint32_t tag)
 {
 	switch (NABUCTL_TYPE(tag)) {
@@ -91,7 +91,7 @@ atom_typedesc(uint32_t tag)
  * atom_objdesc --
  *	Return a string describing an atom's object type.
  */
-static const char *
+const char *
 atom_objdesc(uint32_t tag)
 {
 	switch (NABUCTL_OBJ(tag)) {
@@ -142,6 +142,17 @@ atom_consume(struct atom *atom)
 	void *rv = atom->data;
 	atom->data = NULL;
 	return rv;
+}
+
+/*
+ * atom_dataref --
+ *	Get a pointer to the atom data.  NOTE: The returned value
+ *	is only valid for the life of the atom itself.
+ */
+void *
+atom_dataref(struct atom *atom)
+{
+	return atom->data;
 }
 
 /*
@@ -212,6 +223,8 @@ atom_recv(struct conn_io *conn)
 	}
 	hdr.tag = ntohl(hdr.tag);
 	hdr.length = ntohl(hdr.length);
+	log_debug("Atom header: tag=0x%08x type=%s length=%u",
+	    hdr.tag, atom_typedesc(hdr.tag), hdr.length);
 
 	/* Sanity-check the data type vs payload. */
 	switch (NABUCTL_TYPE(hdr.tag)) {
@@ -364,7 +377,7 @@ atom_list_append_number(struct atom_list *list, uint32_t tag, uint64_t val)
 
 	assert(NABUCTL_TYPE(tag) == NABUCTL_TYPE_NUMBER);
 	snprintf(str, sizeof(str), "0x%llx", (unsigned long long)val);
-	return atom_list_append_string(list, tag, str);
+	return atom_list_append(list, tag, str, strlen(str) + 1);
 }
 
 /*
