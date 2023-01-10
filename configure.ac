@@ -44,17 +44,15 @@ AS_IF([test "$GCC" = "yes"],
 	 AC_MSG_RESULT([no])])
 
 case "$CANONICAL_TARGET" in
-	*-*-darwin*)
-		# MD5 is marked as deprecated on macOS, but we're
-		# kind of forced to use it regardless.
-		WARNCFLAGS="$WARNCFLAGS -Wno-deprecated-declarations"
-		;;
-
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 		;;
 esac
+
+# MD5 is marked as deprecated on some platforms, but we're
+# kind of forced to use it regardless.
+WARNCFLAGS="$WARNCFLAGS -Wno-deprecated-declarations"
 
 AC_SUBST([WARNCFLAGS])
 
