@@ -98,7 +98,8 @@ struct fetcherr {
 
 void		 fetch_seterr(struct fetcherr *, int);
 void		 fetch_syserr(void);
-void		 fetch_info(const char *, ...) __printflike(1, 2);
+void		 fetch_info(const char *, ...)
+		     __attribute__((__format__(__printf__, 1, 2)));
 int		 fetch_default_port(const char *);
 int		 fetch_default_proxy_port(const char *);
 int		 fetch_bind(int, int, const char *);

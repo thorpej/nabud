@@ -190,7 +190,7 @@ ftp_chkerr(conn_t *conn)
 /*
  * Send a command and check reply
  */
-__printflike(2, 3)
+__attribute__((__format__(__printf__, 2, 3)))
 static int
 ftp_cmd(conn_t *conn, const char *fmt, ...)
 {
