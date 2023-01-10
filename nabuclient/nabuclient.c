@@ -790,8 +790,9 @@ static bool
 commands(void)
 {
 	const struct cmdtab *cmd;
-	char *retline, *line = NULL, *cp, *tok;
-	size_t linelen;
+	char *line = NULL, *cp, *tok;
+	size_t zero;
+	ssize_t linelen;
 	char *argv[MAXARGV];
 	int argc;
 	bool all_done;
@@ -807,14 +808,11 @@ commands(void)
 		}
 		fprintf(stdout, "nabu> ");
 		fflush(stdout);
-		retline = fgetln(stdin, &linelen);
-		if (retline == NULL) {
+		zero = 0;
+		linelen = getline(&line, &zero, stdin);
+		if (linelen < 0) {
 			return true;		/* got EOF */
 		}
-
-		line = malloc(linelen);
-		assert(line != NULL);
-		memcpy(line, retline, linelen);
 		line[linelen - 1] = '\0';	/* get rid of the newline */
 
 		/* Break it into tokens. */
