@@ -165,7 +165,7 @@ atom_send_hdr(struct conn_io *conn, const struct nabuctl_atom_header *hdr)
 void
 atom_send_error(struct conn_io *conn)
 {
-	static const struct nabuctl_atom_header buf = {
+	struct nabuctl_atom_header buf = {
 		.tag = htonl(NABUCTL_ERROR),
 	};
 	conn_io_send(conn, &buf, sizeof(buf));
