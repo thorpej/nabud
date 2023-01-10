@@ -59,7 +59,9 @@
 
 #ifdef __linux__
 /* Keep this down to Linux, it can create surprises else where. */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #endif
 
 #if HAVE_CONFIG_H
