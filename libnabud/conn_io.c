@@ -544,5 +544,8 @@ conn_io_cancel(struct conn_io *conn)
 	 * waiting to do I/O.
 	 */
 	conn_io_set_state(conn, CONN_STATE_CANCELLED);
-	(void) write(conn->cancel_fds[1], &conn->state, sizeof(conn->state));
+	if (write(conn->cancel_fds[1], &conn->state, sizeof(conn->state)) < 0) {
+		log_error("[%s] Connection cancellation failed!",
+		    conn_io_name(conn));
+	}
 }
