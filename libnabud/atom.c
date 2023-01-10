@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <arpa/inet.h>
+
 #include "atom.h"
 #include "log.h"
 
