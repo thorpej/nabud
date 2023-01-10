@@ -105,7 +105,7 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libnabud_la_LIBADD =
-am_libnabud_la_OBJECTS = conn_io.lo fileio.lo log.lo
+am_libnabud_la_OBJECTS = atom.lo conn_io.lo fileio.lo log.lo
 libnabud_la_OBJECTS = $(am_libnabud_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -126,8 +126,8 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/conn_io.Plo ./$(DEPDIR)/fileio.Plo \
-	./$(DEPDIR)/log.Plo
+am__depfiles_remade = ./$(DEPDIR)/atom.Plo ./$(DEPDIR)/conn_io.Plo \
+	./$(DEPDIR)/fileio.Plo ./$(DEPDIR)/log.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -319,7 +319,7 @@ AM_CFLAGS = $(PTHREAD_CFLAGS) $(WARNCFLAGS)
 noinst_LTLIBRARIES = libnabud.la
 
 #libnabud_la_CPPFLAGS	=
-libnabud_la_SOURCES = conn_io.c fileio.c log.c
+libnabud_la_SOURCES = atom.c conn_io.c fileio.c log.c
 all: all-am
 
 .SUFFIXES:
@@ -374,6 +374,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/atom.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conn_io.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fileio.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log.Plo@am__quote@ # am--include-marker
@@ -535,7 +536,8 @@ clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/conn_io.Plo
+		-rm -f ./$(DEPDIR)/atom.Plo
+	-rm -f ./$(DEPDIR)/conn_io.Plo
 	-rm -f ./$(DEPDIR)/fileio.Plo
 	-rm -f ./$(DEPDIR)/log.Plo
 	-rm -f Makefile
@@ -583,7 +585,8 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/conn_io.Plo
+		-rm -f ./$(DEPDIR)/atom.Plo
+	-rm -f ./$(DEPDIR)/conn_io.Plo
 	-rm -f ./$(DEPDIR)/fileio.Plo
 	-rm -f ./$(DEPDIR)/log.Plo
 	-rm -f Makefile
