@@ -28,6 +28,10 @@
  * Support for control messages.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <assert.h>
@@ -333,7 +337,9 @@ control_init(const char *path)
 
 	memset(&sun, 0, sizeof(sun));
 	strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+#ifdef HAVE_SOCKADDR_UN_SUN_LEN
 	sun.sun_len = SUN_LEN(&sun);
+#endif
 	sun.sun_family = AF_LOCAL;
 
 	log_info("Creating control channel at %s", path);
