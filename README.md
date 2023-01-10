@@ -189,6 +189,11 @@ SSL libraries are currently supported:
 * SecureTransport (the native API on macOS)
 * OpenSSL
 
+On Linux (at least, on the Ubuntu distribution I used), there's a good chance that OpenSSL will not already
+be installed, so you will need to do so yourself.  Because Linux distributions are all different, how to do
+that is left as an exercise for the reader.  However, once it's installed, there is not likely to be any
+additional magic that you need to perform; the configure script will probably find it.
+
 Because an effort has been made to keep nabud fairly self-contained and reliant only on APIs provided by
 the operating system, building it just requires a toolchain.  For the BSDs and Linux, it's probably already
 installed on your system, but if it's not, then doing so is left as an exercise for the reader.  For macOS,
@@ -237,6 +242,7 @@ showing the messages you will typically see:
 allow programs running on the NABU to access up to 256 "slots" of cloud storage that are cached
 in the server.  This opens up a lot of exciting opportunities for things like downloadable game
 levels, music tracks, etc.
+* nabud now builds on Linux (built and tested on Ubuntu 22.04 LTS).
 
 ### nabud-0.7.1
 * Fix a compiler warning that was happening with some versions of Xcode on macOS.
