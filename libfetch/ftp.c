@@ -323,7 +323,9 @@ ftp_cwd(conn_t *conn, const char *path, int subdir)
 	} else if (strcmp(conn->ftp_home, "/") == 0) {
 		dst = strdup(path - 1);
 	} else {
-		asprintf(&dst, "%s/%s", conn->ftp_home, path);
+		if (asprintf(&dst, "%s/%s", conn->ftp_home, path) == -1) {
+			dst = NULL;
+		}
 	}
 	if (dst == NULL) {
 		fetch_syserr();
@@ -680,14 +682,19 @@ ftp_transfer(conn_t *conn, const char *oper, const char *file, const char *op_ar
 	const char *filename;
 	size_t filenamelen;
 	int type;
-	int low, pasv, verbose;
+#if defined(IPV6_PORTRANGE) || defined(IP_PORTRANGE)
+	int low;
+#endif
+	int pasv, verbose;
 	int e, sd = -1;
 	socklen_t l;
 	char *s;
 	fetchIO *df;
 
 	/* check flags */
+#if defined(IPV6_PORTRANGE) || defined(IP_PORTRANGE)
 	low = CHECK_FLAG('l');
+#endif
 	pasv = !CHECK_FLAG('a');
 	verbose = CHECK_FLAG('v');
 
