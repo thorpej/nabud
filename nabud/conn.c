@@ -335,69 +335,51 @@ conn_add_tcp(char *portstr, unsigned int channel)
 		return;
 	}
 
-	struct sockaddr_in sin = {
-		.sin_len = sizeof(sin),
-		.sin_family = AF_INET,
-		.sin_port = htons((in_port_t)port),
-		.sin_addr = { .s_addr = htonl(INADDR_ANY) },
+	static const struct addrinfo hints = {
+		.ai_flags = AI_PASSIVE | AI_NUMERICSERV,
+		.ai_socktype = SOCK_STREAM,
+		.ai_protocol = IPPROTO_TCP,
 	};
+	struct addrinfo *ai0, *ai;
+	int error;
 
-	snprintf(name, sizeof(name), "IPv4-%ld", port);
-	sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (sock >= 0) {
-		if (bind(sock, (struct sockaddr *)&sin, sizeof(sin)) == 0) {
-			if (listen(sock, 8) == 0) {
-				conn_create_common(strdup(name), sock, channel,
-				    CONN_TYPE_LISTENER, conn_tcp_thread);
-				sock = -1;
+	error = getaddrinfo(NULL, portstr, &hints, &ai0);
+	if (error) {
+		log_error("getaddrinfo() failed: %s", gai_strerror(error));
+		return;
+	}
+
+	for (ai = ai0; ai != NULL; ai = ai->ai_next) {
+		snprintf(name, sizeof(name), "IPv%s-%ld",
+		    ai->ai_family == AF_INET ? "4" :
+		    ai->ai_family == AF_INET6 ? "6" : "?",
+		    port);
+
+		sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		if (sock >= 0) {
+			if (bind(sock, ai->ai_addr, ai->ai_addrlen) == 0) {
+				if (listen(sock, 8) == 0) {
+					conn_create_common(strdup(name), sock,
+					    channel, CONN_TYPE_LISTENER,
+					    conn_tcp_thread);
+					sock = -1;
+				} else {
+					log_error("Unable to listen on %s: %s",
+					    name, strerror(errno));
+				}
 			} else {
-				log_error("Unable to listen on IPv4 socket: %s",
-				    strerror(errno));
+				log_error("Unable to bind %s: %s",
+				    name, strerror(errno));
 			}
 		} else {
-			log_error("Unable to bind IPv4 socket: %s",
-			    strerror(errno));
+			log_error("Unable to create %s socket: %s",
+			    name, strerror(errno));
 		}
-	} else {
-		log_error("Unable to create IPv4 socket: %s",
-		    strerror(errno));
-	}
-	if (sock >= 0) {
-		close(sock);
-	}
-
-#ifdef PF_INET6
-	struct sockaddr_in6 sin6 = {
-		.sin6_len = sizeof(sin6),
-		.sin6_family = AF_INET6,
-		.sin6_port = htons((in_port_t)port),
-		.sin6_addr = IN6ADDR_ANY_INIT,
-	};
-
-	snprintf(name, sizeof(name), "IPv6-%ld", port);
-	sock = socket(PF_INET6, SOCK_STREAM, IPPROTO_TCP);
-	if (sock >= 0) {
-		if (bind(sock, (struct sockaddr *)&sin6, sizeof(sin6)) == 0) {
-			if (listen(sock, 8) == 0) {
-				conn_create_common(strdup(name), sock, channel,
-				    CONN_TYPE_LISTENER, conn_tcp_thread);
-				sock = -1;
-			} else {
-				log_error("Unable to listen on IPv6 socket: %s",
-				    strerror(errno));
-			}
-		} else {
-			log_error("Unable to bind IPv6 socket: %s",
-			    strerror(errno));
+		if (sock >= 0) {
+			close(sock);
 		}
-	} else {
-		log_error("Unable to create IPv6 socket: %s",
-		    strerror(errno));
 	}
-	if (sock >= 0) {
-		close(sock);
-	}
-#endif /* PF_INET6 */
+	freeaddrinfo(ai0);
 }
 
 /*
