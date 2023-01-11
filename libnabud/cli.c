@@ -94,6 +94,46 @@ cli_cmdtab_lookup(const struct cmdtab *tab, const char *name)
 }
 
 /*
+ * cli_help --
+ *	Help helper.
+ */
+bool
+cli_help(const struct cmdtab *cmdtab)
+{
+	printf("Available commands:\n");
+	return cli_help_list(cmdtab);
+}
+
+/*
+ * cli_help_list --
+ *	Another help helper.
+ */
+bool
+cli_help_list(const struct cmdtab *cmdtab)
+{
+	const struct cmdtab *cmd;
+
+	for (cmd = cmdtab; cmd->name != NULL; cmd++) {
+		if (! cmd->suppress_in_help) {
+			printf("\t%s\n", cmd->name);
+		}
+	}
+	return false;
+}
+
+/*
+ * cli_command_unknown --
+ *	Called when an unknown / unrecognized command is entered
+ *	at the top-level.
+ */
+bool
+cli_command_unknown(int argc, char *argv[])
+{
+	printf("Unknown command: '%s'.  Try 'help'.\n", argv[0]);
+	return false;
+}
+
+/*
  * cli_commands --
  *	CLI command loop.
  */
@@ -168,4 +208,20 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 
  quit:
 	printf("Quit!\n");
+}
+
+/*
+ * cli_subcommand --
+ *	Call a sub-command.
+ */
+bool
+cli_subcommand(const struct cmdtab *tab, int argc, char *argv[], int offset)
+{
+	const struct cmdtab *cmd;
+
+	assert(offset >= 0);
+	cmd = cmdtab_lookup(tab, argv[offset]);
+	assert(cmd != NULL);
+
+	return (*cmd->func)(argc, argv);
 }

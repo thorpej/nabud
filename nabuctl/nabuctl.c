@@ -606,37 +606,50 @@ command_list_connections(int argc, char *argv[])
 	return false;
 }
 
-static bool	command_help(int, char *[]);
-
 static bool
-command_unknown(int argc, char *argv[])
+command_verb_noun_unknown(int argc, char *argv[])
 {
-	printf("Unknown command: %s.  Try 'help'.\n", argv[0]);
+	printf("Don't know how to %s '%s'.  Try '%s ?'.\n",
+	    argv[0], argv[1], argv[0]);
 	return false;
 }
+
+static const struct cmdtab list_cmdtab[] = {
+	{ .name = "channels",		.func = command_list_channels },
+	{ .name = "connections",	.func = command_list_connections },
+
+	{ .name = "help",		.func = command_help,
+					.suppress_in_help = true },
+	{ .name = "?",			.func = command_help,
+					.suppress_in_help = true },
+
+	CMDTAB_EOL(command_verb_noun_unknown)
+};
+
+static bool
+command_list(int argc, char *argv[])
+{
+	return cli_subcommand(list_cmdtab, argc, argv, 1);
+}
+
+static bool	command_help(int, char *[]);
 
 static const struct cmdtab cmdtab[] = {
 	{ .name = "exit",		.func = command_exit },
 	{ .name = "quit",		.func = command_exit },
 
 	{ .name = "help",		.func = command_help },
+	{ .name = "?",			.func = command_help },
 
-	{ .name = "list-channels",	.func = command_list_channels },
-	{ .name = "list-connections",	.func = command_list_connections },
+	{ .name = "list",		.func = command_list },
 
-	{ .name = NULL,			.func = command_unknown }
+	CMDTAB_EOL(cli_command_unknown)
 };
 
 static bool
 command_help(int argc, char *argv[])
 {
-	const struct cmdtab *cmd;
-
-	printf("Available commands:\n");
-	for (cmd = cmdtab; cmd->name != NULL; cmd++) {
-		printf("\t%s\n", cmd->name);
-	}
-	return false;
+	return cli_help(cmdtab);
 }
 
 static bool

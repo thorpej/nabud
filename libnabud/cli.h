@@ -36,12 +36,22 @@
 struct cmdtab {
 	const char	*name;
 	bool		(*func)(int argc, char *argv[]);
+	bool		suppress_in_help;
 };
+
+#define	CMDTAB_EOL(unkfunc)	{ .func = (unkfunc),			\
+				  .suppress_in_help = true }
 
 const struct cmdtab *cli_cmdtab_lookup(const struct cmdtab *, const char *);
 bool	cli_commands(const char *, const struct cmdtab *,
 	    bool (*)(void *), void *);
 void	cli_throw(void);
 void	cli_quit(void);
+
+bool	cli_help(const struct cmdtab *);
+bool	cli_help_list(const struct cmdtab *);
+bool	cli_subcommand(const struct cmdtab *, int, char *[], int);
+
+bool	cli_command_unknown(int, char *[]);
 
 #endif /* cli_h_included */

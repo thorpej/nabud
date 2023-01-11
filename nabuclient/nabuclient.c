@@ -742,13 +742,6 @@ command_rn_fh_close(int argc, char *argv[])
 
 static bool	command_help(int, char *[]);
 
-static bool
-command_unknown(int argc, char *argv[])
-{
-	printf("Unknown command: %s.  Try 'help'.\n", argv[0]);
-	return false;
-}
-
 static const struct cmdtab cmdtab[] = {
 	{ .name = "exit",		.func = command_exit },
 	{ .name = "quit",		.func = command_exit },
@@ -769,25 +762,13 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "fh-read",		.func = command_rn_fh_read },
 	{ .name = "fh-close",		.func = command_rn_fh_close },
 
-	{ .name = NULL,			.func = command_unknown }
+	CMDTAB_EOL(cli_command_unknown)
 };
 
 static bool
 command_help(int argc, char *argv[])
 {
-	const struct cmdtab *cmd;
-
-	printf("Available commands:\n");
-	for (cmd = cmdtab; cmd->name != NULL; cmd++) {
-		printf("\t%s\n", cmd->name);
-	}
-	return false;
-}
-
-static void
-handle_exitsig(int signo)
-{
-	cli_quit();
+	return cli_help(cmdtab);
 }
 
 static void __attribute__((__noreturn__))
