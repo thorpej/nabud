@@ -57,6 +57,10 @@ static struct conn_io server_conn;
 
 static const char nabuctl_version[] = VERSION;
 
+/*****************************************************************************
+ * RANDOM USEFUL STUFF
+ *****************************************************************************/
+
 #define	FREE(x)								\
 do {									\
 	if ((x) != NULL) {						\
@@ -64,11 +68,6 @@ do {									\
 		x = NULL;						\
 	}								\
 } while (/*CONSTCOND*/0)
-
-struct req_repl {
-	struct atom_list req_list;
-	struct atom_list reply_list;
-};
 
 static int
 number_display_width(unsigned int number)
@@ -81,6 +80,98 @@ number_display_width(unsigned int number)
 	}
 	return 1;
 }
+
+/*****************************************************************************
+ * SERVER COMMUNICATION STUFF
+ *****************************************************************************/
+
+struct req_repl {
+	struct atom_list req_list;
+	struct atom_list reply_list;
+};
+
+static void
+rr_init(struct req_repl *rr)
+{
+	atom_list_init(&rr->req_list);
+	atom_list_init(&rr->reply_list);
+}
+
+static void
+rr_done(struct req_repl *rr)
+{
+	atom_list_free(&rr->req_list);
+	atom_list_free(&rr->reply_list);
+}
+
+static void
+rr_req_build_failed(struct req_repl *rr)
+{
+	atom_list_free(&rr->req_list);
+	log_error("Building request atom list failed!");
+}
+
+static void
+server_disconnected(void)
+{
+	printf("Server disconnected!\n");
+	cli_quit();
+}
+
+static void
+server_send(struct atom_list *list)
+{
+	if (! atom_list_send(&server_conn, list)) {
+		server_disconnected();
+	}
+}
+
+static void
+server_recv(struct atom_list *list)
+{
+	if (! atom_list_recv(&server_conn, list)) {
+		server_disconnected();
+	}
+}
+
+static void
+say_hello(void)
+{
+	struct req_repl rr;
+	struct atom *atom;
+
+	rr_init(&rr);
+	if (atom_list_append_string(&rr.req_list, NABUCTL_REQ_HELLO,
+				    nabuctl_version) &&
+	    atom_list_append_done(&rr.req_list)) {
+		server_send(&rr.req_list);
+	} else {
+		rr_req_build_failed(&rr);
+		goto out;
+	}
+
+	server_recv(&rr.reply_list);
+	atom = atom_list_next(&rr.reply_list, NULL);
+	if (atom_data_type(atom) != NABUCTL_TYPE_STRING) {
+		log_error("Expected type %s, got %s.",
+		    atom_typedesc(NABUCTL_TYPE_STRING),
+		    atom_typedesc(atom_data_type(atom)));
+		goto out;
+	}
+	char *server_version = atom_dataref(atom);
+
+	printf("Server version: %s\n", server_version);
+	if (strcmp(server_version, nabuctl_version) != 0) {
+		log_error("Version mismatch (client %s, server %s).",
+		    nabuctl_version, server_version);
+	}
+ out:
+	rr_done(&rr);
+}
+
+/*****************************************************************************
+ * CHANNEL STUFF
+ *****************************************************************************/
 
 struct channel_desc {
 	TAILQ_ENTRY(channel_desc) link;
@@ -254,6 +345,58 @@ channel_deserialize(struct atom_list *reply_list, struct atom *atom)
 	return atom;
 }
 
+static void
+channel_list_fetch(void)
+{
+	struct req_repl rr;
+	struct atom *atom;
+
+	rr_init(&rr);
+	if (atom_list_append_void(&rr.req_list, NABUCTL_REQ_LIST_CHANNELS) &&
+	    atom_list_append_done(&rr.req_list)) {
+		server_send(&rr.req_list);
+	} else {
+		rr_req_build_failed(&rr);
+		cli_throw();
+	}
+
+	server_recv(&rr.reply_list);
+	channel_list_reset();
+
+	for (atom = NULL;;) {
+		atom = atom_list_next(&rr.reply_list, atom);
+		if (atom == NULL) {
+			log_error("Unexpected end of atom list.");
+			cli_throw();
+		}
+		switch (atom_tag(atom)) {
+		case NABUCTL_DONE:
+			log_debug("Finished enumerating channel list.");
+			goto out;
+
+		case NABUCTL_OBJ_CHANNEL:
+			log_debug("Deserializing channel.");
+			atom = channel_deserialize(&rr.reply_list, atom);
+			if (atom == NULL) {
+				/* Error already reported. */
+				cli_throw();
+			}
+			continue;
+
+		default:
+			log_error("Unexpected atom tag=0x%08x",
+			    atom_tag(atom));
+			break;
+		}
+	}
+ out:
+	rr_done(&rr);
+}
+
+/*****************************************************************************
+ * CONNECTION STUFF
+ *****************************************************************************/
+
 struct connection_desc {
 	TAILQ_ENTRY(connection_desc) link;
 	char		*name;
@@ -392,83 +535,56 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 }
 
 static void
-rr_init(struct req_repl *rr)
-{
-	atom_list_init(&rr->req_list);
-	atom_list_init(&rr->reply_list);
-}
-
-static void
-rr_done(struct req_repl *rr)
-{
-	atom_list_free(&rr->req_list);
-	atom_list_free(&rr->reply_list);
-}
-
-static void
-rr_req_build_failed(struct req_repl *rr)
-{
-	atom_list_free(&rr->req_list);
-	log_error("Building request atom list failed!");
-}
-
-static void
-server_disconnected(void)
-{
-	printf("Server disconnected!\n");
-	cli_quit();
-}
-
-static void
-server_send(struct atom_list *list)
-{
-	if (! atom_list_send(&server_conn, list)) {
-		server_disconnected();
-	}
-}
-
-static void
-server_recv(struct atom_list *list)
-{
-	if (! atom_list_recv(&server_conn, list)) {
-		server_disconnected();
-	}
-}
-
-static void
-say_hello(void)
+connection_list_fetch(void)
 {
 	struct req_repl rr;
 	struct atom *atom;
 
 	rr_init(&rr);
-	if (atom_list_append_string(&rr.req_list, NABUCTL_REQ_HELLO,
-				    nabuctl_version) &&
+	if (atom_list_append_void(&rr.req_list, NABUCTL_REQ_LIST_CONNECTIONS) &&
 	    atom_list_append_done(&rr.req_list)) {
 		server_send(&rr.req_list);
 	} else {
 		rr_req_build_failed(&rr);
-		goto out;
+		cli_throw();
 	}
 
 	server_recv(&rr.reply_list);
-	atom = atom_list_next(&rr.reply_list, NULL);
-	if (atom_data_type(atom) != NABUCTL_TYPE_STRING) {
-		log_error("Expected type %s, got %s.",
-		    atom_typedesc(NABUCTL_TYPE_STRING),
-		    atom_typedesc(atom_data_type(atom)));
-		goto out;
-	}
-	char *server_version = atom_dataref(atom);
+	connection_list_reset();
 
-	printf("Server version: %s\n", server_version);
-	if (strcmp(server_version, nabuctl_version) != 0) {
-		log_error("Version mismatch (client %s, server %s).",
-		    nabuctl_version, server_version);
+	for (atom = NULL;;) {
+		atom = atom_list_next(&rr.reply_list, atom);
+		if (atom == NULL) {
+			log_error("Unexpected end of atom list.");
+			cli_throw();
+		}
+		switch (atom_tag(atom)) {
+		case NABUCTL_DONE:
+			log_debug("Finished enumerating channel list.");
+			goto out;
+
+		case NABUCTL_OBJ_CONNECTION:
+			log_debug("Deserializing connection.");
+			atom = connection_deserialize(&rr.reply_list, atom);
+			if (atom == NULL) {
+				/* Error already reported. */
+				cli_throw();
+			}
+			continue;
+
+		default:
+			log_error("Unexpected atom tag=0x%08x",
+			    atom_tag(atom));
+			break;
+		}
 	}
  out:
 	rr_done(&rr);
 }
+
+/*****************************************************************************
+ * COMMAND STUFF
+ *****************************************************************************/
 
 static bool
 command_exit(int argc, char *argv[])
@@ -488,51 +604,8 @@ channel_print_cb(struct channel_desc *chan, void *ctx)
 static bool
 command_list_channels(int argc, char *argv[])
 {
-	struct req_repl rr;
-	struct atom *atom;
-
-	rr_init(&rr);
-	if (atom_list_append_void(&rr.req_list, NABUCTL_REQ_LIST_CHANNELS) &&
-	    atom_list_append_done(&rr.req_list)) {
-		server_send(&rr.req_list);
-	} else {
-		rr_req_build_failed(&rr);
-		cli_throw();
-	}
-
-	server_recv(&rr.reply_list);
-	channel_list_reset();
-
-	for (atom = NULL;;) {
-		atom = atom_list_next(&rr.reply_list, atom);
-		if (atom == NULL) {
-			log_error("Unexpected end of atom list.");
-		}
-		switch (atom_tag(atom)) {
-		case NABUCTL_DONE:
-			log_debug("Finished enumerating channel list.");
-			goto out;
-
-		case NABUCTL_OBJ_CHANNEL:
-			log_debug("Deserializing channel.");
-			atom = channel_deserialize(&rr.reply_list, atom);
-			if (atom == NULL) {
-				/* Error already reported. */
-				goto out;
-			}
-			continue;
-
-		default:
-			log_error("Unexpected atom tag=0x%08x",
-			    atom_tag(atom));
-			break;
-		}
-	}
- out:
-	rr_done(&rr);
-
+	channel_list_fetch();
 	channel_list_enumerate(channel_print_cb, NULL);
-
 	return false;
 }
 
@@ -558,51 +631,8 @@ connection_print_cb(struct connection_desc *conn, void *ctx)
 static bool
 command_list_connections(int argc, char *argv[])
 {
-	struct req_repl rr;
-	struct atom *atom;
-
-	rr_init(&rr);
-	if (atom_list_append_void(&rr.req_list, NABUCTL_REQ_LIST_CONNECTIONS) &&
-	    atom_list_append_done(&rr.req_list)) {
-		server_send(&rr.req_list);
-	} else {
-		rr_req_build_failed(&rr);
-		cli_throw();
-	}
-
-	server_recv(&rr.reply_list);
-	connection_list_reset();
-
-	for (atom = NULL;;) {
-		atom = atom_list_next(&rr.reply_list, atom);
-		if (atom == NULL) {
-			log_error("Unexpected end of atom list.");
-		}
-		switch (atom_tag(atom)) {
-		case NABUCTL_DONE:
-			log_debug("Finished enumerating channel list.");
-			goto out;
-
-		case NABUCTL_OBJ_CONNECTION:
-			log_debug("Deserializing connection.");
-			atom = connection_deserialize(&rr.reply_list, atom);
-			if (atom == NULL) {
-				/* Error already reported. */
-				goto out;
-			}
-			continue;
-
-		default:
-			log_error("Unexpected atom tag=0x%08x",
-			    atom_tag(atom));
-			break;
-		}
-	}
- out:
-	rr_done(&rr);
-
+	connection_list_fetch();
 	connection_list_enumerate(connection_print_cb, NULL);
-
 	return false;
 }
 
@@ -657,6 +687,13 @@ nabuctl_cliprep(void *ctx)
 {
 	/* Do a HELLO exchange with the server. */
 	say_hello();
+
+	/*
+	 * Pre-fetch the channel and server list so we can get going
+	 * right away without listing first.
+	 */
+	channel_list_fetch();
+	connection_list_fetch();
 
 	return true;
 }
