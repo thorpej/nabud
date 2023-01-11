@@ -155,6 +155,7 @@ AC_CONFIG_FILES([
 	libnabud/Makefile
 	nabud/Makefile
 	nabuclient/Makefile
+	nabuctl/Makefile
 ])
 
 AC_OUTPUT

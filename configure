@@ -14194,7 +14194,7 @@ fi
 
 # Generate the Makefiles
 #
-ac_config_files="$ac_config_files Makefile libfetch/Makefile libmj/Makefile libnabud/Makefile nabud/Makefile nabuclient/Makefile"
+ac_config_files="$ac_config_files Makefile libfetch/Makefile libmj/Makefile libnabud/Makefile nabud/Makefile nabuclient/Makefile nabuctl/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -15214,6 +15214,7 @@ do
     "libnabud/Makefile") CONFIG_FILES="$CONFIG_FILES libnabud/Makefile" ;;
     "nabud/Makefile") CONFIG_FILES="$CONFIG_FILES nabud/Makefile" ;;
     "nabuclient/Makefile") CONFIG_FILES="$CONFIG_FILES nabuclient/Makefile" ;;
+    "nabuctl/Makefile") CONFIG_FILES="$CONFIG_FILES nabuctl/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
