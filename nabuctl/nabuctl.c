@@ -47,21 +47,15 @@
 #include <unistd.h>
 
 #include "libnabud/atom.h"
+#include "libnabud/cli.h"
 #include "libnabud/conn_io.h"
 #include "libnabud/log.h"
 #include "libnabud/missing.h"
 #include "libnabud/nabuctl_proto.h"
 
 static struct conn_io server_conn;
-static jmp_buf	quit_env;
-static jmp_buf	except_env;
-
-#define	QUIT()		longjmp(quit_env, 1)
-#define	THROW()		longjmp(except_env, 1)
 
 static const char nabuctl_version[] = VERSION;
-
-#define	MAXARGV		8
 
 #define	FREE(x)								\
 do {									\
@@ -109,7 +103,7 @@ channel_desc_alloc(void)
 	struct channel_desc *chan = calloc(1, sizeof(*chan));
 	if (chan == NULL) {
 		printf("Unable to allocate channel descriptor!");
-		QUIT();
+		cli_quit();
 	}
 	return chan;
 }
@@ -281,7 +275,7 @@ connection_desc_alloc(void)
 	struct connection_desc *conn = calloc(1, sizeof(*conn));
 	if (conn == NULL) {
 		printf("Unable to allocate connection descriptor!");
-		QUIT();
+		cli_quit();
 	}
 	return conn;
 }
@@ -422,7 +416,7 @@ static void
 server_disconnected(void)
 {
 	printf("Server disconnected!\n");
-	QUIT();
+	cli_quit();
 }
 
 static void
@@ -503,7 +497,7 @@ command_list_channels(int argc, char *argv[])
 		server_send(&rr.req_list);
 	} else {
 		rr_req_build_failed(&rr);
-		THROW();
+		cli_throw();
 	}
 
 	server_recv(&rr.reply_list);
@@ -573,7 +567,7 @@ command_list_connections(int argc, char *argv[])
 		server_send(&rr.req_list);
 	} else {
 		rr_req_build_failed(&rr);
-		THROW();
+		cli_throw();
 	}
 
 	server_recv(&rr.reply_list);
@@ -614,10 +608,14 @@ command_list_connections(int argc, char *argv[])
 
 static bool	command_help(int, char *[]);
 
-static const struct cmdtab {
-	const char	*name;
-	bool		(*func)(int, char *[]);
-} cmdtab[] = {
+static bool
+command_unknown(int argc, char *argv[])
+{
+	printf("Unknown command: %s.  Try 'help'.\n", argv[0]);
+	return false;
+}
+
+static const struct cmdtab cmdtab[] = {
 	{ .name = "exit",		.func = command_exit },
 	{ .name = "quit",		.func = command_exit },
 
@@ -626,7 +624,7 @@ static const struct cmdtab {
 	{ .name = "list-channels",	.func = command_list_channels },
 	{ .name = "list-connections",	.func = command_list_connections },
 
-	{ .name = NULL }
+	{ .name = NULL,			.func = command_unknown }
 };
 
 static bool
@@ -642,69 +640,12 @@ command_help(int argc, char *argv[])
 }
 
 static bool
-commands(void)
+nabuctl_cliprep(void *ctx)
 {
-	const struct cmdtab *cmd;
-	char *retline, *line = NULL, *cp, *tok;
-	size_t linelen;
-	char *argv[MAXARGV];
-	int argc;
-	bool all_done;
+	/* Do a HELLO exchange with the server. */
+	say_hello();
 
-	for (all_done = false;;) {
-		nextline:
-		if (line != NULL) {
-			free(line);
-			line = NULL;
-		}
-		if (all_done) {
-			return false;
-		}
-		fprintf(stdout, "nabu> ");
-		fflush(stdout);
-		retline = fgetln(stdin, &linelen);
-		if (retline == NULL) {
-			return true;		/* got EOF */
-		}
-
-		line = malloc(linelen);
-		assert(line != NULL);
-		memcpy(line, retline, linelen);
-		line[linelen - 1] = '\0';	/* get rid of the newline */
-
-		/* Break it into tokens. */
-		argc = 0;
-		cp = line;
-		while ((tok = strtok(cp, " \t")) != NULL) {
-			cp = NULL;
-			if (argc == MAXARGV) {
-				command_help(argc, argv);
-				goto nextline;	/* double-break, sigh */
-			}
-			argv[argc++] = tok;
-		}
-
-		for (cmd = cmdtab; cmd->name != NULL; cmd++) {
-			if (strcmp(argv[0], cmd->name) == 0) {
-				break;
-			}
-		}
-		if (cmd->name == NULL) {
-			printf("Unknown command: %s.  Try 'help'.\n", argv[0]);
-		} else {
-			if (setjmp(except_env)) {
-				all_done = false;
-			} else {
-				all_done = (*cmd->func)(argc, argv);
-			}
-		}
-	}
-}
-
-static void
-handle_exitsig(int signo)
-{
-	QUIT();
+	return true;
 }
 
 static void __attribute__((__noreturn__))
@@ -774,24 +715,8 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (setjmp(quit_env)) {
-		goto quit;
-	}
-
-	/* handle_exitsig() is now safe. */
-	(void) signal(SIGINT, handle_exitsig);
-
-	/*
-	 * Do a HELLO exchange with the server to verify we're talking
-	 * the same language.
-	 */
-	say_hello();
-
 	/* Enter the command loop. */
-	if (commands()) {
-		quit:
-		printf("Quit!\n");
-	}
+	cli_commands(getprogname(), cmdtab, nabuctl_cliprep, NULL));
 
 	printf("Thanks for visiting the land of NABU!\n");
 	exit(0);

@@ -54,25 +54,19 @@
 
 #define	NABU_PROTO_INLINES
 
+#include "libnabud/cli.h"
 #include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
 
 static int	client_sock;
-static jmp_buf	quit_env;
-static jmp_buf	except_env;
-
-#define	QUIT()		longjmp(quit_env, 1)
-#define	THROW()		longjmp(except_env, 1)
 
 static const char nabuclient_version[] = VERSION;
-
-#define	MAXARGV		8
 
 static void
 server_disconnected(void)
 {
 	printf("Server disconnected!\n");
-	QUIT();
+	cli_quit();
 }
 
 static const uint8_t ack_seq[] = NABU_MSGSEQ_ACK;
@@ -91,7 +85,7 @@ nabu_send(const void *vbuf, size_t len)
 		}
 		if (actual < 0) {
 			warn("writing to socket");
-			THROW();
+			cli_throw();
 		}
 		buf += actual;
 		resid -= actual;
@@ -124,7 +118,7 @@ nabu_recv(void *vbuf, size_t len)
 		}
 		if (actual < 0) {
 			warn("reading from socket");
-			THROW();
+			cli_throw();
 		}
 		buf += actual;
 		resid -= actual;
@@ -181,7 +175,7 @@ nabu_recv_packet_data(size_t *lenp, uint16_t crc)
 
  bad:
 	free(pktbuf);
-	THROW();
+	cli_throw();
 }
 
 static void
@@ -283,7 +277,7 @@ check_authorized(const void *vgot)
 		printf("*** UNAUTHORIZED! ***\n");
 		printf("Sending NABU_MSGSEQ_ACK.\n");
 		nabu_send_ack();
-		THROW();
+		cli_throw();
 	}
 	printf("*** Unexpected reply ***\n");
 	return false;
@@ -328,7 +322,7 @@ command_get_channel_status(int argc, char *argv[])
 	nabu_recv(reply, sizeof(reply));
 	print_reply(reply, sizeof(reply));
 	if (! check_ack(reply)) {
-		THROW();
+		cli_throw();
 	}
 
 	printf("Sending NABU_MSG_CHANNEL_STATUS.\n");
@@ -360,7 +354,7 @@ command_get_transmit_status(int argc, char *argv[])
 	nabu_recv(reply, sizeof(reply));
 	print_reply(reply, sizeof(reply));
 	if (! check_ack(reply)) {
-		THROW();
+		cli_throw();
 	}
 
 	printf("Sending NABU_MSG_TRANSMIT_STATUS.\n");
@@ -404,11 +398,11 @@ send_packet_request(uint16_t segment, uint32_t image,
 
 	if (segment > 0xff) {
 		printf("WOAH! There is only 1 byte for the segment number!\n");
-		THROW();
+		cli_throw();
 	}
 	if (image > 0x00FFFFFF) {
 		printf("WOAH! There are only 3 bytes for the image number!\n");
-		THROW();
+		cli_throw();
 	}
 
 	printf("Sending: NABU_MSG_PACKET_REQUEST.\n");
@@ -483,13 +477,13 @@ command_get_image(int argc, char *argv[])
 
 	if (argc < 2) {
 		printf("Args, bro.\n");
-		THROW();
+		cli_throw();
 	}
 
 	val = strtol(argv[1], NULL, 16);
 	if (val < 0 || val > 0x00ffffff) {
 		printf("'%s' invalid; must be between 0 - 00FFFFFF\n", argv[1]);
-		THROW();
+		cli_throw();
 	}
 	image = (uint32_t)val;
 
@@ -543,13 +537,13 @@ command_change_channel(int argc, char *argv[])
 
 	if (argc < 2) {
 		printf("Args, bro.\n");
-		THROW();
+		cli_throw();
 	}
 
 	channel = strtol(argv[1], NULL, 10);
 	if (channel < 0 || channel > 0x100) {
 		printf("%s, seriously?\n", argv[1]);
-		THROW();
+		cli_throw();
 	}
 
 	printf("Sending: NABU_MSG_CHANGE_CHANNEL.\n");
@@ -579,7 +573,7 @@ rn_parse_slot(const char *cp)
 	long val = strtol(cp, NULL, 0);
 	if (val < 0 || val > 255) {
 		printf("'%s' invalid; must be between 0 - 255\n", cp);
-		THROW();
+		cli_throw();
 	}
 	return (uint8_t)val;
 }
@@ -590,7 +584,7 @@ rn_parse_offset(const char *cp)
 	long val = strtol(cp, NULL, 0);
 	if (val < 0 || val > 0xffffffff) {
 		printf("'%s' invalid offset\n", cp);
-		THROW();
+		cli_throw();
 	}
 	return (uint32_t)val;
 }
@@ -601,7 +595,7 @@ rn_parse_length(const char *cp)
 	long val = strtol(cp, NULL, 0);
 	if (val < 0 || val > 0xffff) {
 		printf("'%s' invalid length\n", cp);
-		THROW();
+		cli_throw();
 	}
 	return (uint16_t)val;
 }
@@ -615,12 +609,12 @@ command_rn_file_open(int argc, char *argv[])
 
 	if (argc < 3) {
 		printf("Args, bro.\n");
-		THROW();
+		cli_throw();
 	}
 
 	if (strlen(argv[1]) > 255) {
 		printf("File name too long: %s\n", argv[1]);
-		THROW();
+		cli_throw();
 	}
 	namelen = strlen(argv[1]);
 
@@ -631,7 +625,7 @@ command_rn_file_open(int argc, char *argv[])
 	} else {
 		printf("'%s' invalid; must be 'ro' or 'rw'\n",
 		    argv[2]);
-		THROW();
+		cli_throw();
 	}
 
 	if (argc > 3) {
@@ -666,7 +660,7 @@ command_rn_fh_size(int argc, char *argv[])
 
 	if (argc != 2) {
 		printf("Args, bro.\n");
-		THROW();
+		cli_throw();
 	}
 
 	slot = rn_parse_slot(argv[1]);
@@ -693,7 +687,7 @@ command_rn_fh_read(int argc, char *argv[])
 
 	if (argc < 4) {
 		printf("Args, bro.\n");
-		THROW();
+		cli_throw();
 	}
 
 	msg[0] = rn_parse_slot(argv[1]);
@@ -715,7 +709,7 @@ command_rn_fh_read(int argc, char *argv[])
 		FILE *fp = fopen(argv[4], "wb");
 		if (fp == NULL) {
 			printf("Can't open '%s' for saving data.\n", argv[4]);
-			THROW();
+			cli_throw();
 		}
 		printf("Writing data to '%s'.\n", argv[4]);
 		fwrite(buf, length, 1, fp);
@@ -732,7 +726,7 @@ command_rn_fh_close(int argc, char *argv[])
 
 	if (argc != 2) {
 		printf("Args, bro.\n");
-		THROW();
+		cli_throw();
 	}
 
 	slot = rn_parse_slot(argv[1]);
@@ -748,10 +742,14 @@ command_rn_fh_close(int argc, char *argv[])
 
 static bool	command_help(int, char *[]);
 
-static const struct cmdtab {
-	const char	*name;
-	bool		(*func)(int, char *[]);
-} cmdtab[] = {
+static bool
+command_unknown(int argc, char *argv[])
+{
+	printf("Unknown command: %s.  Try 'help'.\n", argv[0]);
+	return false;
+}
+
+static const struct cmdtab cmdtab[] = {
 	{ .name = "exit",		.func = command_exit },
 	{ .name = "quit",		.func = command_exit },
 
@@ -771,7 +769,7 @@ static const struct cmdtab {
 	{ .name = "fh-read",		.func = command_rn_fh_read },
 	{ .name = "fh-close",		.func = command_rn_fh_close },
 
-	{ .name = NULL }
+	{ .name = NULL,			.func = command_unknown }
 };
 
 static bool
@@ -786,68 +784,10 @@ command_help(int argc, char *argv[])
 	return false;
 }
 
-static bool
-commands(void)
-{
-	const struct cmdtab *cmd;
-	char *line = NULL, *cp, *tok;
-	size_t zero;
-	ssize_t linelen;
-	char *argv[MAXARGV];
-	int argc;
-	bool all_done;
-
-	for (all_done = false;;) {
-		nextline:
-		if (line != NULL) {
-			free(line);
-			line = NULL;
-		}
-		if (all_done) {
-			return false;
-		}
-		fprintf(stdout, "nabu> ");
-		fflush(stdout);
-		zero = 0;
-		linelen = getline(&line, &zero, stdin);
-		if (linelen < 0) {
-			return true;		/* got EOF */
-		}
-		line[linelen - 1] = '\0';	/* get rid of the newline */
-
-		/* Break it into tokens. */
-		argc = 0;
-		cp = line;
-		while ((tok = strtok(cp, " \t")) != NULL) {
-			cp = NULL;
-			if (argc == MAXARGV) {
-				command_help(argc, argv);
-				goto nextline;	/* double-break, sigh */
-			}
-			argv[argc++] = tok;
-		}
-
-		for (cmd = cmdtab; cmd->name != NULL; cmd++) {
-			if (strcmp(argv[0], cmd->name) == 0) {
-				break;
-			}
-		}
-		if (cmd->name == NULL) {
-			printf("Unknown command: %s.  Try 'help'.\n", argv[0]);
-		} else {
-			if (setjmp(except_env)) {
-				all_done = false;
-			} else {
-				all_done = (*cmd->func)(argc, argv);
-			}
-		}
-	}
-}
-
 static void
 handle_exitsig(int signo)
 {
-	QUIT();
+	cli_quit();
 }
 
 static void __attribute__((__noreturn__))
@@ -927,18 +867,8 @@ main(int argc, char *argv[])
 		    "Unable to establish a connecting, giving up.");
 	}
 
-	if (setjmp(quit_env)) {
-		goto quit;
-	}
-
-	/* handle_exitsig() is now safe. */
-	(void) signal(SIGINT, handle_exitsig);
-
 	/* Enter the command loop. */
-	if (commands()) {
-		quit:
-		printf("Quit!\n");
-	}
+	cli_commands(getprogname(), cmdtab, NULL, NULL);
 
 	printf("Thanks for visiting the land of NABU!\n");
 	exit(0);

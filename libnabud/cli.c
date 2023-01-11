@@ -1,0 +1,171 @@
+/*-
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
+ * All rights reserved.
+ *      
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met: 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *                      
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.         
+ */             
+
+/*
+ * Command line tool helper functions.
+ */
+
+#include <assert.h>
+#include <setjmp.h>
+#include <stdbool.h>
+#include <signal.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "cli.h"
+
+#define	MAXARGV		8
+
+static jmp_buf		cli_quit_env;
+static jmp_buf		cli_except_env;
+
+/*
+ * cli_quit --
+ *	Throw a "quit" exception.
+ */
+void
+cli_quit(void)
+{
+	longjmp(cli_quit_env, 1);
+}
+
+/*
+ * cli_throw --
+ *	Throw a general exception that puts us back into the
+ *	main command loop.
+ */
+void
+cli_throw(void)
+{
+	longjmp(cli_except_env, 1);
+}
+
+/*
+ * cli_handle_exitsig --
+ *	Signal handler for signals-that-cause-exit.
+ */
+static void
+cli_handle_exitsig(int signo)
+{
+	CLI_QUIT();
+}
+
+/*
+ * cli_cmdtab_lookup --
+ *	Lookup an entry in a command table.
+ */
+const struct cmdtab *
+cli_cmdtab_lookup(const struct cmdtab *tab, const char *name)
+{
+	const struct cmdtab *cmd;
+
+	for (cmd = tab; cmd->name != NULL; cmd++) {
+		if (strcmp(name, cmd->name) == 0) {
+			break;
+		}
+	}
+	return cmd;
+}
+
+/*
+ * cli_commands --
+ *	CLI command loop.
+ */
+void
+cli_commands(const char *prompt, const struct cmdtab *cmdtab,
+    bool (*prepfunc)(void *), void *ctx)
+{
+	const struct cmdtab *cmd;
+	char *line = NULL, *cp, *tok;
+	size_t zero;
+	ssize_t linelen;
+	char *argv[MAXARGV];
+	int argc;
+	bool all_done;
+
+	if (setjmp(cli_quit_env)) {
+		goto quit;
+	}
+
+	/* cli_handle_exitsig() is now safe. */
+	(void) signal(SIGINT, cli_handle_exitsig);
+
+	/*
+	 * Now that the command processing environment is set up,
+	 * perform any setup needed before we actually process
+	 * commands.
+	 */
+	if (prepfunc != NULL && !(*prepfunc)(ctx)) {
+		/* Error already displayed. */
+		return;
+	}
+
+	for (all_done = false;;) {
+ nextline:
+		if (line != NULL) {
+			free(line);
+			line = NULL;
+		}
+		if (all_done) {
+			return;			/* quiet return */
+		}
+		fprintf(stdout, "%s> ", prompt);
+		fflush(stdout);
+		zero = 0;
+		linelen = getline(&line, &zero, stdin);
+		if (linelen < 0) {
+			goto quit;		/* got EOF */
+		}
+		line[linelen - 1] = '\0';	/* get rid of the newline */
+
+		/* Break it into tokens. */
+		argc = 0;
+		cp = line;
+		while ((tok = strtok(cp, " \t")) != NULL) {
+			cp = NULL;
+			if (argc == MAXARGV) {
+				command_help(argc, argv);
+				goto nextline;	/* double-break, sigh */
+			}
+			argv[argc++] = tok;
+		}
+
+		cmd = cmdtab_lookup(cmdtab, argv[0]);
+		assert(cmd != NULL);
+
+		if (setjmp(cli_except_env)) {
+			all_done = false;
+		} else {
+			all_done = (*cmd->func)(argc, argv);
+		}
+	}
+
+ quit:
+	printf("Quit!\n");
+}
