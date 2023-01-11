@@ -44,6 +44,7 @@
 
 static jmp_buf		cli_quit_env;
 static jmp_buf		cli_except_env;
+static bool		cli_except_env_use;
 
 /*
  * cli_quit --
@@ -63,7 +64,11 @@ cli_quit(void)
 void
 cli_throw(void)
 {
-	longjmp(cli_except_env, 1);
+	if (cli_except_env_use) {
+		longjmp(cli_except_env, 1);
+	} else {
+		abort();
+	}
 }
 
 /*
@@ -199,11 +204,13 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 		cmd = cmdtab_lookup(cmdtab, argv[0]);
 		assert(cmd != NULL);
 
+		cli_except_env_use = true;
 		if (setjmp(cli_except_env)) {
 			all_done = false;
 		} else {
 			all_done = (*cmd->func)(argc, argv);
 		}
+		cli_except_env_use = false;
 	}
 
  quit:
