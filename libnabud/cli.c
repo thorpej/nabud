@@ -73,7 +73,7 @@ cli_throw(void)
 static void
 cli_handle_exitsig(int signo)
 {
-	CLI_QUIT();
+	cli_quit();
 }
 
 /*
