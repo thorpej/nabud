@@ -556,14 +556,13 @@ conn_get_selected_file(struct nabu_connection *conn)
  *	Set the selected file for the connection.
  */
 void
-conn_set_selected_file(struct nabu_connection *conn, const char *name)
+conn_set_selected_file(struct nabu_connection *conn, char *name)
 {
-	char *cp = name == NULL ? NULL : strdup(name);
 	char *oname;
 
 	pthread_mutex_lock(&conn->mutex);
 	oname = conn->l_selected_file;
-	conn->l_selected_file = cp;
+	conn->l_selected_file = name;
 	pthread_mutex_unlock(&conn->mutex);
 
 	if (oname != NULL) {

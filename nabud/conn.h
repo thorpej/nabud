@@ -106,7 +106,7 @@ struct nabu_image *conn_set_last_image_if(struct nabu_connection *,
 struct image_channel *conn_get_channel(struct nabu_connection *);
 void	conn_set_channel(struct nabu_connection *, struct image_channel *);
 char	*conn_get_selected_file(struct nabu_connection *);
-void	conn_set_selected_file(struct nabu_connection *, const char *);
+void	conn_set_selected_file(struct nabu_connection *, char *);
 
 #define	conn_name(c)		conn_io_name(&(c)->io)
 #define	conn_state(c)		conn_io_state(&(c)->io)
