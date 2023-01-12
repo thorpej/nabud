@@ -58,7 +58,7 @@ struct nabuctl_atom_header {
 };
 
 #define	NABUCTL_DONE			0
-#define	NABUCTL_ERROR			0xffffffffU
+#define	NABUCTL_ERROR			0x00ffffffU
 
 #define	NABUCTL_TYPE(x)		((x) & (0xffU << 24))
 #define	NABUCTL_TYPE_VOID	(0U << 24) /* length must be zero */
