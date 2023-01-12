@@ -50,6 +50,7 @@ uint32_t	atom_tag(struct atom *);
 size_t		atom_length(struct atom *);
 void *		atom_consume(struct atom *);
 void *		atom_dataref(struct atom *);
+uint64_t	atom_number_value(struct atom *);
 
 const char *	atom_typedesc(uint32_t);
 const char *	atom_objdesc(uint32_t);

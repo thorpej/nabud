@@ -156,6 +156,21 @@ atom_dataref(struct atom *atom)
 }
 
 /*
+ * atom_number_value --
+ *	Return the value for a number atom.
+ */
+uint64_t
+atom_number_value(struct atom *atom)
+{
+	long long val;
+
+	assert(NABUCTL_TYPE(atom->hdr.tag) == NABUCTL_TYPE_NUMBER);
+
+	val = strtoll(atom->data, NULL, 0);
+	return (uint64_t)val;
+}
+
+/*
  * atom_send_hdr --
  *	Send the atom header.
  */
@@ -488,6 +503,11 @@ atom_list_recv(struct conn_io *conn, struct atom_list *list)
 			    conn_io_name(conn), atom_objdesc(objtype));
 			objtype = 0;
 			break;
+
+		case NABUCTL_ERROR:
+			log_debug("[%s] Received error atom.",
+			    conn_io_name(conn));
+			return true;
 
 		case NABUCTL_OBJ_CHANNEL:
 		case NABUCTL_OBJ_CONNECTION:
