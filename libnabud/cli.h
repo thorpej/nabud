@@ -43,10 +43,10 @@ struct cmdtab {
 				  .suppress_in_help = true }
 
 const struct cmdtab *cli_cmdtab_lookup(const struct cmdtab *, const char *);
-bool	cli_commands(const char *, const struct cmdtab *,
+void	cli_commands(const char *, const struct cmdtab *,
 	    bool (*)(void *), void *);
-void	cli_throw(void);
-void	cli_quit(void);
+void	cli_throw(void) __attribute__((__noreturn__));
+void	cli_quit(void) __attribute__((__noreturn__));
 
 bool	cli_help(const struct cmdtab *);
 bool	cli_help_list(const struct cmdtab *);

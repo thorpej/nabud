@@ -195,13 +195,13 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 		while ((tok = strtok(cp, " \t")) != NULL) {
 			cp = NULL;
 			if (argc == MAXARGV) {
-				command_help(argc, argv);
+				printf("Too many command arguments.\n");
 				goto nextline;	/* double-break, sigh */
 			}
 			argv[argc++] = tok;
 		}
 
-		cmd = cmdtab_lookup(cmdtab, argv[0]);
+		cmd = cli_cmdtab_lookup(cmdtab, argv[0]);
 		assert(cmd != NULL);
 
 		cli_except_env_use = true;
@@ -227,7 +227,7 @@ cli_subcommand(const struct cmdtab *tab, int argc, char *argv[], int offset)
 	const struct cmdtab *cmd;
 
 	assert(offset >= 0);
-	cmd = cmdtab_lookup(tab, argv[offset]);
+	cmd = cli_cmdtab_lookup(tab, argv[offset]);
 	assert(cmd != NULL);
 
 	return (*cmd->func)(argc, argv);

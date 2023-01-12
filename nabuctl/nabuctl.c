@@ -680,6 +680,7 @@ command_connection_usage(void)
 	printf("Usage:\n");
 	printf("\tconnection <number> channel <number>\n");
 	printf("\tconnection <number> file <number>\n");
+	return false;
 }
 
 static bool
@@ -691,8 +692,10 @@ command_connection(int argc, char *argv[])
 	}
 	if (argc < 4) {
 		printf("What would you like to do with the connection?\n");
-		return command_connection_help(argc, argv);
+		return command_connection_usage();
 	}
+
+	return false;
 }
 
 static bool	command_help(int, char *[]);
@@ -803,7 +806,7 @@ main(int argc, char *argv[])
 	}
 
 	/* Enter the command loop. */
-	cli_commands(getprogname(), cmdtab, nabuctl_cliprep, NULL));
+	cli_commands(getprogname(), cmdtab, nabuctl_cliprep, NULL);
 
 	printf("Thanks for visiting the land of NABU!\n");
 	exit(0);
