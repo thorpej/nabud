@@ -201,6 +201,9 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 			argv[argc++] = tok;
 		}
 
+		if (argc == 0) {
+			continue;
+		}
 		cmd = cli_cmdtab_lookup(cmdtab, argv[0]);
 		assert(cmd != NULL);
 
