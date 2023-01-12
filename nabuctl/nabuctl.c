@@ -81,6 +81,22 @@ number_display_width(unsigned int number)
 	return 1;
 }
 
+static bool
+parse_number(const char *arg, const char *what,
+    long lower, long upper, long *valp)
+{
+	long val;
+
+	val = strtol(arg, NULL, 10);
+	if (val < lower || val > upper) {
+		printf("Invalid %s: '%s'; must be between %ld - %ld\n",
+		    what, arg, lower, upper);
+		return false;
+	}
+	*valp = val;
+	return true;
+}
+
 /*****************************************************************************
  * SERVER COMMUNICATION STUFF
  *****************************************************************************/
@@ -167,6 +183,22 @@ say_hello(void)
 	}
  out:
 	rr_done(&rr);
+}
+
+/*****************************************************************************
+ * FILE STUFF
+ *****************************************************************************/
+
+static int file_count = 0;
+
+static bool
+file_parse(const char *arg, uint32_t *connp)
+{
+	if (file_count < 1) {
+		printf("No files.\n");
+		return false;
+	}
+	return false;
 }
 
 /*****************************************************************************
@@ -272,6 +304,19 @@ channel_list_enumerate(bool (*func)(struct channel_desc *, void *), void *ctx)
 			break;
 		}
 	}
+}
+
+static struct channel_desc *
+channel_lookup(unsigned int number)
+{
+	struct channel_desc *chan;
+
+	TAILQ_FOREACH(chan, &channel_list, link) {
+		if (chan->number == number) {
+			return chan;
+		}
+	}
+	return NULL;
 }
 
 static struct atom *
@@ -393,6 +438,33 @@ channel_list_fetch(void)
 	rr_done(&rr);
 }
 
+static bool
+channel_parse(const char *arg, uint32_t *chanp)
+{
+	struct channel_desc *chan;
+	long val;
+
+	if (TAILQ_FIRST(&channel_list) == NULL) {
+		printf("No channels.\n");
+		return false;
+	}
+
+	if (! parse_number(arg, "channel", 1, 255, &val)) {
+		/* Error already reported. */
+		return false;
+	}
+
+	TAILQ_FOREACH(chan, &channel_list, link) {
+		if (chan->number == (unsigned int)val) {
+			*chanp = chan->number;
+			return true;
+		}
+	}
+
+	printf("Unknown channel: %ld\n", val);
+	return false;
+}
+
 /*****************************************************************************
  * CONNECTION STUFF
  *****************************************************************************/
@@ -472,6 +544,19 @@ connection_list_enumerate(bool (*func)(struct connection_desc *, void *),
 			break;
 		}
 	}
+}
+
+static struct connection_desc *
+connection_lookup(unsigned int number)
+{
+	struct connection_desc *conn;
+
+	TAILQ_FOREACH(conn, &connection_list, link) {
+		if (conn->number == number) {
+			return conn;
+		}
+	}
+	return NULL;
 }
 
 static struct atom *
@@ -582,17 +667,47 @@ connection_list_fetch(void)
 	rr_done(&rr);
 }
 
+static bool
+connection_parse(const char *arg, uint32_t *connp)
+{
+	long val;
+
+	if (connection_count < 1) {
+		printf("No connections.\n");
+		return false;
+	}
+
+	if (! parse_number(arg, "connection", 1, connection_count, &val)) {
+		/* Error already reported. */
+		return false;
+	}
+
+	*connp = (uint32_t)val;
+	return true;
+}
+
+static void
+connection_change_channel(uint32_t connection, uint32_t channel)
+{
+	struct connection_desc *conn = connection_lookup(connection);
+	assert(conn != NULL);
+
+	struct channel_desc *chan = channel_lookup(channel);
+	assert(chan != NULL);
+
+	printf("%s: Selecting channel '%s' on %s.\n",
+	    conn->name, chan->name, chan->source);
+}
+
+static void
+connection_select_file(uint32_t conn, uint32_t chan)
+{
+	printf("SELECT FILE: %u %u\n", conn, chan);
+}
+
 /*****************************************************************************
  * COMMAND STUFF
  *****************************************************************************/
-
-static bool
-command_verb_noun_unknown(int argc, char *argv[])
-{
-	printf("Don't know how to %s '%s'.  Try '%s ?'.\n",
-	    argv[0], argv[1], argv[0]);
-	return false;
-}
 
 static bool
 command_exit(int argc, char *argv[])
@@ -644,38 +759,65 @@ command_list_connections(int argc, char *argv[])
 	return false;
 }
 
-static bool	command_list_help(int argc, char *argv[]);
+static bool
+command_list_usage(int argc, char *argv[])
+{
+	printf("Usage:\n");
+	printf("\tlist channels\n");
+	printf("\tlist connections\n");
+	return false;
+}
 
 static const struct cmdtab list_cmdtab[] = {
 	{ .name = "channels",		.func = command_list_channels },
 	{ .name = "connections",	.func = command_list_connections },
 
-	{ .name = "help",		.func = command_list_help,
-					.suppress_in_help = true },
-	{ .name = "?",			.func = command_list_help,
-					.suppress_in_help = true },
-
-	CMDTAB_EOL(command_verb_noun_unknown)
+	CMDTAB_EOL(command_list_usage)
 };
-
-static bool
-command_list_help(int argc, char *argv[])
-{
-	return cli_help_list(list_cmdtab);
-}
 
 static bool
 command_list(int argc, char *argv[])
 {
 	if (argc < 2) {
-		printf("What would you like to list?\n");
-		return command_list_help(argc, argv);
+		return command_list_usage(argc, argv);
 	}
 	return cli_subcommand(list_cmdtab, argc, argv, 1);
 }
 
 static bool
-command_connection_usage(void)
+command_connection_channel(int argc, char *argv[])
+{
+	uint32_t conn, chan;
+
+	assert(argc >= 4);
+
+	if (! connection_parse(argv[1], &conn) ||
+	    ! channel_parse(argv[3], &chan)) {
+		/* Error already reported. */
+		return false;
+	}
+	connection_change_channel(conn, chan);
+	return false;
+}
+
+static bool
+command_connection_file(int argc, char *argv[])
+{
+	uint32_t conn, fileno;
+
+	assert(argc >= 4);
+
+	if (! connection_parse(argv[2], &conn) ||
+	    ! file_parse(argv[3], &fileno)) {
+		/* Error already reported. */
+		return false;
+	}
+	connection_select_file(conn, fileno);
+	return false;
+}
+
+static bool
+command_connection_usage(int argc, char *argv[])
 {
 	printf("Usage:\n");
 	printf("\tconnection <number> channel <number>\n");
@@ -683,19 +825,20 @@ command_connection_usage(void)
 	return false;
 }
 
+static const struct cmdtab connection_cmdtab[] = {
+	{ .name = "channel",		.func = command_connection_channel },
+	{ .name = "file",		.func = command_connection_file },
+
+	CMDTAB_EOL(command_connection_usage)
+};
+
 static bool
 command_connection(int argc, char *argv[])
 {
-	if (argc < 2) {
-		printf("No connection number specified.\n");
-		return command_connection_usage();
-	}
 	if (argc < 4) {
-		printf("What would you like to do with the connection?\n");
-		return command_connection_usage();
+		return command_connection_usage(argc, argv);
 	}
-
-	return false;
+	return cli_subcommand(connection_cmdtab, argc, argv, 2);
 }
 
 static bool	command_help(int, char *[]);
