@@ -587,6 +587,14 @@ connection_list_fetch(void)
  *****************************************************************************/
 
 static bool
+command_verb_noun_unknown(int argc, char *argv[])
+{
+	printf("Don't know how to %s '%s'.  Try '%s ?'.\n",
+	    argv[0], argv[1], argv[0]);
+	return false;
+}
+
+static bool
 command_exit(int argc, char *argv[])
 {
 	return true;			/* EOF! */
@@ -636,30 +644,55 @@ command_list_connections(int argc, char *argv[])
 	return false;
 }
 
-static bool
-command_verb_noun_unknown(int argc, char *argv[])
-{
-	printf("Don't know how to %s '%s'.  Try '%s ?'.\n",
-	    argv[0], argv[1], argv[0]);
-	return false;
-}
+static bool	command_list_help(int argc, char *argv[]);
 
 static const struct cmdtab list_cmdtab[] = {
 	{ .name = "channels",		.func = command_list_channels },
 	{ .name = "connections",	.func = command_list_connections },
 
-	{ .name = "help",		.func = command_help,
+	{ .name = "help",		.func = command_list_help,
 					.suppress_in_help = true },
-	{ .name = "?",			.func = command_help,
+	{ .name = "?",			.func = command_list_help,
 					.suppress_in_help = true },
 
 	CMDTAB_EOL(command_verb_noun_unknown)
 };
 
 static bool
+command_list_help(int argc, char *argv[])
+{
+	return cli_help_list(list_cmdtab);
+}
+
+static bool
 command_list(int argc, char *argv[])
 {
+	if (argc < 2) {
+		printf("What would you like to list?\n");
+		return command_list_help(argc, argv);
+	}
 	return cli_subcommand(list_cmdtab, argc, argv, 1);
+}
+
+static bool
+command_connection_usage(void)
+{
+	printf("Usage:\n");
+	printf("\tconnection <number> channel <number>\n");
+	printf("\tconnection <number> file <number>\n");
+}
+
+static bool
+command_connection(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("No connection number specified.\n");
+		return command_connection_usage();
+	}
+	if (argc < 4) {
+		printf("What would you like to do with the connection?\n");
+		return command_connection_help(argc, argv);
+	}
 }
 
 static bool	command_help(int, char *[]);
@@ -670,6 +703,10 @@ static const struct cmdtab cmdtab[] = {
 
 	{ .name = "help",		.func = command_help },
 	{ .name = "?",			.func = command_help },
+
+	{ .name = "connection",		.func = command_connection },
+	{ .name = "conn",		.func = command_connection,
+					.suppress_in_help = true },
 
 	{ .name = "list",		.func = command_list },
 
