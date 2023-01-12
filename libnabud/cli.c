@@ -88,14 +88,28 @@ cli_handle_exitsig(int signo)
 const struct cmdtab *
 cli_cmdtab_lookup(const struct cmdtab *tab, const char *name)
 {
-	const struct cmdtab *cmd;
+	const struct cmdtab *cmd, *first_match = NULL;
+	size_t namelen = strlen(name);
+	size_t cmdlen;
+	bool collision = false;
 
 	for (cmd = tab; cmd->name != NULL; cmd++) {
-		if (strcmp(name, cmd->name) == 0) {
-			break;
+		cmdlen = strlen(cmd->name);
+		if (namelen > cmdlen) {
+			continue;
+		}
+		if (cmdlen == namelen && strcmp(name, cmd->name) == 0) {
+			return cmd;
+		}
+		if (strncmp(name, cmd->name, namelen) == 0) {
+			if (first_match == NULL) {
+				first_match = cmd;
+			} else {
+				collision = true;
+			}
 		}
 	}
-	return cmd;
+	return (first_match == NULL || collision) ? cmd : first_match;
 }
 
 /*
