@@ -74,6 +74,7 @@ void	image_add_source(char *, char *);
 void	image_add_channel(image_channel_type, char *, char *, const char *,
 	    char *, char *, unsigned int);
 
+struct image_channel *image_channel_lookup(unsigned int);
 bool	image_channel_enumerate(bool (*)(struct image_channel *, void *),
 				void *);
 

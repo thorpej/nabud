@@ -179,7 +179,7 @@ image_add_source(char *name, char *root)
  * image_channel_lookup --
  *	Look up an image channel by number.
  */
-static struct image_channel *
+struct image_channel *
 image_channel_lookup(unsigned int number)
 {
 	struct image_channel *chan;
