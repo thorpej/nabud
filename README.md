@@ -22,13 +22,9 @@ and _daemon(3)_.
 * Serve your own or others' homebrew NABU binaries (_nabu_ files).
 * High-performance; nabud implements a content cache to optimize common access patterns and avoid redundant I/O.
 * Small footprint; it can run on small machines. The only thing it throws memory at is the content cache.
-
-The NabuRetroNet _HomeBrew_ channel does not currently work with nabud.  This is because
-the NABU always requests image 000001 when it boots, and DJ's Internet adapter application
-presents a drop-down menu to select the image to be vended when 000001 is requested.  I plan
-to introduce an interactive command-line tool that will allow nabud users to dynamically
-select an image from the list and pin it to the connection, as well as allow for the connection's
-channel to be changed dynamically without having to edit the config file or restart nabud.
+* A control program, nabuctl, that allows a user to easily change the channel used by a NABU
+connection, select programs to load from homebrew channels (that vend ".nabu" files), view listings provided
+by such channels, etc.
 
 ## Configuration
 
@@ -91,13 +87,15 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
       ],
       "Channels": [
         {
-          "Name": "cycle1",
+          "Name": "NABU Network 1984 Cycle v1",
+          "Path": "cycle1",
           "Number": 1,
           "Type": "pak",
           "Source": "NabuRetroNet"
         },
         {
-          "Name": "cycle2",
+          "Name": "NABU Network 1984 Cycle v2",
+          "Path": "cycle2",
           "Number": 2,
           "Type": "pak",
           "Source": "NabuRetroNet",
@@ -105,6 +103,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
         {
           "Name": "HomeBrew",
           "Path": "HomeBrew/titles",
+          "ListURL": "https://cloud.nabu.ca/HomeBrew/titles/files.txt",
           "Number": 3,
           "Type": "nabu",
           "Source": "NabuRetroNet",
@@ -142,6 +141,16 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "tcp",
           "Port": "5003",
           "Channel": 3,
+        },
+        {
+          "Type": "tcp",
+          "Port": "5011",
+          "Channel": 11,
+        },
+        {
+          "Type": "tcp",
+          "Port": "5012",
+          "Channel": 12,
         }
       ]
     }
@@ -225,29 +234,87 @@ nabud understands the following command line options:
 * _-l logfile_ -- specifies the path to a log file.  Without this option, nabud will log to the system log using _syslog(3)_
 using the _LOG_USER_ facility.  Note that when running in the foreground, log messages are always sent to the
 controlling terminal.
+* _-u user_ -- Specifies the user that nabud should run as.
+* _-U umask_ -- Specifies the file creation mask that nabud should use when creating files.
 
 In addition to errors, nabud logs some basic information about the requests it servies.  Here is a system log snippet
 showing the messages you will typically see:
 
-    Dec 30 12:07:13 the-ripe-vessel nabud[6179]: INFO: main: Welcome to NABU! I'm version 0.5 of your host, nabud.
-    Dec 30 12:07:13 the-ripe-vessel nabud[6179]: INFO: image_add_local_source: Adding Local source KTNet at /home/nabu
-    Dec 30 12:07:13 the-ripe-vessel nabud[6179]: INFO: image_add_channel: Adding pak channel 1 (cycle1 on KTNet) at /home/nabu/cycle1
-    Dec 30 12:07:13 the-ripe-vessel nabud[6179]: INFO: image_add_channel: Adding nabu channel 2 (homebrew on KTNet) at /home/nabu/homebrew
-    Dec 30 12:07:13 the-ripe-vessel nabud[6179]: INFO: conn_add_serial: Creating Serial connection on /dev/tty-uftdi-A10MHWD6-0.
-    Dec 30 12:07:13 the-ripe-vessel nabud[6179]: INFO: image_channel_select: [/dev/tty-uftdi-A10MHWD6-0] Selected channel 1 (cycle1 on KTNet).
-    Dec 30 12:07:13 the-ripe-vessel nabud[6179]: INFO: adaptor_event_loop: [/dev/tty-uftdi-A10MHWD6-0] Connection starting.
-    Dec 30 12:07:15 the-ripe-vessel nabud[6179]: INFO: image_cache_insert: Cached pak-000001 on Channel 1; total cache size: 54336
-    Dec 30 12:07:15 the-ripe-vessel nabud[6179]: INFO: image_use: [/dev/tty-uftdi-A10MHWD6-0] Using image pak-000001 from Channel 1.
-    Dec 30 12:07:22 the-ripe-vessel nabud[6179]: INFO: image_done: [/dev/tty-uftdi-A10MHWD6-0] Done with image pak-000001.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: main: Welcome to NABU! I'm version 0.8 of your host, nabud.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: main: Running as UID 2000, file creation mask 002
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: control_init: Creating control channel at /tmp/nabuctl.sock
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_source: Adding Source Local at /home/nabu
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_source: Adding Source NabuRetroNet at https://cloud.nabu.ca
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding pak channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet) at https://cloud.nabu.ca/cycle1
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding pak channel 2 (NABU Network 1984 Cycle v2 on NabuRetroNet) at https://cloud.nabu.ca/cycle2
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding nabu channel 3 (HomeBrew on NabuRetroNet) at https://cloud.nabu.ca/HomeBrew/titles
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Channel 3 has a listing at: https://cloud.nabu.ca/HomeBrew/titles/files.txt
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding pak channel 11 (cycle1 on Local) at /home/nabu/cycle1
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding nabu channel 12 (homebrew on Local) at /home/nabu/homebrew
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_serial: Creating Serial connection on /dev/tty-uftdi-A10MHWD6-0.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [/dev/tty-uftdi-A10MHWD6-0] Selected channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5001.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5001] Selected channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5001] Selected channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: adaptor_event_loop: [/dev/tty-uftdi-A10MHWD6-0] Connection starting.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5002.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5002] Selected channel 2 (NABU Network 1984 Cycle v2 on NabuRetroNet).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5002] Selected channel 2 (NABU Network 1984 Cycle v2 on NabuRetroNet).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5003.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5003] Selected channel 3 (HomeBrew on NabuRetroNet).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5003] Selected channel 3 (HomeBrew on NabuRetroNet).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5011.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5011] Selected channel 11 (cycle1 on Local).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5011] Selected channel 11 (cycle1 on Local).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5012.
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5012] Selected channel 12 (homebrew on Local).
+    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5012] Selected channel 12 (homebrew on Local).
+
+It is recommended that you run nabud as a minimally-privileged user using the _-u user_ option.  Typically, you would do this by
+following these steps:
+1. Create a group that will be able to modify any files created by nabud, for example _nabu_.
+2. Create a user specifically for running nabud, for example _nabu_.  Set the default group ID
+of that user to the group created in step 1.
+3. Select a group that will be used to grant permission to open serial ports for NABU connections.
+Historitcally, a _dialer_ group exists on some Unix systems for this purpose.  Create one, if necessary.
+4. Add the user created in step 2 to the group you selected in step 3.
+5. Ensure your serial port devices grant read/write permission to the group selected in step 3.
+6. Optionally use the _-U umask_ argument to alter the default file creation mask so that users
+in the group created in step 1 can both read and write any files created by nabud.
+
+For example, on my NetBSD system, I have the following user and group configuration for nabud:
+
+    % grep nabu /etc/group
+    dialer:*:117:nabu
+    nabu:*:2000:thorpej
+    
+    % grep nabu /etc/passwd
+    nabu:*:2000:2000:NABU User:/nonexistent:/sbin/nologin
+    
+    % ls -l /dev/ttyU*
+    0 crw-rw----  1 uucp  dialer  66, 0 Dec 31 14:15 /dev/ttyU0
+    0 crw-rw----  1 uucp  dialer  66, 1 May 19  2021 /dev/ttyU1
+    0 crw-rw----  1 uucp  dialer  66, 2 May 19  2021 /dev/ttyU2
+    0 crw-rw----  1 uucp  dialer  66, 3 May 19  2021 /dev/ttyU3
+    0 crw-rw----  1 uucp  dialer  66, 4 May 19  2021 /dev/ttyU4
+    0 crw-rw----  1 uucp  dialer  66, 5 May 19  2021 /dev/ttyU5
+    0 crw-rw----  1 uucp  dialer  66, 6 May 19  2021 /dev/ttyU6
+    0 crw-rw----  1 uucp  dialer  66, 7 May 19  2021 /dev/ttyU7
+    
+    # ./nabud -u nabu -U 002
 
 ## Changes
 
 ### nabud-0.8 (in development on main branch)
-* Support for the NabuRetroNet blob store extensions to the Adaptor protocol.  These extensions
+* Experimental for the NabuRetroNet blob store extensions to the Adaptor protocol.  These extensions
 allow programs running on the NABU to access up to 256 "slots" of cloud storage that are cached
 in the server.  This opens up a lot of exciting opportunities for things like downloadable game
-levels, music tracks, etc.
+levels, music tracks, etc.  This work is currently unfinished, and is provided only as a preview.
 * nabud now builds on Linux (built and tested on Ubuntu 22.04 LTS).
+* Added _-u user_ and _-U umask_ options for easily running nabud as a minimally-privileged user.
+* Added nabuctl, a program for sending control messages to nabud.  This allows you to easily change
+the channel used by individual NABU connections, and list and select programs to run from the
+NabuRetroNet _HomeBrew_ channel.
 
 ### nabud-0.7.1
 * Fix a compiler warning that was happening with some versions of Xcode on macOS.
@@ -285,8 +352,7 @@ even while being bombarded with requests for information.
 
 I also want to acknowledge some people whose code I have borrowed or used as a reference for this project:
 * Nick Daniels' [NabuNetworkEmulator](https://github.com/GryBsh/NabuNetworkEmulator) served as a reference
-for the NABU Adaptor protocol.  The _nabu_proto.h_ file was derived directly from his work, and the file
-_adaptor.c_ was partially derived from his work.
+for the NABU Adaptor protocol.  The files _nabu_proto.h_ and _adaptor.c_ was partially derived from his work.
 * David Kuder's [nabu-tftp](https://github.com/dkgrizzly/nabu-tftp) gateway for the Raspberry Pi Pico
 also served to clarify some bits of the Adaptor protocol.
 * Alistair Crooks' "Minimal JSON" (_libmj_) was used to build the configuraiton file parser.
