@@ -1,3 +1,4 @@
 ACLOCAL_AMFLAGS		= -I m4
 
-SUBDIRS			= libfetch libmj libnabud nabud nabuclient nabuctl
+SUBDIRS			= examples libfetch libmj libnabud nabud nabuclient \
+			  nabuctl

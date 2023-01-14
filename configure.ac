@@ -150,6 +150,7 @@ AC_CHECK_FUNCS(getprogname)
 #
 AC_CONFIG_FILES([
 	Makefile
+	examples/Makefile
 	libfetch/Makefile
 	libmj/Makefile
 	libnabud/Makefile
