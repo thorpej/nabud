@@ -416,7 +416,7 @@ And you can select a file to loaded wnen the NABU boots and requests image 00000
 
 ## Changes
 
-### nabud-0.8 (in development on main branch)
+### nabud-0.8
 * Experimental for the NabuRetroNet blob store extensions to the Adaptor protocol.  These extensions
 allow programs running on the NABU to access up to 256 "slots" of cloud storage that are cached
 in the server.  This opens up a lot of exciting opportunities for things like downloadable game
