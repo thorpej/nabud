@@ -32,8 +32,12 @@
 #include "config.h"
 #endif
 
+#include <sys/stat.h>
+#include <err.h>
 #include <errno.h>
+#include <grp.h>
 #include <pthread.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -58,6 +62,7 @@
 #define	VALID_ATOM(a, t)	((a) != NULL && (a)->type == (t))
 
 static bool	foreground;
+mode_t		nabud_umask;
 
 static void
 config_error(const char *preamble, mj_t *atom)
@@ -373,6 +378,8 @@ usage(void)
 	fprintf(stderr, "       -d         enable debugging (implies -f)\n");
 	fprintf(stderr, "       -f         run in the foreground\n");
 	fprintf(stderr, "       -l logfile specifies the log file\n");
+	fprintf(stderr, "       -u user    specifies user to run as\n");
+	fprintf(stderr, "       -U umask   specifies umask for file creation\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -382,11 +389,13 @@ main(int argc, char *argv[])
 	const char *nabud_conf = NABUD_CONF;
 	unsigned int logopts = 0;
 	const char *logfile = NULL;
+	const char *as_user = NULL;
+	const char *with_umask = NULL;
 	int ch;
 
 	setprogname(argv[0]);
 
-	while ((ch = getopt(argc, argv, "c:dfl:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dfl:u:U:")) != -1) {
 		switch (ch) {
 		case 'c':
 			nabud_conf = optarg;
@@ -406,6 +415,14 @@ main(int argc, char *argv[])
 			logfile = optarg;
 			break;
 
+		case 'u':
+			as_user = optarg;
+			break;
+
+		case 'U':
+			with_umask = optarg;
+			break;
+
 		default:
 			usage();
 			/* NOTREACHED */
@@ -417,6 +434,65 @@ main(int argc, char *argv[])
 	if (argc != 0) {
 		usage();
 		/* NOTREACHED */
+	}
+
+	/*
+	 * If we've been asked to run as an unprivileged user, switch
+	 * to that user now, before we attempt to create any files.
+	 */
+	if (as_user != NULL) {
+		struct passwd *pwd;
+
+		pwd = getpwnam(as_user);
+		if (pwd == NULL) {
+			errx(EXIT_FAILURE, "Unknown user: %s", as_user);
+		}
+
+		/*
+		 * If we're already the specified user, then there's nothing
+		 * to do.  Otherwise, if we're not the running as the super-
+		 * user, then we can't do what's been requested.
+		 */
+		if (getuid() != pwd->pw_uid) {
+			if (geteuid() != 0) {
+				errx(EXIT_FAILURE,
+				    "Already running as UID %d; "
+				    "cannot switch to user %s", geteuid(),
+				    as_user);
+			}
+			if (setgid(pwd->pw_gid) < 0) {
+				err(EXIT_FAILURE, "setgid(%d)", pwd->pw_gid);
+			}
+			if (initgroups(as_user, pwd->pw_gid) < 0) {
+				err(EXIT_FAILURE, "initgroups(%s, %d)",
+				    as_user, pwd->pw_gid);
+			}
+			if (setuid(pwd->pw_uid) < 0) {
+				err(EXIT_FAILURE, "setuid(%d)", pwd->pw_uid);
+			}
+		}
+	}
+
+	/*
+	 * As with above, if we've been requested to change our umask,
+	 * do it before we create any files.
+	 */
+	if (with_umask != NULL) {
+		char *endcp;
+		long val;
+
+		errno = 0;
+		val = strtol(with_umask, &endcp, 8);
+		if (errno != 0 || *endcp != '\0' ||
+		    val < 0 || val > 0777) {
+			errx(EXIT_FAILURE, "Invalid umask: %s", with_umask);
+		}
+		nabud_umask = (mode_t)val;
+		(void) umask(nabud_umask);
+	} else {
+		/* Just get the current value so we can report it. */
+		nabud_umask = umask(0);
+		(void) umask(nabud_umask);
 	}
 
 	/* Initlalize logging. */
@@ -438,6 +514,8 @@ main(int argc, char *argv[])
 
 	log_info("Welcome to NABU! I'm version %s of your host, %s.",
 	    nabud_version, getprogname());
+	log_info("Running as UID %d, file creation mask %03o",
+	    geteuid(), (int)nabud_umask);
 
 	/* Set up our control connection. */
 	control_init(NULL);
