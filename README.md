@@ -303,6 +303,117 @@ For example, on my NetBSD system, I have the following user and group configurat
     
     # ./nabud -u nabu -U 002
 
+## Controlling nabud with nabuctl
+
+A control program, nabuctl, is provided that allows you to interact with nabud to change channels,
+list connections, display channel listings, etc.  nabuctl must be run on the same system where
+nabud is running.
+
+Upon start-up, nabuctl does a handshake with the server to ensure they're the same version:
+
+    % nabuctl
+    Server version: 0.8
+    nabuctl> 
+
+There is some basic help available:
+
+    nabuctl> ?
+    Available commands:
+            exit
+            quit
+            help
+            ?
+            channel
+            connection
+            list
+            show
+    nabuctl> 
+
+You can list the channels available, as well as any current connections:
+
+    nabuctl> list channels
+    1  - NABU Network 1984 Cycle v1 (NabuRetroNet)
+    2  - NABU Network 1984 Cycle v2 (NabuRetroNet)
+    3  - HomeBrew                   (NabuRetroNet)
+    11 - cycle1                     (Local)
+    12 - homebrew                   (Local)
+    nabuctl> list connections
+    1  - Serial   [1]  /dev/tty-uftdi-A10MHWD6-0
+    2  - Listener [1]  IPv6-5001
+    3  - Listener [1]  IPv4-5001
+    4  - Listener [2]  IPv6-5002
+    5  - Listener [2]  IPv4-5002
+    6  - Listener [3]  IPv6-5003
+    7  - Listener [3]  IPv4-5003
+    8  - Listener [11] IPv6-5011
+    9  - Listener [11] IPv4-5011
+    10 - Listener [12] IPv6-5012
+    11 - Listener [12] IPv4-5012
+    nabuctl> 
+
+Additional details for channels and connections can also be viewed:
+
+    nabuctl> show channel 3
+    Channel 3:
+            Name: HomeBrew
+          Source: NabuRetroNet
+            Path: https://cloud.nabu.ca/HomeBrew/titles
+            Type: NABU
+     Listing URL: https://cloud.nabu.ca/HomeBrew/titles/files.txt
+    nabuctl> show connection 1
+    Connection 1:
+             Name: /dev/tty-uftdi-A10MHWD6-0
+             Type: Serial
+            State: OK
+          Channel: 1
+    nabuctl> 
+
+You can change channels:
+
+    nabuctl> connection 1 channel 3
+    /dev/tty-uftdi-A10MHWD6-0: Selecting channel 'HomeBrew' on NabuRetroNet.
+    nabuctl> 
+
+You can see the list of files available on a connections's channel, if that channel provides a listing:
+
+    nabuctl> connection 1 listing
+    =====> RetroNET
+    1  - RetronetChat.nabu             Chat (v2.4b)
+    2  - Telnet Client.nabu            vt100 Telnet Client (0.8b)
+    =====> Demos
+    3  - Demo - Christmas.nabu         Merry Christmas
+    4  - Demo - Bad Apple.nabu         Bad Apple!
+    5  - plasma.nabu                   Plasma
+    6  - HelloNABUBounce.nabu          Hello NABU Bounce
+    7  - Mandelbrot.nabu               Mandelbrot
+    =====> Games
+    8  - Nabutris.nabu                 Nabutris
+    9  - doom.nabu                     DOOM!
+    =====> Pictures
+    10 - pic - Leo.nabu                Leo The Great
+    11 - pic - DJ.nabu                 DJ
+    12 - pic - rambo.nabu              Rambo
+    13 - pic - alien.nabu              Alien
+    14 - pic - amazon woman.nabu       Amazon Woman
+    15 - pic - angry goblin.nabu       Angry Goblin
+    16 - pic - aquitic adventure.nabu  Aquatic Adventure
+    17 - pic - car babe.nabu           Car Babe
+    18 - pic - death.nabu              Death
+    19 - pic - Metropolis Android.nabu Metropolis Android
+    20 - pic - spider man.nabu         Spider Man
+    21 - pic - aleste game.nabu        Aleste Game Ad
+    22 - pic - dragon party.nabu       Dragon Party
+    23 - LarsPicture1.nabu             Lars Picture 1 (NSFW)
+    =====> Utilities
+    24 - ScanCodeViewer.nabu           Scan Code Viewer
+    nabuctl> 
+
+And you can select a file to loaded wnen the NABU boots and requests image 000001:
+
+    nabuctl> connection 1 file 8
+    /dev/tty-uftdi-A10MHWD6-0: Selecting file 'Nabutris.nabu'
+    nabuctl> 
+
 ## Changes
 
 ### nabud-0.8 (in development on main branch)
