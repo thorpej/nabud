@@ -213,6 +213,8 @@ struct channel_desc {
 	char		*default_file;
 	char		*type;
 	char		*source;
+	char		*listing_data;
+	size_t		listing_size;
 	unsigned int	number;
 };
 static TAILQ_HEAD(, channel_desc) channel_list =
@@ -240,6 +242,7 @@ channel_desc_free(struct channel_desc *chan)
 	FREE(chan->default_file);
 	FREE(chan->type);
 	FREE(chan->source);
+	FREE(chan->listing_data);
 	free(chan);
 }
 
@@ -465,6 +468,99 @@ channel_parse(const char *arg, uint32_t *chanp)
 	return false;
 }
 
+static void
+channel_clear_cache(uint32_t channel)
+{
+	struct req_repl rr;
+	struct atom *atom;
+
+	struct channel_desc *chan = channel_lookup(channel);
+	assert(chan != NULL);
+
+	printf("Clearing cache on '%s' (%s).\n", chan->name, chan->source);
+
+	rr_init(&rr);
+
+	if (atom_list_append_number(&rr.req_list,
+				    NABUCTL_REQ_CHAN_CLEAR_CACHE,
+				    chan->number) &&
+	    atom_list_append_done(&rr.req_list)) {
+		server_send(&rr.req_list);
+	} else {
+		rr_req_build_failed(&rr);
+		goto out;
+	}
+
+	server_recv(&rr.reply_list);
+	atom = atom_list_next(&rr.reply_list, NULL);
+	if (atom_tag(atom) == NABUCTL_ERROR) {
+		printf("*** Failed to clear cache! ***\n");
+	}
+ out:
+	rr_done(&rr);
+
+	/* If we have listing data, free it. */
+	FREE(chan->listing_data);
+	chan->listing_size = 0;
+}
+
+static void
+channel_fetch_listing(uint32_t channel)
+{
+	struct req_repl rr;
+	struct atom *atom;
+
+	struct channel_desc *chan = channel_lookup(channel);
+	assert(chan != NULL);
+
+	FREE(chan->listing_data);
+	chan->listing_size = 0;
+
+
+	if (chan->list_url == NULL) {
+ 		return;
+	}
+
+	rr_init(&rr);
+
+	if (atom_list_append_number(&rr.req_list,
+				    NABUCTL_REQ_CHAN_FETCH_LISTING,
+				    chan->number) &&
+	    atom_list_append_done(&rr.req_list)) {
+		server_send(&rr.req_list);
+	} else {
+		rr_req_build_failed(&rr);
+		goto out;
+	}
+
+	server_recv(&rr.reply_list);
+	atom = atom_list_next(&rr.reply_list, NULL);
+	if (atom_tag(atom) == NABUCTL_ERROR) {
+		printf("*** Error fetching listing! ***\n");
+	} else if (atom_tag(atom) == NABUCTL_TYPE_BLOB) {
+		chan->listing_data = atom_consume(atom);
+		chan->listing_size = atom_length(atom);
+	}
+ out:
+	rr_done(&rr);
+}
+
+static void
+channel_display_listing(uint32_t channel)
+{
+	struct channel_desc *chan = channel_lookup(channel);
+	assert(chan != NULL);
+
+	channel_fetch_listing(channel);
+
+	if (chan->listing_data == NULL) {
+		printf("Channel %u (%s on %s) has no listing.\n",
+		    chan->number, chan->name, chan->source);
+		return;
+	}
+	printf("Listing size: %zu bytes.\n", chan->listing_size);
+}
+
 /*****************************************************************************
  * CONNECTION STUFF
  *****************************************************************************/
@@ -687,8 +783,43 @@ connection_parse(const char *arg, uint32_t *connp)
 }
 
 static void
+connection_cancel(uint32_t connection)
+{
+	struct req_repl rr;
+	struct atom *atom;
+
+	struct connection_desc *conn = connection_lookup(connection);
+	assert(conn != NULL);
+
+	printf("%s: Cancelling connection.\n", conn->name);
+
+	rr_init(&rr);
+
+	if (atom_list_append_string(&rr.req_list,
+				    NABUCTL_REQ_CONN_CANCEL,
+				    conn->name) &&
+	    atom_list_append_done(&rr.req_list)) {
+		server_send(&rr.req_list);
+	} else {
+		rr_req_build_failed(&rr);
+		goto out;
+	}
+
+	server_recv(&rr.reply_list);
+	atom = atom_list_next(&rr.reply_list, NULL);
+	if (atom_tag(atom) == NABUCTL_ERROR) {
+		printf("*** Failed to cancel channel! ***\n");
+	}
+ out:
+	rr_done(&rr);
+}
+
+static void
 connection_change_channel(uint32_t connection, uint32_t channel)
 {
+	struct req_repl rr;
+	struct atom *atom;
+
 	struct connection_desc *conn = connection_lookup(connection);
 	assert(conn != NULL);
 
@@ -697,6 +828,29 @@ connection_change_channel(uint32_t connection, uint32_t channel)
 
 	printf("%s: Selecting channel '%s' on %s.\n",
 	    conn->name, chan->name, chan->source);
+
+	rr_init(&rr);
+
+	if (atom_list_append_string(&rr.req_list,
+				    NABUCTL_REQ_CONN_CHANGE_CHANNEL,
+				    conn->name) &&
+	    atom_list_append_number(&rr.req_list,
+				    NABUCTL_TYPE_NUMBER,
+				    chan->number) &&
+	    atom_list_append_done(&rr.req_list)) {
+		server_send(&rr.req_list);
+	} else {
+		rr_req_build_failed(&rr);
+		goto out;
+	}
+
+	server_recv(&rr.reply_list);
+	atom = atom_list_next(&rr.reply_list, NULL);
+	if (atom_tag(atom) == NABUCTL_ERROR) {
+		printf("*** Changing channel failed! ***\n");
+	}
+ out:
+	rr_done(&rr);
 }
 
 static void
@@ -785,11 +939,36 @@ command_list(int argc, char *argv[])
 }
 
 static bool
+command_connection_usage(int argc, char *argv[])
+{
+	printf("Usage:\n");
+	printf("\tconnection <number> cancel\n");
+	printf("\tconnection <number> channel <number>\n");
+	printf("\tconnection <number> file <number>\n");
+	return false;
+}
+
+static bool
+command_connection_cancel(int argc, char *argv[])
+{
+	uint32_t conn;
+
+	if (! connection_parse(argv[1], &conn)) {
+		/* Error already reported. */
+		return false;
+	}
+	connection_cancel(conn);
+	return false;
+}
+
+static bool
 command_connection_channel(int argc, char *argv[])
 {
 	uint32_t conn, chan;
 
-	assert(argc >= 4);
+	if (argc < 4) {
+		return command_connection_usage(argc, argv);
+	}
 
 	if (! connection_parse(argv[1], &conn) ||
 	    ! channel_parse(argv[3], &chan)) {
@@ -805,7 +984,9 @@ command_connection_file(int argc, char *argv[])
 {
 	uint32_t conn, fileno;
 
-	assert(argc >= 4);
+	if (argc < 4) {
+		return command_connection_usage(argc, argv);
+	}
 
 	if (! connection_parse(argv[2], &conn) ||
 	    ! file_parse(argv[3], &fileno)) {
@@ -817,16 +998,28 @@ command_connection_file(int argc, char *argv[])
 }
 
 static bool
-command_connection_usage(int argc, char *argv[])
+command_connection_listing(int argc, char *argv[])
 {
-	printf("Usage:\n");
-	printf("\tconnection <number> channel <number>\n");
-	printf("\tconnection <number> file <number>\n");
+	struct connection_desc *conn;
+	uint32_t connection;
+
+	if (argc < 3) {
+		return command_connection_usage(argc, argv);
+	}
+
+	if (! connection_parse(argv[1], &connection) ||
+	    (conn = connection_lookup(connection)) == NULL) {
+		/* Error already reported. */
+		return false;
+	}
+	channel_display_listing(conn->channel);
 	return false;
 }
 
 static const struct cmdtab connection_cmdtab[] = {
+	{ .name = "cancel",		.func = command_connection_cancel },
 	{ .name = "channel",		.func = command_connection_channel },
+	{ .name = "listing",		.func = command_connection_listing },
 	{ .name = "file",		.func = command_connection_file },
 
 	CMDTAB_EOL(command_connection_usage)
@@ -835,10 +1028,47 @@ static const struct cmdtab connection_cmdtab[] = {
 static bool
 command_connection(int argc, char *argv[])
 {
-	if (argc < 4) {
+	if (argc < 3) {
 		return command_connection_usage(argc, argv);
 	}
 	return cli_subcommand(connection_cmdtab, argc, argv, 2);
+}
+
+static bool
+command_channel_clear_cache(int argc, char *argv[])
+{
+	uint32_t chan;
+
+	assert(argc >= 2);
+	if (! channel_parse(argv[1], &chan)) {
+		/* Error already reported. */
+		return false;
+	}
+	channel_clear_cache(chan);
+	return false;
+}
+
+static bool
+command_channel_usage(int argc, char *argv[])
+{
+	printf("Usage:\n");
+	printf("\tchannel <number> clear-cache\n");
+	return false;
+}
+
+static const struct cmdtab channel_cmdtab[] = {
+	{ .name = "clear-cache",	.func = command_channel_clear_cache },
+
+	CMDTAB_EOL(command_channel_usage)
+};
+
+static bool
+command_channel(int argc, char *argv[])
+{
+	if (argc < 2) {
+		return command_channel_usage(argc, argv);
+	}
+	return cli_subcommand(channel_cmdtab, argc, argv, 2);
 }
 
 static bool	command_help(int, char *[]);
@@ -850,9 +1080,8 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "help",		.func = command_help },
 	{ .name = "?",			.func = command_help },
 
+	{ .name = "channel",		.func = command_channel },
 	{ .name = "connection",		.func = command_connection },
-	{ .name = "conn",		.func = command_connection,
-					.suppress_in_help = true },
 
 	{ .name = "list",		.func = command_list },
 
@@ -911,7 +1140,7 @@ main(int argc, char *argv[])
 	(void) signal(SIGPIPE, SIG_IGN);
 
 	/* Logging system is required for conn_io. */
-	if (! log_init(NULL, LOG_OPT_FOREGROUND)) {
+	if (! log_init(NULL, LOG_OPT_DEBUG | LOG_OPT_FOREGROUND)) {
 		errx(EXIT_FAILURE, "log_init() failed");
 	}
 

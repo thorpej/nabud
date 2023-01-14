@@ -380,6 +380,131 @@ image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 }
 
 /*
+ * image_cache_clear --
+ *	Clear the image cache for a channel.
+ */
+void
+image_cache_clear(struct image_channel *chan)
+{
+	LIST_HEAD(, nabu_image) old_cache;
+	struct nabu_image *img;
+	void *listing;
+
+	LIST_INIT(&old_cache);
+	pthread_mutex_lock(&image_cache_lock);
+	while ((img = LIST_FIRST(&chan->image_cache)) != NULL) {
+		image_cache_size -= img->length;
+		LIST_REMOVE(img, link);
+		LIST_INSERT_HEAD(&old_cache, img, link);
+	}
+	listing = chan->listing;
+	chan->listing = NULL;
+	chan->listing_size = 0;
+	pthread_mutex_unlock(&image_cache_lock);
+
+	while ((img = LIST_FIRST(&old_cache)) != NULL) {
+		LIST_REMOVE(img, link);
+		image_release(img);
+	}
+
+	if (listing != NULL) {
+		free(listing);
+	}
+}
+
+/*
+ * image_channel_fetch_listing --
+ *	Return a copy of the channel's listing, fetching it
+ *	from the server as necessary.
+ */
+char *
+image_channel_copy_listing(struct image_channel *chan, size_t *sizep)
+{
+	char *data, *cp, *tmp;
+	size_t allocsize, filesize;
+	unsigned int attempt = 0;
+
+ top:
+	log_debug("[%s] Attempt #%d to get listing.", chan->name, attempt++);
+	pthread_mutex_lock(&image_cache_lock);
+	if (chan->listing == NULL) {
+		/* No listing yet; need to fetch. */
+		pthread_mutex_unlock(&image_cache_lock);
+		log_debug("[%s] No cached listing; need to fetch.",
+		    chan->name);
+		goto fetch;
+	}
+	allocsize = chan->listing_size;
+	pthread_mutex_unlock(&image_cache_lock);
+
+	log_debug("[%s] Cached listing is %zu bytes.", chan->name, allocsize);
+	data = malloc(allocsize);
+	if (data == NULL) {
+		log_error("[%s] Unable to allocate %zu byte for listing.",
+		    chan->name, allocsize);
+		return NULL;
+	}
+
+	pthread_mutex_lock(&image_cache_lock);
+	if (chan->listing != NULL && allocsize >= chan->listing_size) {
+		memcpy(data, chan->listing, chan->listing_size);
+		*sizep = chan->listing_size;
+		pthread_mutex_unlock(&image_cache_lock);
+		log_debug("[%s] Copied %zu bytes of cached listing.",
+		    chan->name, *sizep);
+		return data;
+	}
+	/*
+	 * If we got here, the size changed to be larger and and we need
+	 * to try again.
+	 */
+	pthread_mutex_unlock(&image_cache_lock);
+	free(data);
+	goto top;
+
+ fetch:
+	if (chan->list_url == NULL) {
+		/* No listing. */
+		log_debug("[%s] No listing for this channel.", chan->name);
+		return NULL;
+	}
+
+	/* Allocate an extra byte to ensure there's a \n at the end. */
+	log_debug("[%s] Fetching listing from %s", chan->name, chan->list_url);
+	data = fileio_load_file_from_location(chan->list_url, 1, 0, &filesize);
+	if (data == NULL) {
+		log_error("[%s] Unable to fetch listing from %s\n",
+		    chan->name, chan->list_url);
+		return NULL;
+	}
+	allocsize = filesize + 1;
+	data[filesize] = '\n';
+	*sizep = allocsize;
+
+	/* Now cache a copy. */
+	cp = malloc(allocsize);
+	if (cp == NULL) {
+		log_error("[%s] Unable to allocate %zu bytes to cache listing.",
+		    chan->name, allocsize);
+		return data;
+	}
+	memcpy(cp, data, allocsize);
+
+	pthread_mutex_lock(&image_cache_lock);
+	tmp = chan->listing;
+	chan->listing = cp;
+	chan->listing_size = allocsize;
+	pthread_mutex_unlock(&image_cache_lock);
+	if (tmp != NULL) {
+		free(tmp);
+	}
+	log_info("[%s] Cached %zu bytes of listing data.", chan->name,
+	    allocsize);
+
+	return data;
+}
+
+/*
  * image_nabu_name --
  *	Generate a NABU flat image name.
  */

@@ -65,8 +65,6 @@ control_serialize_channel(struct image_channel *chan, void *ctx)
 
 	rv = rv && atom_list_append_string(list, NABUCTL_CHAN_NAME, chan->name);
 
-	/* XXX NABUCTL_CHAN_DISPLAY_NAME */
-
 	rv = rv && atom_list_append_string(list, NABUCTL_CHAN_PATH, chan->path);
 
 	if (chan->list_url != NULL) {
@@ -228,6 +226,173 @@ control_req_list_connections(struct atom_list *reply_list)
 	return rv;
 }
 
+struct connection_req_context {
+	const char	*name;
+	union {
+		struct image_channel *chan;
+		char *selected_file;
+	};
+	uint32_t	op;
+	bool		found;
+};
+
+static bool
+control_req_connection_cb(struct nabu_connection *conn, void *v)
+{
+	struct connection_req_context *ctx = v;
+
+	if (strcmp(conn_name(conn), ctx->name) != 0) {
+		return true;		/* keep enumerating */
+	}
+	ctx->found = true;
+
+	switch (ctx->op) {
+	case NABUCTL_REQ_CONN_CANCEL:
+		conn_cancel(conn);
+		break;
+
+	case NABUCTL_REQ_CONN_CHANGE_CHANNEL:
+		conn_set_channel(conn, ctx->chan);
+		break;
+
+	case NABUCTL_REQ_CONN_SELECT_FILE:
+		conn_set_selected_file(conn, ctx->selected_file);
+		break;
+
+	default:
+		break;
+	}
+	return false;			/* stop enumerating */
+}
+
+static bool
+conntrol_req_connection_process(struct connection_req_context *ctx,
+    struct atom_list *reply_list)
+{
+	bool rv;
+
+	conn_enumerate(control_req_connection_cb, ctx);
+
+	if (ctx->found) {
+		rv = atom_list_append_done(reply_list);
+	} else {
+		rv = atom_list_append_error(reply_list);
+	}
+	return rv;
+}
+
+/*
+ * control_req_connection_cancel --
+ *	Handle a CONN CANCEL request.
+ */
+static bool
+control_req_connection_cancel(struct atom *req, struct atom_list *reply_list)
+{
+	struct connection_req_context ctx = {
+		.name = atom_dataref(req),
+		.op = NABUCTL_REQ_CONN_CANCEL,
+	};
+
+	return conntrol_req_connection_process(&ctx, reply_list);
+}
+
+/*
+ * control_req_connection_change_chanel --
+ *	Handle a CONN CHANGE CHANNEL request.
+ */
+static bool
+control_req_connection_change_channel(struct conn_io *conn, struct atom *req,
+    struct atom_list *req_list, struct atom_list *reply_list)
+{
+	struct atom *number_atom;
+	struct connection_req_context ctx = {
+		.name = atom_dataref(req),
+		.op = NABUCTL_REQ_CONN_CHANGE_CHANNEL,
+	};
+
+	number_atom = atom_list_next(req_list, req);
+	if (number_atom == NULL ||
+	    atom_data_type(number_atom) != NABUCTL_TYPE_NUMBER) {
+ bad:
+		return atom_list_append_error(reply_list);
+	}
+
+	uint64_t val = atom_number_value(number_atom);
+	if (val == 0) {
+		ctx.chan = NULL;
+	} else if (val > 255 ||
+		   (ctx.chan =
+		    image_channel_lookup((unsigned int)val)) == NULL) {
+		goto bad;
+	}
+
+	return conntrol_req_connection_process(&ctx, reply_list);
+}
+
+/*
+ * control_req_connection_select_file --
+ *	Handle a CONN SELECT FILE request.
+ */
+static bool
+control_req_connection_select_file(struct conn_io *conn, struct atom *req,
+    struct atom_list *req_list, struct atom_list *reply_list)
+{
+	struct atom *file_atom;
+	struct connection_req_context ctx = {
+		.name = atom_dataref(req),
+		.op = NABUCTL_REQ_CONN_SELECT_FILE,
+	};
+
+	file_atom = atom_list_next(req_list, req);
+	if (file_atom == NULL ||
+	    (atom_data_type(file_atom) != NABUCTL_TYPE_STRING)) {
+		return atom_list_append_error(reply_list);
+	}
+
+	ctx.selected_file = atom_dataref(file_atom);
+	return conntrol_req_connection_process(&ctx, reply_list);
+}
+
+/*
+ * control_req_channel_clear_cache --
+ *	Handle a CHAN CLEAR CACHE request.
+ */
+static bool
+control_req_channel_clear_cache(struct atom *req, struct atom_list *reply_list)
+{
+	uint64_t val = atom_number_value(req);
+	struct image_channel *chan = image_channel_lookup((unsigned int)val);
+	if (chan != NULL) {
+		image_cache_clear(chan);
+		return atom_list_append_done(reply_list);
+	}
+	return atom_list_append_error(reply_list);
+}
+
+/*
+ * control_req_channel_fetch_listing --
+ *	Handle a CHAN FETCH LISTING request.
+ */
+static bool
+control_req_channel_fetch_listing(struct atom *req,
+    struct atom_list *reply_list)
+{
+	uint64_t val = atom_number_value(req);
+	struct image_channel *chan = image_channel_lookup((unsigned int)val);
+	if (chan == NULL) {
+		return atom_list_append_error(reply_list);
+	}
+
+	bool rv = true;
+	size_t datalen;
+	char *data = image_channel_copy_listing(chan, &datalen);
+	if (data != NULL) {
+		rv = atom_list_append(reply_list, NABUCTL_TYPE_BLOB,
+		    data, datalen);
+	}
+	return rv && atom_list_append_done(reply_list);
+}
+
 /*
  * control_connection_thread --
  *	Worker thread for control connections.
@@ -281,10 +446,44 @@ control_connection_thread(void *arg)
 			ok = control_req_list_connections(&reply_list);
 			break;
 
+		case NABUCTL_REQ_CONN_CANCEL:
+			log_debug("[%s] Got NABUCTL_REQ_CONN_CANCEL.",
+			    conn_io_name(conn));
+			ok = control_req_connection_cancel(req, &reply_list);
+			break;
+
+		case NABUCTL_REQ_CONN_CHANGE_CHANNEL:
+			log_debug("[%s] Got NABUCTL_REQ_CONN_CHANGE_CHANNEL.",
+			    conn_io_name(conn));
+			ok = control_req_connection_change_channel(conn,
+			    req, &req_list, &reply_list);
+			break;
+
+		case NABUCTL_REQ_CONN_SELECT_FILE:
+			log_debug("[%s] Got NABUCTL_REQ_CONN_SELECT_FILE.",
+			    conn_io_name(conn));
+			ok = control_req_connection_select_file(conn,
+			    req, &req_list, &reply_list);
+			break;
+
+		case NABUCTL_REQ_CHAN_CLEAR_CACHE:
+			log_debug("[%s] Got NABUCTL_REQ_CHAN_CLEAR_CACHE.",
+			    conn_io_name(conn));
+			ok = control_req_channel_clear_cache(req, &reply_list);
+			break;
+
+		case NABUCTL_REQ_CHAN_FETCH_LISTING:
+			log_debug("[%s] Got NABUCTL_REQ_CHAN_FETCH_LISTING.",
+			    conn_io_name(conn));
+			ok = control_req_channel_fetch_listing(req,
+			    &reply_list);
+			break;
+
 		default:
 			log_error("[%s] Unknown request atom: 0x%08x",
 			    conn_io_name(conn), atom_tag(req));
 			ok = atom_list_append_error(&reply_list);
+			break;
 		}
 
 		if (ok) {

@@ -54,6 +54,8 @@ struct image_channel {
 	char		*path;
 	char		*list_url;
 	char		*default_file;
+	void		*listing;
+	size_t		listing_size;
 	unsigned int	number;
 	LIST_HEAD(, nabu_image) image_cache;
 };
@@ -77,6 +79,8 @@ void	image_add_channel(image_channel_type, char *, char *, const char *,
 struct image_channel *image_channel_lookup(unsigned int);
 bool	image_channel_enumerate(bool (*)(struct image_channel *, void *),
 				void *);
+void	image_cache_clear(struct image_channel *);
+char *	image_channel_copy_listing(struct image_channel *, size_t *);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);
