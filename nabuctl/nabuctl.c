@@ -1001,6 +1001,94 @@ command_list(int argc, char *argv[])
 }
 
 static bool
+command_show_usage(int argc, char *argv[])
+{
+	printf("Usage:\n");
+	printf("\tshow channel <numnber>\n");
+	printf("\tshow connection <number>\n");
+	return false;
+}
+
+static bool
+command_show_channel(int argc, char *argv[])
+{
+	struct channel_desc *chan;
+	uint32_t channel;
+
+	if (! channel_parse(argv[2], &channel)) {
+		/* Error already reported. */
+		return false;
+	}
+
+	channel_list_fetch();
+	if ((chan = channel_lookup(channel)) == NULL) {
+		printf("Invalid channel: %s\n", argv[2]);
+		return false;
+	}
+
+	printf("Channel %u:\n", chan->number);
+	printf("        Name: %s\n", chan->name);
+	printf("      Source: %s\n", chan->source);
+	printf("        Path: %s\n", chan->path);
+	printf("        Type: %s\n", chan->type);
+	if (chan->default_file != NULL) {
+		printf("Default file: %s\n", chan->default_file);
+	}
+	if (chan->list_url != NULL) {
+		printf(" Listing URL: %s\n", chan->list_url);
+	}
+
+	return false;
+}
+
+static bool
+command_show_connection(int argc, char *argv[])
+{
+	struct connection_desc *conn;
+	uint32_t connection;
+
+	if (! connection_parse(argv[2], &connection)) {
+		/* Error already reported. */
+		return false;
+	}
+
+	connection_list_fetch();
+	if ((conn = connection_lookup(connection)) == NULL) {
+		printf("Invalid connection: %s\n", argv[2]);
+		return false;
+	}
+
+	printf("Connection %u:\n", conn->number);
+	printf("         Name: %s\n", conn->name);
+	printf("         Type: %s\n", conn->type);
+	printf("        State: %s\n", conn->state);
+	if (conn->channel != 0) {
+		printf("      Channel: %u\n", conn->channel);
+	}
+	if (conn->selected_file != NULL) {
+		printf("Selected file: %s\n", conn->selected_file);
+	}
+
+	return false;
+}
+
+static const struct cmdtab show_cmdtab[] = {
+	{ .name = "channel",		.func = command_show_channel },
+	{ .name = "connection",		.func = command_show_connection },
+
+	CMDTAB_EOL(command_show_usage)
+};
+
+static bool
+command_show(int argc, char *argv[])
+{
+	if (argc < 3) {
+		return command_show_usage(argc, argv);
+	}
+	return cli_subcommand(show_cmdtab, argc, argv, 1);
+}
+
+static bool
 command_connection_usage(int argc, char *argv[])
 {
 	printf("Usage:\n");
@@ -1194,6 +1282,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "connection",		.func = command_connection },
 
 	{ .name = "list",		.func = command_list },
+	{ .name = "show",		.func = command_show },
 
 	CMDTAB_EOL(cli_command_unknown)
 };
@@ -1237,11 +1326,26 @@ int
 main(int argc, char *argv[])
 {
 	const char *path = NABUCTL_PATH_DEFAULT;
-	int sock;
+	unsigned int logopts = 0;
+	int ch, sock;
 
 	setprogname(argv[0]);
 
-	if (argc != 1) {
+	while ((ch = getopt(argc, argv, "d")) != -1) {
+		switch (ch) {
+		case 'd':
+			logopts |= LOG_OPT_DEBUG;
+			break;
+
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 0) {
 		usage();
 		/* NOTREACHED */
 	}
@@ -1250,7 +1354,7 @@ main(int argc, char *argv[])
 	(void) signal(SIGPIPE, SIG_IGN);
 
 	/* Logging system is required for conn_io. */
-	if (! log_init(NULL, LOG_OPT_FOREGROUND)) {
+	if (! log_init(NULL, logopts | LOG_OPT_FOREGROUND)) {
 		errx(EXIT_FAILURE, "log_init() failed");
 	}
 
@@ -1289,7 +1393,5 @@ main(int argc, char *argv[])
 
 	/* Enter the command loop. */
 	cli_commands(getprogname(), cmdtab, nabuctl_cliprep, NULL);
-
-	printf("Thanks for visiting the land of NABU!\n");
 	exit(0);
 }
