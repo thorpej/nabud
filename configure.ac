@@ -164,6 +164,7 @@ AC_OUTPUT
 #
 AC_MSG_NOTICE([ === Configuration results ===])
 AC_MSG_NOTICE([Version:                  $PACKAGE_VERSION])
+AC_MSG_NOTICE([Installation prefix:      $prefix])
 AC_MSG_NOTICE([C compiler:               $CC])
 AC_MSG_NOTICE([POSIX threads C compiler: $PTHREAD_CC])
 AC_MSG_NOTICE([POSIX threads CFLAGS:     $PTHREAD_CFLAGS])

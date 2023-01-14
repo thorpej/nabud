@@ -327,7 +327,9 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(PTHREAD_CFLAGS) $(WARNCFLAGS)
 nabud_SOURCES = adaptor.c conn.c control.c image.c main.c retronet.c
-nabud_CPPFLAGS = $(SSL_INCLUDES) $(PAK_INCLUDES)
+nabud_CPPFLAGS = -DINSTALL_PREFIX=\"$(prefix)\" \
+			  $(SSL_INCLUDES) $(PAK_INCLUDES)
+
 nabud_LDADD = ../libnabud/libnabud.la \
 			  ../libfetch/libfetch.la \
 			  ../libmj/libmj.la \

@@ -5,7 +5,8 @@ bin_PROGRAMS		= nabud
 
 nabud_SOURCES		= adaptor.c conn.c control.c image.c main.c retronet.c
 
-nabud_CPPFLAGS		= $(SSL_INCLUDES) $(PAK_INCLUDES)
+nabud_CPPFLAGS		= -DINSTALL_PREFIX=\"$(prefix)\" \
+			  $(SSL_INCLUDES) $(PAK_INCLUDES)
 
 nabud_LDADD		= ../libnabud/libnabud.la \
 			  ../libfetch/libfetch.la \

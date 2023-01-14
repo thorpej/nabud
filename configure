@@ -16495,6 +16495,8 @@ fi
 printf "%s\n" "$as_me:  === Configuration results ===" >&6;}
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Version:                  $PACKAGE_VERSION" >&5
 printf "%s\n" "$as_me: Version:                  $PACKAGE_VERSION" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: Installation prefix:      $prefix" >&5
+printf "%s\n" "$as_me: Installation prefix:      $prefix" >&6;}
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: C compiler:               $CC" >&5
 printf "%s\n" "$as_me: C compiler:               $CC" >&6;}
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: POSIX threads C compiler: $PTHREAD_CC" >&5

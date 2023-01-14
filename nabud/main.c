@@ -52,7 +52,7 @@
 #include "../libmj/mj.h"
 
 #ifndef NABUD_CONF
-#define	NABUD_CONF		"/etc/nabud.conf"
+#define	NABUD_CONF		INSTALL_PREFIX "/etc/nabud.conf"
 #endif
 
 #define	VALID_ATOM(a, t)	((a) != NULL && (a)->type == (t))
