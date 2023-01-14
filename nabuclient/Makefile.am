@@ -1,6 +1,6 @@
 AM_CFLAGS		= $(WARNCFLAGS)
 
-bin_PROGRAMS		= nabuclient
+noinst_PROGRAMS		= nabuclient
 
 nabuclient_SOURCES	= nabuclient.c
 
