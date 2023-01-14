@@ -342,6 +342,7 @@ control_req_connection_select_file(struct conn_io *conn, struct atom *req,
 		.name = atom_dataref(req),
 		.op = NABUCTL_REQ_CONN_SELECT_FILE,
 	};
+	bool rv;
 
 	file_atom = atom_list_next(req_list, req);
 	if (file_atom == NULL ||
@@ -349,8 +350,12 @@ control_req_connection_select_file(struct conn_io *conn, struct atom *req,
 		return atom_list_append_error(reply_list);
 	}
 
-	ctx.selected_file = atom_dataref(file_atom);
-	return conntrol_req_connection_process(&ctx, reply_list);
+	ctx.selected_file = atom_consume(file_atom);
+	rv = conntrol_req_connection_process(&ctx, reply_list);
+	if (! ctx.found) {
+		free(ctx.selected_file);
+	}
+	return rv;
 }
 
 /*
