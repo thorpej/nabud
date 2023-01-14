@@ -1,7 +1,7 @@
 AM_CFLAGS		= $(PTHREAD_CFLAGS) $(WARNCFLAGS)
 CC			= $(PTHREAD_CC)
 
-bin_PROGRAMS		= nabud
+sbin_PROGRAMS		= nabud
 
 nabud_SOURCES		= adaptor.c conn.c control.c image.c main.c retronet.c
 
