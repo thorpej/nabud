@@ -481,9 +481,21 @@ conn_get_channel(struct nabu_connection *conn)
 void
 conn_set_channel(struct nabu_connection *conn, struct image_channel *chan)
 {
+	char *selected_file;
+
+	/*
+	 * Changing the channel clears the selected file.
+	 */
+
 	pthread_mutex_lock(&conn->mutex);
 	conn->l_channel = chan;
+	selected_file = conn->l_selected_file;
+	conn->l_selected_file = NULL;
 	pthread_mutex_unlock(&conn->mutex);
+
+	if (selected_file != NULL) {
+		free(selected_file);
+	}
 }
 
 /*
