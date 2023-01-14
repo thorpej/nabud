@@ -467,7 +467,7 @@ even while being bombarded with requests for information.
 
 I also want to acknowledge some people whose code I have borrowed or used as a reference for this project:
 * Nick Daniels' [NabuNetworkEmulator](https://github.com/GryBsh/NabuNetworkEmulator) served as a reference
-for the NABU Adaptor protocol.  The files _nabu_proto.h_ and _adaptor.c_ was partially derived from his work.
+for the NABU Adaptor protocol.  The files _nabu_proto.h_ and _adaptor.c_ were partially derived from his work.
 * David Kuder's [nabu-tftp](https://github.com/dkgrizzly/nabu-tftp) gateway for the Raspberry Pi Pico
 also served to clarify some bits of the Adaptor protocol.
 * Alistair Crooks' "Minimal JSON" (_libmj_) was used to build the configuraiton file parser.
