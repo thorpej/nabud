@@ -469,16 +469,17 @@ image_channel_copy_listing(struct image_channel *chan, size_t *sizep)
 		return NULL;
 	}
 
-	/* Allocate an extra byte to ensure there's a \n at the end. */
+	/* Allocate an extra byte to ensure there's a \n\0 at the end. */
 	log_debug("[%s] Fetching listing from %s", chan->name, chan->list_url);
-	data = fileio_load_file_from_location(chan->list_url, 1, 0, &filesize);
+	data = fileio_load_file_from_location(chan->list_url, 2, 0, &filesize);
 	if (data == NULL) {
 		log_error("[%s] Unable to fetch listing from %s\n",
 		    chan->name, chan->list_url);
 		return NULL;
 	}
-	allocsize = filesize + 1;
+	allocsize = filesize + 2;
 	data[filesize] = '\n';
+	data[filesize + 1] = '\0';
 	*sizep = allocsize;
 
 	/* Now cache a copy. */

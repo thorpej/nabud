@@ -32,6 +32,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -39,12 +40,12 @@
 #include <string.h>
 
 #include "listing.h"
+#include "log.h"
 
 struct parser_context {
 	char *cur;
 	struct listing_category *current_category;
 	struct listing *listing;
-	unsigned int next_fileno;
 	jmp_buf alloc_fail_env;
 };
 
@@ -61,19 +62,19 @@ listing_alloc_internal(struct parser_context *ctx, size_t size)
 static struct listing *
 listing_alloc(struct parser_context *ctx)
 {
-	return listing_alloc_internal(sizeof(struct listing));
+	return listing_alloc_internal(ctx, sizeof(struct listing));
 }
 
 static struct listing_category *
 category_alloc(struct parser_context *ctx)
 {
-	return listing_alloc_internal(sizeof(struct listing_category));
+	return listing_alloc_internal(ctx, sizeof(struct listing_category));
 }
 
 static struct listing_entry *
 entry_alloc(struct parser_context *ctx)
 {
-	return listing_alloc_internal(sizeof(struct listing_entry));
+	return listing_alloc_internal(ctx, sizeof(struct listing_entry));
 }
 
 static void
@@ -111,7 +112,7 @@ parse_category(struct parser_context *ctx)
 
 	/* If the resulting name is not empty, create the category. */
 	if (strlen(name) != 0) {
-		struct listing_category *category = category_alloc();
+		struct listing_category *category = category_alloc(ctx);
 		TAILQ_INIT(&category->entries);
 		category->name = name;
 
@@ -128,7 +129,7 @@ parse_entry(struct parser_context *ctx)
 	 *
 	 *	HelloNABUBounce.nabu ; Hello NABU Bounce
 	 */
-	char *name, *desc, *limit = *cp;
+	char *name, *desc, *limit, *cp;
 
 	assert(ctx->current_category != NULL);
 
@@ -150,7 +151,8 @@ parse_entry(struct parser_context *ctx)
 		limit = desc;
 
 		/* Zero back to the end of the name. */
-		zero_back(cp, name);
+		*cp++ = '\0';
+		zero_back(cp - 2, name);
 
 		/* Find the end of the line. */
 		cp += strcspn(cp, "\n");
@@ -170,14 +172,19 @@ parse_entry(struct parser_context *ctx)
 	zero_back(cp, limit);
 
 	/* If the resulting name is not empty, create the category. */
-	if (strlen(name) != 0) {
-		struct listing_entry *entry = entry_alloc();
+	size_t namelen = strlen(name);
+	if (namelen != 0) {
+		struct listing_entry *entry = entry_alloc(ctx);
 		entry->name = name;
 		entry->desc = desc;
 
-		entry->number = ctx->next_fileno++;
-		TAILQ_INSERT_TAIL(&ctx->current_category->entries, entry, link);
-		ctx->current_category = category;
+		entry->number = ctx->listing->next_fileno++;
+		TAILQ_INSERT_TAIL(&ctx->current_category->entries, entry,
+		    category_link);
+		TAILQ_INSERT_TAIL(&ctx->listing->entries, entry, listing_link);
+		if (namelen > ctx->listing->longest_name) {
+			ctx->listing->longest_name = namelen;
+		}
 	}
 }
 
@@ -226,47 +233,65 @@ parse_listing(struct parser_context *ctx)
 	}
 }
 
+struct listing_entry *
+listing_entry_lookup(struct listing *l, unsigned int number)
+{
+	struct listing_entry *e;
+
+	TAILQ_FOREACH(e, &l->entries, listing_link) {
+		if (e->number == number) {
+			return e;
+		}
+	}
+	return NULL;
+}
+
 struct listing *
 listing_create(char *data, size_t length)
 {
 	struct parser_context ctx = {
 		.cur = data,
-		.next_fileno = 1,
 	};
 
 	if (setjmp(ctx.alloc_fail_env)) {
 		log_debug("Memory allocation failed.");
-		listing_free(ctx.listing);
+		if (ctx.listing != NULL) {
+			listing_free(ctx.listing);
+		} else {
+			free(ctx.listing->data);
+		}
 		return NULL;
 	}
 
-	ctx.listing = listing_alloc();
+	ctx.listing = listing_alloc(&ctx);
 	ctx.listing->data = data;
 	ctx.listing->length = length;
+	ctx.listing->next_fileno = 1;
+	TAILQ_INIT(&ctx.listing->categories);
+	TAILQ_INIT(&ctx.listing->entries);
 
 	parse_listing(&ctx);
-	return ctx->listing;
+	return ctx.listing;
 }
 
 void
 listing_free(struct listing *l)
 {
-	if (l != NULL) {
-		struct listing_category *c;
+	struct listing_category *c;
 
-		while ((c = TAILQ_FIRST(&l->categories)) != NULL) {
-			struct listing_entry *e;
+	while ((c = TAILQ_FIRST(&l->categories)) != NULL) {
+		struct listing_entry *e;
 
-			while ((e = TAILQ_FIRST(&c->entries) != NULL) {
-				TAILQ_REMOVE(&c->entries, e, link);
-				free(e);
-			}
-			TAILQ_REMOVE(&l->categories, c, link);
-			free(c);
+		while ((e = TAILQ_FIRST(&c->entries)) != NULL) {
+			TAILQ_REMOVE(&c->entries, e, category_link);
+			TAILQ_REMOVE(&l->entries, e, listing_link);
+			free(e);
 		}
-		if (l->data != NULL) {
-			free(l->data);
-		}
-		free(l);
+		TAILQ_REMOVE(&l->categories, c, link);
+		free(c);
 	}
+	if (l->data != NULL) {
+		free(l->data);
+	}
+	free(l);
 }

@@ -37,6 +37,9 @@ struct listing {
 	char		*data;
 	size_t		length;
 	TAILQ_HEAD(, listing_category) categories;
+	TAILQ_HEAD(, listing_entry) entries;
+	unsigned int	next_fileno;
+	unsigned int	longest_name;
 };
 
 struct listing_category {
@@ -46,12 +49,14 @@ struct listing_category {
 };
 
 struct listing_entry {
-	TAILQ_ENTRY(listing_entry) link;
+	TAILQ_ENTRY(listing_entry) category_link;
+	TAILQ_ENTRY(listing_entry) listing_link;
 	const char	*name;
 	const char	*desc;
 	unsigned int	number;
 };
 
+struct listing_entry *listing_entry_lookup(struct listing *, unsigned int);
 struct listing	*listing_create(char *, size_t);
 void		listing_free(struct listing *);
 
