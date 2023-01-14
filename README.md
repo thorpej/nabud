@@ -41,14 +41,19 @@ Channel can be served by any source.
 Each Source has 3 properies:
 * Name: a string that idenfies the source.  It's meant both for human consumption
 as well as for specifying which Source provides a Channel.
-* Location: a URL string that specifies the root of the source.
+* Location: a local path or a URL string that specifies the root of the source.
 
 ### Channels
 
-Each Channel has 4 properites:
+Each Channel has 4 mandatory properites and 3 optional properties:
 * Name: a string that identifies a Channel.  It's meant both for human consumption, but
 also specifies the name of the directory in the Source's location that contains the Channel's
 files.
+* Path: an optional string that overrides the default directory for the Channel's content.
+* ListURL: on optional string that specifes the URL for the Channel's file listing.
+* DefaultFile: an optional string that specifies the default file to serve when the
+NABU requests image 000001.  This is used only if the Connection has not specified a
+selected file.
 * Number: a unique number from 1 to 255 that identifies the Channel to the NABU.
 * Type: a string that specifies the type of files provided by the Channel:
     * pak: NABU _pak_ files (content that is pre-wrapped in packet headers).  These
@@ -77,7 +82,6 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
       "Sources": [
         {
           "Name": "Local",
-          "Type": "local",
           "Location": "/home/nabu",
         },
         {
