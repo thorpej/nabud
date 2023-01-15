@@ -431,7 +431,8 @@ And you can select a file to loaded wnen the NABU boots and requests image 00000
 
 ### nabud-0.9
 * Added _rc.d_ and _rc.conf.d_ extras for NetBSD and a few other tweaks to make it ready for pkgsrc.
-* Updated example config for additional NabuRetroNet channels.
+* Updated example config in preparation for additional NabuRetroNet channels.
+* Fixed the time packet to properly report the day of the week.
 
 ### nabud-0.8
 * Experimental for the NabuRetroNet blob store extensions to the Adaptor protocol.  These extensions
