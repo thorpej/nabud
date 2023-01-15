@@ -307,6 +307,15 @@ For example, on my NetBSD system, I have the following user and group configurat
     
     # ./nabud -u nabu -U 002
 
+## Extras for your operating system
+
+nabud comes with some extras that help with integration onto operating systems on which it runs.
+
+* NetBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are installed into $(prefix)/share.
+Tweak them to your liking and copy them into _/etc/rc.d_ and _/etc/rc.conf.d_.
+
+If you are interested in providing extras for your favorite operating system, please let me know!
+
 ## Controlling nabud with nabuctl
 
 A control program, nabuctl, is provided that allows you to interact with nabud to change channels,
@@ -419,6 +428,10 @@ And you can select a file to loaded wnen the NABU boots and requests image 00000
     nabuctl> 
 
 ## Changes
+
+### nabud-0.9
+* Added _rc.d_ and _rc.conf.d_ extras for NetBSD and a few other tweaks to make it ready for pkgsrc.
+* Updated example config for additional NabuRetroNet channels.
 
 ### nabud-0.8
 * Experimental for the NabuRetroNet blob store extensions to the Adaptor protocol.  These extensions
