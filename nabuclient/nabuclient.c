@@ -453,7 +453,7 @@ command_get_time(int argc, char *argv[])
 	printf("Server time:\n");
 	printf("\t  mystery[0]: $%02X\n", t->mystery[0]);
 	printf("\t  mystery[1]: $%02X\n", t->mystery[1]);
-	printf("\t  mystery[2]: $%02X\n", t->mystery[2]);
+	printf("\t day of week: $%02X\n", t->week_day);
 	printf("\t       month: %u\n", t->month);
 	printf("\tday of month: %u\n", t->month_day);
 	printf("\t        year: %u\n", t->year);
