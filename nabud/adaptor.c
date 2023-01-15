@@ -163,7 +163,7 @@ static void
 adaptor_send_unauthorized(struct nabu_connection *conn)
 {
 	log_debug("[%s] Sending UNAUTHORIZED.", conn_name(conn));
-	conn_send_byte(conn, NABU_MSG_UNAUTHORIZED);
+	conn_send_byte(conn, NABU_SERVICE_UNAUTHORIZED);
 	log_debug("[%s] Waiting for NABU to ACK.", conn_name(conn));
 	if (adaptor_expect_ack(conn)) {
 		log_debug("[%s] Received ACK.", conn_name(conn));
@@ -184,7 +184,7 @@ adaptor_send_packet(struct nabu_connection *conn, uint8_t *buf, size_t len)
 
 	adaptor_escape_packet(conn, buf, len);
 	log_debug("[%s] Sending AUTHORIZED.", conn_name(conn));
-	conn_send_byte(conn, NABU_MSG_AUTHORIZED);
+	conn_send_byte(conn, NABU_SERVICE_AUTHORIZED);
 	log_debug("[%s] Waiting for NABU to ACK.", conn_name(conn));
 	if (adaptor_expect_ack(conn)) {
 		log_debug("[%s] Received ACK, sending packet.",
@@ -367,10 +367,10 @@ adaptor_send_time(struct nabu_connection *conn)
 static void
 adaptor_msg_reset(struct nabu_connection *conn)
 {
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_MSG_CONFIRMED.",
+	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
-	conn_send_byte(conn, NABU_MSG_CONFIRMED);
+	conn_send_byte(conn, NABU_STATE_CONFIRMED);
 }
 
 /*
@@ -393,8 +393,8 @@ adaptor_msg_mystery(struct nabu_connection *conn)
 		log_debug("[%s] msg[0] = 0x%02x msg[1] = 0x%02x",
 		    conn_name(conn), msg[0], msg[1]);
 	}
-	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn_name(conn));
-	conn_send_byte(conn, NABU_MSG_CONFIRMED);
+	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
+	conn_send_byte(conn, NABU_STATE_CONFIRMED);
 }
 
 /*
@@ -407,13 +407,15 @@ adaptor_msg_channel_status(struct nabu_connection *conn)
 	struct image_channel *chan = conn_get_channel(conn);
 
 	if (chan != NULL) {
-		log_debug("[%s] Sending HAVE_CHANNEL.", conn_name(conn));
-		conn_send_byte(conn, NABU_MSG_HAVE_CHANNEL);
+		log_debug("[%s] Sending NABU_SIGNAL_STATUS_YES.",
+		    conn_name(conn));
+		conn_send_byte(conn, NABU_SIGNAL_STATUS_YES);
 		conn_send(conn, nabu_msg_finished,
 		    sizeof(nabu_msg_finished));
 	} else {
-		log_debug("[%s] Sending NEED_CHANNEL.", conn_name(conn));
-		conn_send_byte(conn, NABU_MSG_NEED_CHANNEL);
+		log_debug("[%s] Sending NABU_SIGNAL_STATUS_NO.",
+		    conn_name(conn));
+		conn_send_byte(conn, NABU_SIGNAL_STATUS_NO);
 		conn_send(conn, nabu_msg_finished,
 		    sizeof(nabu_msg_finished));
 	}
@@ -447,13 +449,13 @@ adaptor_msg_get_status(struct nabu_connection *conn)
 		log_error("[%s] Status type never arrived.", conn_name(conn));
 	} else {
 		switch (msg) {
-		case NABU_MSG_CHANNEL_STATUS:
+		case NABU_STATUS_SIGNAL:
 			log_debug("[%s] Channel status requested.",
 			    conn_name(conn));
 			adaptor_msg_channel_status(conn);
 			break;
 
-		case NABU_MSG_TRANSMIT_STATUS:
+		case NABU_STATUS_TRANSMIT:
 			log_debug("[%s] Transmit status requested.",
 			    conn_name(conn));
 			adaptor_msg_transmit_status(conn);
@@ -474,10 +476,10 @@ adaptor_msg_get_status(struct nabu_connection *conn)
 static void
 adaptor_msg_start_up(struct nabu_connection *conn)
 {
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_MSG_CONFIRMED.",
+	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
-	conn_send_byte(conn, NABU_MSG_CONFIRMED);
+	conn_send_byte(conn, NABU_STATE_CONFIRMED);
 }
 
 /*
@@ -504,8 +506,8 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 	log_debug("[%s] NABU requested segment %u of image %06X.",
 	    conn_name(conn), segment, image);
 
-	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn_name(conn));
-	conn_send_byte(conn, NABU_MSG_CONFIRMED);
+	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
+	conn_send_byte(conn, NABU_STATE_CONFIRMED);
 
 	if (image == NABU_IMAGE_TIME) {
 		if (segment == 0) {
@@ -561,8 +563,8 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 
 	image_channel_select(conn, channel);
 
-	log_debug("[%s] Sending NABU_MSG_CONFIRMED.", conn_name(conn));
-	conn_send_byte(conn, NABU_MSG_CONFIRMED);
+	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
+	conn_send_byte(conn, NABU_STATE_CONFIRMED);
 }
 
 /*

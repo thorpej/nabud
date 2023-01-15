@@ -143,7 +143,7 @@ nabu_recv_packet_data(size_t *lenp, uint16_t crc)
 			have_escape = false;
 			if (c == NABU_MSG_ESCAPE) {
 				pktbuf[pktidx++] = NABU_MSG_ESCAPE;
-			} else if (c == NABU_MSG_DONE) {
+			} else if (c == NABU_STATE_DONE) {
 				break;
 			} else {
 				printf("Received unknown escape byte: $%02X\n",
@@ -267,13 +267,13 @@ check_authorized(const void *vgot)
 {
 	const uint8_t *got = vgot;
 
-	if (*got == NABU_MSG_AUTHORIZED) {
+	if (*got == NABU_SERVICE_AUTHORIZED) {
 		printf("AUTHORIZED!\n");
 		printf("Sending NABU_MSGSEQ_ACK.\n");
 		nabu_send_ack();
 		return true;
 	}
-	if (*got == NABU_MSG_UNAUTHORIZED) {
+	if (*got == NABU_SERVICE_UNAUTHORIZED) {
 		printf("*** UNAUTHORIZED! ***\n");
 		printf("Sending NABU_MSGSEQ_ACK.\n");
 		nabu_send_ack();
@@ -302,10 +302,10 @@ command_reset(int argc, char *argv[])
 	print_reply(reply, sizeof(reply));
 	check_ack(reply);
 
-	printf("Expecting: NABU_MSG_CONFIRMED.\n");
+	printf("Expecting: NABU_STATE_CONFIRMED.\n");
 	nabu_recv(reply, 1);
 	print_reply(reply, 1);
-	check_byte(reply, NABU_MSG_CONFIRMED);
+	check_byte(reply, NABU_STATE_CONFIRMED);
 
 	return false;
 }
@@ -325,14 +325,14 @@ command_get_channel_status(int argc, char *argv[])
 		cli_throw();
 	}
 
-	printf("Sending NABU_MSG_CHANNEL_STATUS.\n");
-	nabu_send_byte(NABU_MSG_CHANNEL_STATUS);
+	printf("Sending NABU_STATUS_SIGNAL.\n");
+	nabu_send_byte(NABU_STATUS_SIGNAL);
 
 	printf("Waiting for reply.\n");
 	nabu_recv(reply, 1);
 	print_reply(reply, 1);
-	check_reply(reply[0] == NABU_MSG_HAVE_CHANNEL ||
-		    reply[0] == NABU_MSG_NEED_CHANNEL);
+	check_reply(reply[0] == NABU_SIGNAL_STATUS_YES ||
+		    reply[0] == NABU_SIGNAL_STATUS_NO);
 
 	printf("Expecting NABU_MSGSEQ_FINISHED.\n");
 	nabu_recv(reply, sizeof(reply));
@@ -357,8 +357,8 @@ command_get_transmit_status(int argc, char *argv[])
 		cli_throw();
 	}
 
-	printf("Sending NABU_MSG_TRANSMIT_STATUS.\n");
-	nabu_send_byte(NABU_MSG_TRANSMIT_STATUS);
+	printf("Sending NABU_STATUS_TRANSMIT.\n");
+	nabu_send_byte(NABU_STATUS_TRANSMIT);
 
 	printf("Expecting NABU_MSGSEQ_FINISHED.\n");
 	nabu_recv(reply, sizeof(reply));
@@ -381,10 +381,10 @@ command_start_up(int argc, char *argv[])
 	print_reply(reply, sizeof(reply));
 	check_ack(reply);
 
-	printf("Expecting: NABU_MSG_CONFIRMED.\n");
+	printf("Expecting: NABU_STATE_CONFIRMED.\n");
 	nabu_recv(reply, 1);
 	print_reply(reply, 1);
-	check_byte(reply, NABU_MSG_CONFIRMED);
+	check_byte(reply, NABU_STATE_CONFIRMED);
 
 	return false;
 }
@@ -418,10 +418,10 @@ send_packet_request(uint16_t segment, uint32_t image,
 	nabu_set_uint24(&msg[1], image);
 	nabu_send(msg, sizeof(msg));
 
-	printf("Expecting: NABU_MSG_CONFIRMED.\n");
+	printf("Expecting: NABU_STATE_CONFIRMED.\n");
 	nabu_recv(reply, 1);
 	print_reply(reply, 1);
-	check_byte(reply, NABU_MSG_CONFIRMED);
+	check_byte(reply, NABU_STATE_CONFIRMED);
 
 	printf("Expecting: authorization byte.\n");
 	nabu_recv(reply, 1);
@@ -559,10 +559,10 @@ command_change_channel(int argc, char *argv[])
 	print_octets(msg, sizeof(msg));
 	nabu_send(msg, sizeof(msg));
 
-	printf("Expecting: NABU_MSG_CONFIRMED.\n");
+	printf("Expecting: NABU_STATE_CONFIRMED.\n");
 	nabu_recv(msg, 1);
 	print_reply(msg, 1);
-	check_byte(msg, NABU_MSG_CONFIRMED);
+	check_byte(msg, NABU_STATE_CONFIRMED);
 
 	return false;
 }
