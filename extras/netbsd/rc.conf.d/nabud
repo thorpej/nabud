@@ -1,0 +1,4 @@
+# It is highly recommended that you run nabud as a minimally-privileged
+# user.
+nabud=YES
+nabud_flags="-u nabu -U 002"

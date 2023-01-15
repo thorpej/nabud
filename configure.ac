@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 #
 
-m4_define([nabud_VERSION], [0.8])
+m4_define([nabud_VERSION], [0.9])
 
 AC_INIT([nabud],
 	m4_defn([nabud_VERSION]),
@@ -44,11 +44,18 @@ AS_IF([test "$GCC" = "yes"],
 	 AC_MSG_RESULT([no])])
 
 case "$CANONICAL_TARGET" in
+	*-*-netbsd*)
+		# Provide a service start-up script for NetBSD.
+		EXTRAS_SUBDIRS="extras/netbsd/rc.conf.d extras/netbsd/rc.d"
+		;;
+
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 		;;
 esac
+
+AC_SUBST([EXTRAS_SUBDIRS])
 
 # MD5 is marked as deprecated on some platforms, but we're
 # kind of forced to use it regardless.
@@ -151,6 +158,8 @@ AC_CHECK_FUNCS(getprogname)
 AC_CONFIG_FILES([
 	Makefile
 	examples/Makefile
+	extras/netbsd/rc.conf.d/Makefile
+	extras/netbsd/rc.d/Makefile
 	libfetch/Makefile
 	libmj/Makefile
 	libnabud/Makefile
@@ -166,6 +175,7 @@ AC_OUTPUT
 AC_MSG_NOTICE([ === Configuration results ===])
 AC_MSG_NOTICE([Version:                  $PACKAGE_VERSION])
 AC_MSG_NOTICE([Installation prefix:      $prefix])
+AC_MSG_NOTICE([Extras:                   $EXTRAS_SUBDIRS])
 AC_MSG_NOTICE([C compiler:               $CC])
 AC_MSG_NOTICE([POSIX threads C compiler: $PTHREAD_CC])
 AC_MSG_NOTICE([POSIX threads CFLAGS:     $PTHREAD_CFLAGS])
