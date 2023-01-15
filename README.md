@@ -108,7 +108,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Name": "HomeBrew",
           "Path": "HomeBrew/titles",
           "ListURL": "https://cloud.nabu.ca/HomeBrew/titles/files.txt",
-          "Number": 3,
+          "Number": 9,
           "Type": "nabu",
           "Source": "NabuRetroNet",
         },
@@ -143,8 +143,8 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
         },
         {
           "Type": "tcp",
-          "Port": "5003",
-          "Channel": 3,
+          "Port": "5009",
+          "Channel": 9,
         },
         {
           "Type": "tcp",
