@@ -341,8 +341,8 @@ adaptor_send_time(struct nabu_connection *conn)
 		.mystery = {
 			[0] = 0x02,
 			[1] = 0x02,
-			[2] = 0x02,
 		},
+		.week_day  = tm->tm_wday + 1,
 		.year      = 84,		/* as in 1984 */
 		.month     = tm->tm_mon + 1,
 		.month_day = tm->tm_mday,

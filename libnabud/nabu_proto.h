@@ -308,7 +308,8 @@ struct nabu_pkthdr {
 };
 
 struct nabu_time {
-	uint8_t		mystery[3];
+	uint8_t		mystery[2];
+	uint8_t		week_day;
 	uint8_t		year;
 	uint8_t		month;
 	uint8_t		month_day;
