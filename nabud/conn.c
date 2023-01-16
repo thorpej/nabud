@@ -227,7 +227,6 @@ conn_add_serial(char *path, unsigned int channel)
 	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
 		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
 		    path);
-		goto bad;
 	}
 
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
