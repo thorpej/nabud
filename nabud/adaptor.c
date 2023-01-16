@@ -76,11 +76,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	NABU_PROTO_INLINES
 
 #include "libnabud/log.h"
+#include "libnabud/nhacp_proto.h"
 
 #include "adaptor.h"
 #include "conn.h"
 #include "image.h"
-#include "retronet.h"
+#include "nhacp.h"
 
 static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;
 static const uint8_t nabu_msg_finished[] = NABU_MSGSEQ_FINISHED;
@@ -568,144 +569,6 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 }
 
 /*
- * adaptor_msg_rn_file_open --
- *	RetroNet API: File open.
- */
-static void
-adaptor_msg_rn_file_open(struct nabu_connection *conn)
-{
-	uint16_t fileFlag;
-	uint8_t fileNameLen;
-	uint8_t fileName[256];
-	uint8_t msg[2];
-
-	log_debug("[%s] Waiting for NABU to send fileNameLen.",
-	    conn_name(conn));
-	if (! conn_recv_byte(conn, &fileNameLen)) {
-		log_error("[%s] NABU failed to send fileNameLen.",
-		    conn_name(conn));
-		conn_set_state(conn, CONN_STATE_ABORTED);
-		return;
-	}
-
-	log_debug("[%s] Waiting for NABU to send fileName (%u bytes).",
-	    conn_name(conn), fileNameLen);
-	if (! conn_recv(conn, fileName, fileNameLen)) {
-		log_error("[%s] NABU failed to send fileName.",
-		    conn_name(conn));
-		conn_set_state(conn, CONN_STATE_ABORTED);
-		return;
-	}
-	fileName[fileNameLen] = '\0';
-
-	log_debug("[%s] Waiting for NABU to send fileFlag.", conn_name(conn));
-	if (! conn_recv(conn, msg, sizeof(msg))) {
-		log_error("[%s] NABU failed to send fileFlag.",
-		    conn_name(conn));
-		conn_set_state(conn, CONN_STATE_ABORTED);
-		return;
-	}
-	fileFlag = nabu_get_uint16(msg);
-
-	log_debug("[%s] Waiting for NABU to send reqSlot.", conn_name(conn));
-	if (! conn_recv_byte(conn, msg)) {
-		log_error("[%s] NABU failed to send reqSlot.", conn_name(conn));
-		conn_set_state(conn, CONN_STATE_ABORTED);
-		return;
-	}
-
-	log_debug("[%s] rn_api_file_open(\"%s\", 0x%04x, %u)", conn_name(conn),
-	    fileName, fileFlag, msg[0]);
-	msg[0] = rn_api_file_open(conn, (const char *)fileName, fileFlag,
-	    msg[0]);
-	log_debug("[%s] Returning slot %u.", conn_name(conn), msg[0]);
-	conn_send_byte(conn, msg[0]);
-}
-
-/*
- * adaptor_msg_rn_fh_size --
- *	RetroNet API: File handle size.
- */
-static void
-adaptor_msg_rn_fh_size(struct nabu_connection *conn)
-{
-	uint8_t slot;
-	uint8_t msg[4];
-	int32_t size;
-
-	log_debug("[%s] Waiting for NABU to send slot.", conn_name(conn));
-	if (! conn_recv_byte(conn, &slot)) {
-		log_error("[%s] NABU failed to send slot.", conn_name(conn));
-		conn_set_state(conn, CONN_STATE_ABORTED);
-		return;
-	}
-
-	log_debug("[%s] rn_api_fh_size(%u)", conn_name(conn), slot);
-	size = rn_api_fh_size(conn, slot);
-	log_debug("[%s] Returning size %d.", conn_name(conn), size);
-	nabu_set_uint32(msg, size);
-	conn_send(conn, msg, 4);
-}
-
-/*
- * adaptor_msg_rn_fh_read --
- *	RetroNet API: File handle read.
- */
-static void
-adaptor_msg_rn_fh_read(struct nabu_connection *conn)
-{
-	uint8_t msg[7];
-	uint32_t offset;
-	uint16_t length;
-
-	log_debug("[%s] Waiting for NABU to send slot, offset, length.",
-	    conn_name(conn));
-	if (! conn_recv(conn, msg, sizeof(msg))) {
-		log_error("[%s] NABU failed to send slot, offset, length.",
-		    conn_name(conn));
-		conn_set_state(conn, CONN_STATE_ABORTED);
-		return;
-	}
-	offset = nabu_get_uint32(&msg[1]);
-	length = nabu_get_uint16(&msg[5]);
-
-	uint8_t *buf = malloc(length);
-	if (buf == NULL) {
-		log_error("[%s] Unable to allocate %zu bytes for data.",
-		    conn_name(conn), (size_t)length);
-		for (unsigned int i = 0; i < length; i++) {
-			conn_send_byte(conn, 0);
-		}
-		return;
-	}
-	log_debug("[%s] rn_api_fh_read(%u, %u, %u)", conn_name(conn),
-	    msg[0], offset, length);
-	rn_api_fh_read(conn, msg[0], buf, offset, length);
-	log_debug("[%s] Sending %u bytes of data.", conn_name(conn), length);
-	conn_send(conn, buf, length);
-	free(buf);
-}
-
-/*
- * adaptor_msg_rn_fh_close --
- *	RetroNet API: File handle close.
- */
-static void
-adaptor_msg_rn_fh_close(struct nabu_connection *conn)
-{
-	uint8_t slot;
-
-	log_debug("[%s] Waiting for NABU to send slot.", conn_name(conn));
-	if (! conn_recv_byte(conn, &slot)) {
-		log_error("[%s] NABU failed to send slot.", conn_name(conn));
-		conn_set_state(conn, CONN_STATE_ABORTED);
-		return;
-	}
-	log_debug("[%s] rn_api_fh_close(%u)", conn_name(conn), slot);
-	rn_api_fh_close(conn, slot);
-}
-
-/*
  * adaptor_event_loop --
  *	Main event loop for the Adaptor emulation.
  */
@@ -795,28 +658,10 @@ adaptor_event_loop(struct nabu_connection *conn)
 			adaptor_msg_change_channel(conn);
 			continue;
 
-		case NABU_MSG_RN_FILE_OPEN:
-			log_debug("[%s] Got NABU_MSG_RN_FILE_OPEN.",
+		case NABU_MSG_START_NHACP:
+			log_debug("[%s] Got NABU_MSG_START_NHACP.",
 			    conn_name(conn));
-			adaptor_msg_rn_file_open(conn);
-			continue;
-
-		case NABU_MSG_RN_FH_SIZE:
-			log_debug("[%s] Got NABU_MSG_RN_FH_SIZE.",
-			    conn_name(conn));
-			adaptor_msg_rn_fh_size(conn);
-			continue;
-
-		case NABU_MSG_RN_FH_READ:
-			log_debug("[%s] Got NABU_MSG_RN_FH_READ.",
-			    conn_name(conn));
-			adaptor_msg_rn_fh_read(conn);
-			continue;
-
-		case NABU_MSG_RN_FH_CLOSE:
-			log_debug("[%s] Got NABU_MSG_RN_FH_CLOSE.",
-			    conn_name(conn));
-			adaptor_msg_rn_fh_close(conn);
+			nhacp_start(conn);
 			continue;
 		}
 	}

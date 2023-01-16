@@ -62,10 +62,6 @@ struct nabu_connection {
 	uint8_t		pktbuf[NABU_MAXPACKETSIZE * 2];
 	size_t		pktlen;
 
-	/* RetroNet file API. */
-	LIST_HEAD(, rn_file) rn_files;
-	char		*rn_file_root;
-
 	/*
 	 * This is set if we're being enumerated.  If we are,
 	 * then we have to wait until the enumeration is complete
@@ -74,6 +70,11 @@ struct nabu_connection {
 	 * This field is protected by the connection list mutex.
 	 */
 	uint32_t	enum_count;
+
+	/*
+	 * Root of this connection's local file storage.
+	 */
+	char		*file_root;
 
 	/* Lock that protects the data below. */
 	pthread_mutex_t mutex;
