@@ -91,8 +91,8 @@ struct nabu_connection {
 
 extern unsigned int conn_count;
 
-void	conn_add_serial(char *, unsigned int);
-void	conn_add_tcp(char *, unsigned int);
+void	conn_add_serial(char *, unsigned int, char *);
+void	conn_add_tcp(char *, unsigned int, char *);
 void	conn_destroy(struct nabu_connection *);
 
 bool	conn_enumerate(bool (*)(struct nabu_connection *, void *), void *);

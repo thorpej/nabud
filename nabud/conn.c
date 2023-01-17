@@ -146,8 +146,8 @@ conn_thread(void *arg)
  *	Common connection-creation duties.
  */
 static void
-conn_create_common(char *name, int fd, unsigned int channel, conn_type type,
-    void *(*func)(void *))
+conn_create_common(char *name, int fd, unsigned int channel, char *file_root,
+    conn_type type, void *(*func)(void *))
 {
 	struct nabu_connection *conn;
 
@@ -160,11 +160,17 @@ conn_create_common(char *name, int fd, unsigned int channel, conn_type type,
 	}
 
 	conn->type = type;
+	conn->file_root = file_root;
 	pthread_mutex_init(&conn->mutex, NULL);
 
 	if (! conn_io_init(&conn->io, name, fd)) {
 		/* Error already logged. */
 		goto bad;
+	}
+
+	if (conn->file_root != NULL) {
+		log_info("[%s] Using '%s' for local storage.",
+		    conn_name(conn), conn->file_root);
 	}
 
 	/*
@@ -195,7 +201,7 @@ conn_create_common(char *name, int fd, unsigned int channel, conn_type type,
  *	Add a serial connection.
  */
 void
-conn_add_serial(char *path, unsigned int channel)
+conn_add_serial(char *path, unsigned int channel, char *file_root)
 {
 	struct termios t;
 	int fd;
@@ -251,7 +257,8 @@ conn_add_serial(char *path, unsigned int channel)
 		}
 	}
 
-	conn_create_common(path, fd, channel, CONN_TYPE_SERIAL, conn_thread);
+	conn_create_common(path, fd, channel, file_root, CONN_TYPE_SERIAL,
+	    conn_thread);
  	return;
  bad:
 	close(fd);
@@ -303,8 +310,8 @@ conn_tcp_thread(void *arg)
 		pthread_mutex_unlock(&conn->mutex);
 
 		conn_create_common(strdup(host), sock,
-		    chan != NULL ? chan->number : 0, CONN_TYPE_TCP,
-		    conn_thread);
+		    chan != NULL ? chan->number : 0, strdup(conn->file_root),
+		    CONN_TYPE_TCP, conn_thread);
 	}
 
 	/* Error on the listen socket -- He's dead, Jim. */
@@ -320,7 +327,7 @@ conn_tcp_thread(void *arg)
  *	creates new connections to service them.
  */
 void
-conn_add_tcp(char *portstr, unsigned int channel)
+conn_add_tcp(char *portstr, unsigned int channel, char *file_root)
 {
 	int sock;
 	long port;
@@ -359,7 +366,8 @@ conn_add_tcp(char *portstr, unsigned int channel)
 			if (bind(sock, ai->ai_addr, ai->ai_addrlen) == 0) {
 				if (listen(sock, 8) == 0) {
 					conn_create_common(strdup(name), sock,
-					    channel, CONN_TYPE_LISTENER,
+					    channel, file_root,
+					    CONN_TYPE_LISTENER,
 					    conn_tcp_thread);
 					sock = -1;
 				} else {
@@ -396,6 +404,7 @@ conn_destroy(struct nabu_connection *conn)
 
 	conn_io_fini(&conn->io);
 
+	free(conn->file_root);
 	free(conn);
 }
 

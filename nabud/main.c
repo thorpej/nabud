@@ -230,8 +230,8 @@ config_load_source(mj_t *atom)
 static void
 config_load_connection(mj_t *atom)
 {
-	mj_t *type_atom, *port_atom, *channel_atom;
-	char *type = NULL, *port = NULL, *channel = NULL;
+	mj_t *type_atom, *port_atom, *channel_atom, *file_root_atom;
+	char *type = NULL, *port = NULL, *channel = NULL, *file_root = NULL;
 	long val;
 
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
@@ -261,6 +261,12 @@ config_load_connection(mj_t *atom)
 		val = 0;
 	}
 
+	/* FileRoot is optional. */
+	file_root_atom = mj_get_atom(atom, "FileRoot");
+	if (VALID_ATOM(file_root_atom, MJ_STRING)) {
+		mj_asprint(&file_root, file_root_atom, MJ_HUMAN);
+	}
+
 	type_atom = mj_get_atom(atom, "Type");
 	if (! VALID_ATOM(type_atom, MJ_STRING)) {
 		config_error("Invalid or missing Type in Connection object",
@@ -270,13 +276,13 @@ config_load_connection(mj_t *atom)
 	mj_asprint(&type, type_atom, MJ_HUMAN);
 
 	if (strcasecmp(type, "serial") == 0) {
-		conn_add_serial(port, val);
+		conn_add_serial(port, val, file_root);
 		/* conn_add_serial() owns these. */
-		port = NULL;
+		port = file_root = NULL;
 	} else if (strcasecmp(type, "tcp") == 0) {
-		conn_add_tcp(port, val);
+		conn_add_tcp(port, val, file_root);
 		/* conn_add_tcp() owns these. */
-		port = NULL;
+		port = file_root = NULL;
 	} else {
 		config_error("Connection Type must be Serial or TCP", atom);
 		goto out;
@@ -291,6 +297,9 @@ config_load_connection(mj_t *atom)
 	}
 	if (channel != NULL) {
 		free(channel);
+	}
+	if (file_root != NULL) {
+		free(file_root);
 	}
 }
 
