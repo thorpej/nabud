@@ -28,7 +28,9 @@
  * nabuclient -- a simple client of the NABU Adaptor protocol
  *
  * This exists primarily to test nabud and also to inspect replies
- * from other NABU Adaptor emulators.
+ * from other NABU Adaptor emulators.  This particular program is
+ * really just hacked together and does the bare ninimum to enable
+ * testing.  NO JUDGEMENT.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -37,6 +39,7 @@
 
 #include <sys/socket.h>
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <err.h>	/* XXX HAVE_ERR_H-ize, please */
 #include <netdb.h>
@@ -57,6 +60,7 @@
 #include "libnabud/cli.h"
 #include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
+#include "libnabud/nhacp_proto.h"
 
 static int	client_sock;
 
@@ -567,7 +571,147 @@ command_change_channel(int argc, char *argv[])
 	return false;
 }
 
-#if 0
+static union {
+	struct nhacp_request request;
+	struct nhacp_response reply;
+} nhacp_buf;
+static uint16_t nhacp_length;
+
+static void
+nhacp_send(uint8_t op, uint16_t length)
+{
+	nhacp_buf.request.generic.type = op;
+	nabu_set_uint16(nhacp_buf.request.length, length);
+	nabu_send(&nhacp_buf.request,
+	    length + sizeof(nhacp_buf.request.length));
+}
+
+static void
+nhacp_recv(void)
+{
+	nabu_recv(nhacp_buf.reply.length, sizeof(nhacp_buf.reply.length));
+	uint16_t length = nabu_get_uint16(nhacp_buf.reply.length);
+
+	printf("NHACP response length: 0x%04x\n", length);
+	if (length == 0 || length > NHACP_MAX_MESSAGELEN) {
+		printf("The server is drunk.\n");
+		cli_throw();
+	}
+	nabu_recv(&nhacp_buf.reply.generic, length);
+	nhacp_length = length;
+}
+
+static void
+nhacp_decode_reply(void)
+{
+	uint16_t length;
+
+	nhacp_recv();
+
+	switch (nhacp_buf.reply.generic.type) {
+	case NHACP_RESP_NHACP_STARTED:
+		if (nhacp_length < sizeof(nhacp_buf.reply.nhacp_started)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		printf("Got: NHACP_RESP_NHACP_STARTED.\n");
+		printf("Server Vers=$%02X $%02X ID len=%u '%-*s'\n",
+		    nhacp_buf.reply.nhacp_started.version[0],
+		    nhacp_buf.reply.nhacp_started.version[1],
+		    nhacp_buf.reply.nhacp_started.adapter_id_length,
+		    nhacp_buf.reply.nhacp_started.adapter_id_length,
+		    nhacp_buf.reply.nhacp_started.adapter_id);
+		break;
+
+	case NHACP_RESP_OK:
+		printf("Got: NHACP_RESP_OK.\n");
+		break;
+
+	case NHACP_RESP_ERROR:
+		printf("Got: NHACP_RESP_ERROR.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.error)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		printf("--> Code %u Message '%-*s' <--\n",
+		    nabu_get_uint16(nhacp_buf.reply.error.code),
+		    nhacp_buf.reply.error.message_length,
+		    (char *)nhacp_buf.reply.error.message);
+		break;
+
+	case NHACP_RESP_STORAGE_LOADED:
+		printf("Got: NHACP_RESP_STORAGE_LOADED.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.storage_loaded)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		printf("--> Slot %u Size %u <--\n",
+		    nhacp_buf.reply.storage_loaded.slot,
+		    nabu_get_uint32(nhacp_buf.reply.storage_loaded.length));
+		break;
+
+	case NHACP_RESP_DATA_BUFFER:
+		printf("Got: NHACP_RESP_DATA_BUFFER.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.data_buffer)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		length = nabu_get_uint16(nhacp_buf.reply.data_buffer.length);
+		printf("--> Length: %u <--\n", length);
+		printf("--> START\n");
+		printf("%-*s\n", length,
+		    (char *)nhacp_buf.reply.data_buffer.data);
+		printf("<-- END\n");
+		break;
+
+	case NHACP_RESP_DATE_TIME:
+		printf("Got: NHACP_RESP_DATE_TIME.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.date_time)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		print_reply(nhacp_buf.reply.date_time.yyyymmdd,
+		    sizeof(nhacp_buf.reply.date_time.yyyymmdd) +
+		    sizeof(nhacp_buf.reply.date_time.hhmmss));
+		if (isascii(nhacp_buf.reply.date_time.yyyymmdd[0]) &&
+		    isascii(nhacp_buf.reply.date_time.yyyymmdd[1]) &&
+		    isascii(nhacp_buf.reply.date_time.yyyymmdd[2]) &&
+		    isascii(nhacp_buf.reply.date_time.yyyymmdd[3]) &&
+		    isascii(nhacp_buf.reply.date_time.yyyymmdd[4]) &&
+		    isascii(nhacp_buf.reply.date_time.yyyymmdd[5]) &&
+		    isascii(nhacp_buf.reply.date_time.yyyymmdd[6]) &&
+		    isascii(nhacp_buf.reply.date_time.yyyymmdd[7]) &&
+		    isascii(nhacp_buf.reply.date_time.hhmmss[0]) &&
+		    isascii(nhacp_buf.reply.date_time.hhmmss[1]) &&
+		    isascii(nhacp_buf.reply.date_time.hhmmss[2]) &&
+		    isascii(nhacp_buf.reply.date_time.hhmmss[3]) &&
+		    isascii(nhacp_buf.reply.date_time.hhmmss[4]) &&
+		    isascii(nhacp_buf.reply.date_time.hhmmss[5])) {
+			printf("--> %c%c%c%c-%c%c-%c%c %c%c:%c%c:%c%c <--\n",
+			    nhacp_buf.reply.date_time.yyyymmdd[0],
+			    nhacp_buf.reply.date_time.yyyymmdd[1],
+			    nhacp_buf.reply.date_time.yyyymmdd[2],
+			    nhacp_buf.reply.date_time.yyyymmdd[3],
+			    nhacp_buf.reply.date_time.yyyymmdd[4],
+			    nhacp_buf.reply.date_time.yyyymmdd[5],
+			    nhacp_buf.reply.date_time.yyyymmdd[6],
+			    nhacp_buf.reply.date_time.yyyymmdd[7],
+			    nhacp_buf.reply.date_time.hhmmss[0],
+			    nhacp_buf.reply.date_time.hhmmss[1],
+			    nhacp_buf.reply.date_time.hhmmss[2],
+			    nhacp_buf.reply.date_time.hhmmss[3],
+			    nhacp_buf.reply.date_time.hhmmss[4],
+			    nhacp_buf.reply.date_time.hhmmss[5]);
+		}
+		break;
+
+	default:
+		printf("Got: unknown response type 0x%02x\n",
+		    nhacp_buf.reply.generic.type);
+		break;
+	}
+}
+
 static uint8_t
 nhacp_parse_slot(const char *cp)
 {
@@ -600,7 +744,128 @@ nhacp_parse_length(const char *cp)
 	}
 	return (uint16_t)val;
 }
-#endif
+
+static bool
+command_nhacp_start(int argc, char *argv[])
+{
+	printf("Sending: NABU_MSG_START_NHACP.\n");
+	nabu_send_byte(NABU_MSG_START_NHACP);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_get_date_time(int argc, char *argv[])
+{
+	printf("Sending: NHACP_REQ_GET_DATE_TIME.\n");
+	nhacp_send(NHACP_REQ_GET_DATE_TIME, 1);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_storage_open(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t req_slot = nhacp_parse_slot(argv[1]);
+
+	nhacp_buf.request.storage_open.req_slot = req_slot;
+	nabu_set_uint16(nhacp_buf.request.storage_open.flags, 0);
+	nhacp_buf.request.storage_open.url_length = (uint8_t)strlen(argv[2]);
+	strcpy((char *)nhacp_buf.request.storage_open.url_string, argv[2]);
+
+	printf("Sending: NHACP_REQ_STORAGE_OPEN.\n");
+	nhacp_send(NHACP_REQ_STORAGE_OPEN,
+	    sizeof(nhacp_buf.request.storage_open) + strlen(argv[2]));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_storage_get(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = nhacp_parse_slot(argv[1]);
+	uint32_t offset = nhacp_parse_offset(argv[2]);
+	uint16_t length = nhacp_parse_length(argv[3]);
+
+	nhacp_buf.request.storage_get.slot = slot;
+	nabu_set_uint32(nhacp_buf.request.storage_get.offset, offset);
+	nabu_set_uint16(nhacp_buf.request.storage_get.length, length);
+
+	printf("Sending: NHACP_REQ_STORAGE_GET.\n");
+	nhacp_send(NHACP_REQ_STORAGE_GET,
+	    sizeof(nhacp_buf.request.storage_get));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_storage_put(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = nhacp_parse_slot(argv[1]);
+	uint32_t offset = nhacp_parse_offset(argv[2]);
+	uint16_t length = strlen(argv[3]);
+
+	nhacp_buf.request.storage_put.slot = slot;
+	nabu_set_uint32(nhacp_buf.request.storage_put.offset, offset);
+	nabu_set_uint16(nhacp_buf.request.storage_put.length, length);
+	memcpy(nhacp_buf.request.storage_put.data, argv[3], length);
+
+	printf("Sending: NHACP_REQ_STORAGE_PUT.\n");
+	nhacp_send(NHACP_REQ_STORAGE_PUT,
+	    sizeof(nhacp_buf.request.storage_put) + length);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_storage_close(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = nhacp_parse_slot(argv[1]);
+
+	nhacp_buf.request.storage_close.slot = slot;
+
+	printf("Sending: NHACP_REQ_STORAGE_CLOSE.\n");
+	nhacp_send(NHACP_REQ_STORAGE_CLOSE,
+	    sizeof(nhacp_buf.request.storage_close));
+
+	/* There is no reply to this request. */
+
+	return false;
+}
+
+static bool
+command_nhacp_end_protocol(int argc, char *argv[])
+{
+	printf("Sending: NHACP_REQ_END_PROTOCOL.\n");
+	nhacp_send(NHACP_REQ_END_PROTOCOL, 1);
+
+	return false;
+}
 
 static bool	command_help(int, char *[]);
 
@@ -617,6 +882,14 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "get-transmit-status",.func = command_get_transmit_status },
 	{ .name = "get-time",		.func = command_get_time },
 	{ .name = "get-image",		.func = command_get_image },
+
+	{ .name = "nhacp-start",	.func = command_nhacp_start },
+	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
+	{ .name = "nhacp-storage-get",	.func = command_nhacp_storage_get },
+	{ .name = "nhacp-storage-put",	.func = command_nhacp_storage_put },
+	{ .name = "nhacp-get-date-time", .func = command_nhacp_get_date_time },
+	{ .name = "nhacp-storage-close", .func = command_nhacp_storage_close },
+	{ .name = "nhacp-end-protocol",	.func = command_nhacp_end_protocol },
 
 	CMDTAB_EOL(cli_command_unknown)
 };
