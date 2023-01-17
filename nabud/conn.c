@@ -27,8 +27,8 @@
 /*
  * Connection abstraction.
  *
- * Connections can be either over a serial interface to a real NABU,
- * but eventually also be over a socket to support NABU emulators.
+ * Connections can be either over a serial interface to a real NABU
+ * or over a TCP socket to support NABU emulators.
  */
 
 #include <assert.h>
