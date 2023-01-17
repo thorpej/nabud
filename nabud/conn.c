@@ -229,7 +229,20 @@ conn_add_serial(char *path, unsigned int channel, char *file_root)
 	cfmakeraw(&t);
 	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
 	t.c_cflag |= CLOCAL | CS8 | CSTOPB;
-	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
+	/*
+	 * Linux's cfsetspeed(3) appears to be overly-restrictive in
+	 * that is allows ONLY one of the "normal" baud rates.  This
+	 * same restriction does not exist on BSD systems.
+	 *
+	 * Hilariously, cfsetispeed(3) and cfsetospeed(3) do NOT have
+	 * this same restriction on Linux -- they will happily accept
+	 * whatever speed and let tcsetattr(3) be the final arbiter
+	 * (which is exactly how it works on BSD).
+	 *
+	 * So that's what we do.
+	 */
+	if (cfsetispeed(&t, NABU_NATIVE_BPS) < 0 ||
+	    cfsetospeed(&t, NABU_NATIVE_BPS) < 0) {
 		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
 		    path);
 		goto fallback;
@@ -246,7 +259,8 @@ conn_add_serial(char *path, unsigned int channel, char *file_root)
 		log_info("Failed to 8N2-%d on %s; falling back to 8N2-%d.",
 		    NABU_NATIVE_BPS, path, NABU_FALLBACK_BPS);
  fallback:
-		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
+		if (cfsetispeed(&t, NABU_FALLBACK_BPS) < 0 ||
+		    cfsetospeed(&t, NABU_FALLBACK_BPS) < 0) {
 			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
 			    path);
 			goto bad;
