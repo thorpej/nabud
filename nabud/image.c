@@ -50,8 +50,6 @@
 #elif defined(HAVE_OPENSSL)
 #include <openssl/des.h>
 #include <openssl/md5.h>
-#else
-#define NO_PAK_FILE_SUPPORT
 #endif
 
 #include "libnabud/fileio.h"
@@ -233,14 +231,6 @@ image_add_channel(image_channel_type type, char *name, char *source,
 		    number, chan->name, chan->source->name);
 		goto bad;
 	}
-
-#ifdef NO_PAK_FILE_SUPPORT
-	if (type == IMAGE_CHANNEL_PAK) {
-		log_error("Skipping pak channel %u (%s on %s); "
-		    "no pak file support.", number, name, source);
-		goto bad;
-	}
-#endif /* NO_PAK_FILE_SUPPORT */
 
 	if (relpath != NULL) {
 		/* Get rid of leading /'s */
@@ -517,21 +507,21 @@ image_nabu_name(uint32_t image)
 	return strdup(namestr);
 }
 
-#define	PAK_NAME_SIZE	\
+#define	ENCRYPTED_PAK_NAME_SIZE	\
 	sizeof("FE-A1-04-B7-3D-67-F8-8B-26-4C-0C-81-9B-F6-24-58.npak")
 
-#ifndef NO_PAK_FILE_SUPPORT
 /*
- * image_pak_name --
- *	Generate a NabuRetroNet PAK name from the given image number.
+ * image_encrypted_pak_name --
+ *	Generate a NabuRetroNet encrypted PAK name from the given
+ *	image number.
  */
 static char *
-image_pak_name(uint32_t image)
+image_encrypted_pak_name(uint32_t image)
 {
-	char namestr[sizeof("000001nabu")];
-	char pakname[PAK_NAME_SIZE];
-
 #if defined(HAVE_COMMONCRYPTO_H) || defined(HAVE_OPENSSL)
+	char namestr[sizeof("000001nabu")];
+	char pakname[ENCRYPTED_PAK_NAME_SIZE];
+
 	MD5_CTX ctx;
 	unsigned char digest[MD5_DIGEST_LENGTH];
 
@@ -539,9 +529,6 @@ image_pak_name(uint32_t image)
 	MD5_Init(&ctx);
 	MD5_Update(&ctx, namestr, sizeof(namestr) - 1);
 	MD5_Final(digest, &ctx);
-#else
-#error Unable to generate PAK file names!
-#endif
 
 	snprintf(pakname, sizeof(pakname),
 	    "%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X.npak",
@@ -551,8 +538,27 @@ image_pak_name(uint32_t image)
 	    digest[12], digest[13], digest[14], digest[15]);
 
 	return strdup(pakname);
+#else
+	return NULL;
+#endif
 }
-#endif /* ! NO_PAK_FILE_SUPPORT */
+
+/*
+ * image_pak_name --
+ *	Generate a PAK image name.
+ */
+static char *
+image_pak_name(uint32_t image, bool encrypted)
+{
+	char namestr[sizeof("000001.pak")];
+
+	if (encrypted) {
+		return image_encrypted_pak_name(image);
+	}
+
+	snprintf(namestr, sizeof(namestr), "%06X.pak", image);
+	return strdup(namestr);
+}
 
 /*
  * image_from_nabu --
@@ -588,7 +594,6 @@ image_from_nabu(struct image_channel *chan, uint32_t image,
 	return img;
 }
 
-#ifndef NO_PAK_FILE_SUPPORT
 /*
  * image_decrypt_pak --
  *	Decrypt a PAK image.
@@ -633,7 +638,7 @@ image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
 
 	return true;
 #else
-#error Unable to decrypt PAK files!
+	return false;
 #endif
 }
 
@@ -643,9 +648,11 @@ image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
  */
 static struct nabu_image *
 image_from_pak(struct image_channel *chan, uint32_t image,
-    const char *image_name, const uint8_t *pakbuf, size_t paklen)
+    const char *image_name, uint8_t *pakbuf, size_t paklen,
+    bool encrypted)
 {
 	char image_name_buf[sizeof("pak-000001")];
+	uint8_t *pakdata;
 
 	if (image_name == NULL) {
 		snprintf(image_name_buf, sizeof(image_name_buf),
@@ -653,31 +660,39 @@ image_from_pak(struct image_channel *chan, uint32_t image,
 		image_name = image_name_buf;
 	}
 
-	if ((paklen % 8) != 0) {	/* XXX magic number */
-		log_error("%s size %zu is not a multiple of DES block size.",
-		    image_name, paklen);
-		return NULL;
-	}
-
-	uint8_t *pakdata = malloc(paklen);
-	if (pakdata == NULL) {
-		log_error("Unable to allocate buffer for decrypted %s.",
-		    image_name);
-		return NULL;
-	}
-
 	struct nabu_image *img = calloc(1, sizeof(*img));
 	if (img == NULL) {
 		log_error("Unable to allocate image descriptor for %s.",
 		    image_name);
-		free(pakdata);
-		return NULL;
+		goto bad;
 	}
 
-	if (! image_decrypt_pak(pakbuf, pakdata, paklen)) {
-		log_error("Unable to decrypt PAK image %s.", image_name);
-		free(pakdata);
-		return NULL;
+	if (encrypted) {
+		if ((paklen % 8) != 0) {	/* XXX magic number */
+			log_error("[%s] %s size %zu is not a multiple of "
+			    "DES block size.", chan->name, image_name, paklen);
+			goto bad;
+		}
+
+		pakdata = malloc(paklen);
+		if (pakdata == NULL) {
+			log_error("[%s] Unable to allocate buffer for "
+			    "decrypted %s.", chan->name, image_name);
+			goto bad;
+		}
+
+		log_debug("[%s] Decrypting PAK image %s.",
+		    chan->name, image_name);
+		    
+		if (! image_decrypt_pak(pakbuf, pakdata, paklen)) {
+			log_error("[%s] Unable to decrypt PAK image %s.",
+			    chan->name, image_name);
+			free(pakdata);
+			goto bad;
+		}
+		free(pakbuf);
+	} else {
+		pakdata = pakbuf;
 	}
 
 	img->channel = chan;
@@ -688,8 +703,11 @@ image_from_pak(struct image_channel *chan, uint32_t image,
 	img->refcnt = 1;
 
 	return img;
+
+ bad:
+	free(pakbuf);
+	return NULL;
 }
-#endif /* ! NO_PAK_FILE_SUPPORT */
 
 /*
  * image_load_image_from_url --
@@ -697,7 +715,7 @@ image_from_pak(struct image_channel *chan, uint32_t image,
  */
 static struct nabu_image *
 image_load_image_from_url(struct image_channel *chan, uint32_t image,
-    const char *image_name, const char *url)
+    const char *image_name, const char *url, bool encrypted)
 {
 	struct nabu_image *img;
 	uint8_t *filebuf;
@@ -710,14 +728,10 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 		return NULL;
 	}
 
-#ifndef NO_PAK_FILE_SUPPORT
 	if (chan->type == IMAGE_CHANNEL_PAK) {
 		img = image_from_pak(chan, image, image_name, filebuf,
-		    filesize);
-		free(filebuf);
-	} else
-#endif /* ! NO_PAK_FILE_SUPPORT */
-	{
+		    filesize, encrypted);
+	} else {
 		img = image_from_nabu(chan, image, image_name, filebuf,
 		    filesize);
 	}
@@ -766,6 +780,7 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	struct image_channel *chan;
 	char *selected_name = NULL;
 	int rv;
+	bool try_encrypted_pak = false;
 
 	assert(image != IMAGE_NUMBER_NAMED);
 
@@ -832,6 +847,7 @@ image_load(struct nabu_connection *conn, uint32_t image)
 
 	pthread_mutex_unlock(&image_cache_lock);
 
+ try_again:
 	if (selected_name != NULL) {
 		rv = asprintf(&image_url, "%s/%s", chan->path, selected_name);
 		assert(rv != -1 && image_url != NULL);
@@ -840,17 +856,19 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	} else {
 		const char *imgtype;
 		char *fname;
-#ifndef NO_PAK_FILE_SUPPORT
+
 		if (chan->type == IMAGE_CHANNEL_PAK) {
-			fname = image_pak_name(image);
+			fname = image_pak_name(image, try_encrypted_pak);
 			imgtype = "pak";
-		} else
-#endif /* ! NO_PAK_FILE_SUPPORT */
-		{
+		} else {
 			fname = image_nabu_name(image);
 			imgtype = "nabu";
 		}
-
+		if (fname == NULL) {
+			log_error("[%s] Unable to generate file name "
+			    "for %s-%06X.", conn_name(conn),
+			    imgtype, image);
+		}
 		rv = asprintf(&image_url, "%s/%s", chan->path, fname);
 		assert(rv != -1 && image_url != NULL);
 		log_debug("[%s] Loading %s-%06X from %s", conn_name(conn),
@@ -858,7 +876,8 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		free(fname);
 	}
 
-	img = image_load_image_from_url(chan, image, selected_name, image_url);
+	img = image_load_image_from_url(chan, image, selected_name, image_url,
+	    try_encrypted_pak);
 	free(image_url);
 	if (img != NULL) {
 		struct nabu_image *oimg, *using_img;
@@ -879,6 +898,19 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		image_free(oimg);
 		image_free(img);
 		img = using_img;
+	} else {
+		if (selected_name == NULL &&
+		    chan->type == IMAGE_CHANNEL_PAK && !try_encrypted_pak) {
+			/*
+			 * The unencrypted name didn't work.  While the
+			 * original 1984 cycles are now being vended as
+			 * unencrypted files for the most part, our config
+			 * might be referencing an old Source, so we'll
+			 * try the encrypted name if the regular name failed.
+			 */
+			try_encrypted_pak = true;
+			goto try_again;
+		}
 	}
 
  out:
