@@ -487,7 +487,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	/* Opening directories is not allowed. */
 	if (attrs.is_directory) {
 		log_error("[%s] '%s': Opening directories is not permitted.",
-		    conn_name(ctx->conn), fileio_location(f->fileio.fileio));
+		    conn_name(ctx->conn), fileio_location(fileio));
 		nhacp_send_error(ctx, 0, error_message_einval);
 		goto out;
 	}
@@ -499,7 +499,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	 */
 	if (! attrs.is_seekable) {
 		log_debug("[%s] Need seekable shadow buffer for '%s'",
-		    conn_name(ctx->conn), fileio_location(f->fileio.fileio));
+		    conn_name(ctx->conn), fileio_location(fileio));
 		need_shadow = true;
 	}
 
@@ -507,7 +507,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		if (attrs.size > MAX_SHADOW_LENGTH) {
 			log_debug("[%s] '%s' exceeds maximum shadow length %u.",
 			    conn_name(ctx->conn),
-			    fileio_location(f->fileio.fileio),
+			    fileio_location(fileio),
 			    MAX_SHADOW_LENGTH);
 			nhacp_send_error(ctx, 0, error_message_etoobig);
 			goto out;
