@@ -429,6 +429,11 @@ And you can select a file to loaded wnen the NABU boots and requests image 00000
 
 ## Changes
 
+### nabud-0.9.1
+* Fixed a problem with Linux's overly-restrictive cfsetspeed(3) whereby attempting
+to set the native NABU baud rate would cause the entire serial port setup to fail rather
+then falling back to 115.2K baud.
+
 ### nabud-0.9
 * Added _rc.d_ and _rc.conf.d_ extras for NetBSD and a few other tweaks to make it ready for pkgsrc.
 * Updated example config in preparation for additional NabuRetroNet channels.
