@@ -311,7 +311,8 @@ conn_tcp_thread(void *arg)
 		pthread_mutex_unlock(&conn->mutex);
 
 		conn_create_common(strdup(host), sock,
-		    chan != NULL ? chan->number : 0, strdup(conn->file_root),
+		    chan != NULL ? chan->number : 0,
+		    conn->file_root != NULL ? strdup(conn->file_root) : NULL,
 		    CONN_TYPE_TCP, conn_thread);
 	}
 
