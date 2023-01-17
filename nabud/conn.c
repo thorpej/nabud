@@ -232,7 +232,7 @@ conn_add_serial(char *path, unsigned int channel, char *file_root)
 	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
 		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
 		    path);
-		goto bad;
+		goto fallback;
 	}
 
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
@@ -245,6 +245,7 @@ conn_add_serial(char *path, unsigned int channel, char *file_root)
 		 */
 		log_info("Failed to 8N2-%d on %s; falling back to 8N2-%d.",
 		    NABU_NATIVE_BPS, path, NABU_FALLBACK_BPS);
+ fallback:
 		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
 			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
 			    path);
