@@ -404,6 +404,7 @@ nhacp_fileop_write_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
 			free(f->shadow.data);
 			f->shadow.data = newbuf;
 		}
+		f->shadow.length = offset + length;
 	}
 	memcpy(f->shadow.data + offset, ctx->request.storage_put.data,
 	    length);
@@ -568,7 +569,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 
 	f = nhacp_file_find(ctx, ctx->request.storage_get.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn_name(ctx->conn),
+		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
 		    ctx->request.storage_get.slot);
 		nhacp_send_error(ctx, 0, error_message_ebadf);
 		return;
@@ -576,6 +577,9 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_get.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_get.length);
+
+	log_debug("[%s] slot %u offset %u length %u", conn_name(ctx->conn),
+	    ctx->request.storage_put.slot, offset, length);
 
 	if (length > MAX_STORAGE_GET_LENGTH) {
 		nhacp_send_error(ctx, 0, error_message_einval);
@@ -596,14 +600,17 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 
 	f = nhacp_file_find(ctx, ctx->request.storage_put.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn_name(ctx->conn),
+		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
 		    ctx->request.storage_put.slot);
 		nhacp_send_error(ctx, 0, error_message_ebadf);
 		return;
 	}
 
-	uint32_t offset = nabu_get_uint32(ctx->request.storage_get.offset);
-	uint16_t length = nabu_get_uint16(ctx->request.storage_get.length);
+	uint32_t offset = nabu_get_uint32(ctx->request.storage_put.offset);
+	uint16_t length = nabu_get_uint16(ctx->request.storage_put.length);
+
+	log_debug("[%s] slot %u offset %u length %u", conn_name(ctx->conn),
+	    ctx->request.storage_put.slot, offset, length);
 
 	if (length > MAX_STORAGE_PUT_LENGTH) {
 		nhacp_send_error(ctx, 0, error_message_einval);
@@ -661,11 +668,11 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 
 	f = nhacp_file_find(ctx, ctx->request.storage_close.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %d.", conn_name(ctx->conn),
+		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
 		    ctx->request.storage_close.slot);
 		return;
 	}
-	log_debug("[%s] Freeing file at slot %d.", conn_name(ctx->conn),
+	log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
 	    f->slot);
 	LIST_REMOVE(f, link);
 	nhacp_file_free(ctx, f);
