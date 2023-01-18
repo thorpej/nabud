@@ -34,11 +34,15 @@
 
 #include <sys/socket.h>
 #include <sys/un.h>
+#if defined(LOCAL_PEERCRED) && defined(HAVE_SYS_UCRED_H)
+#include <sys/ucred.h>
+#endif /* LOCAL_PEERCRED && HAVE_SYS_UCRED_H */
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include "libnabud/atom.h"
@@ -511,6 +515,57 @@ control_connection_thread(void *arg)
 #endif /* ! SUN_LEN */
 
 /*
+ * control_peer_name --
+ *	Figure out the control connection peer name, if we can.
+ */
+static char *
+control_peer_name(struct conn_io *conn, int sock)
+{
+#if defined(LOCAL_PEEREID)
+	/*
+	 * NetBSD-like LOCAL_PEEREID.
+	 */
+	struct unpcbid cred;
+	socklen_t len = sizeof(cred);
+	char *name;
+
+	if (getsockopt(sock, SOL_LOCAL, LOCAL_PEEREID, &cred, &len) == 0) {
+		if (asprintf(&name, "pid-%d", (int)cred.unp_pid) >= 0) {
+			return name;
+		}
+	}
+#elif defined(LOCAL_PEERPID)
+	/*
+	 * macOS-like LOCAL_PEERPID
+	 */
+	pid_t pid;
+	socklen_t len = sizeof(pid);
+	char *name;
+
+	if (getsockopt(sock, SOL_LOCAL, LOCAL_PEERPID, &pid, &len) == 0) {
+		if (asprintf(&name, "pid-%d", (int)pid) >= 0) {
+			return name;
+		}
+	}
+#elif defined(LOCAL_PEERCRED) && defined(HAVE_SYS_UCRED_H)
+	/*
+	 * FreeBSD-like LOCAL_PEERCRED.
+	 */
+	struct xucred cred;
+	socklen_t len = sizeof(cred);
+	char *name;
+
+	if (getsockopt(sock, SOL_LOCAL, LOCAL_PEERCRED, &cred, &len) == 0 &&
+	    cred.cr_version == XUCRED_VERSION) {
+		if (asprintf(&name, "pid-%d", (int)cred.cr_pid) >= 0) {
+			return name;
+		}
+	}
+#endif
+	return strdup(conn_io_name(conn));
+}
+
+/*
  * control_listen_thread --
  *	Worker thread that accepts new control connections.
  */
@@ -519,7 +574,7 @@ control_listen_thread(void *arg)
 {
 	struct conn_io *conn = arg;
 	struct conn_io *newconn;
-	const char *name;
+	char *name;
 	struct sockaddr_storage peerss;
 	socklen_t peersslen;
 	int sock;
@@ -532,8 +587,7 @@ control_listen_thread(void *arg)
 			break;
 		}
 
-		/* XXX LOCAL_PEEREID? */
-		name = conn_io_name(conn);
+		name = control_peer_name(conn, sock);
 
 		log_info("[%s] Creating new control connection.",
 		    conn_io_name(conn));
@@ -544,7 +598,7 @@ control_listen_thread(void *arg)
 			close(sock);
 			continue;
 		}
-		if (! conn_io_init(newconn, strdup(name), sock)) {
+		if (! conn_io_init(newconn, name, sock)) {
 			/* Error already logged. */
 			close(sock);
 			continue;
