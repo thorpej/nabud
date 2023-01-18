@@ -39,6 +39,7 @@
 #endif /* LOCAL_PEERCRED && HAVE_SYS_UCRED_H */
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
@@ -573,6 +574,8 @@ control_peer_name(struct conn_io *conn, int sock)
 	return strdup(conn_io_name(conn));
 }
 
+static const char *nabuctl_sock_path;
+
 /*
  * control_listen_thread --
  *	Worker thread that accepts new control connections.
@@ -621,6 +624,7 @@ control_listen_thread(void *arg)
 
 	conn_io_fini(conn);
 	free(conn);
+	(void) unlink(nabuctl_sock_path);
 
 	return NULL;
 }
@@ -639,6 +643,7 @@ control_init(const char *path)
 	if (path == NULL) {
 		path = NABUCTL_PATH_DEFAULT;
 	}
+	nabuctl_sock_path = path;
 
 	if (strlen(path) > sizeof(sun.sun_path)) {
 		log_error("Path to control socket is too long: %s", path);
@@ -696,6 +701,7 @@ control_init(const char *path)
 	return;
 
  bad:
+	(void) unlink(path);
 	if (sock >= 0) {
 		close(sock);
 	}
