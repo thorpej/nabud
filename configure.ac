@@ -65,7 +65,7 @@ AC_SUBST([WARNCFLAGS])
 
 # Check for some common system headers.
 #
-AC_CHECK_HEADERS([inttypes.h])
+AC_CHECK_HEADERS([inttypes.h sys/ucred.h])
 
 # Deal with the crypto libraries we need.
 #
