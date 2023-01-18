@@ -529,6 +529,14 @@ control_peer_name(struct conn_io *conn, int sock)
 	socklen_t len = sizeof(cred);
 	char *name;
 
+	/*
+	 * NetBSD hasn't always had an SOL_LOCAL define, but prior to
+	 * it existing, programs simply used the value 0.
+	 */
+#ifndef SOL_LOCAL
+#define	SOL_LOCAL	0
+#endif
+
 	if (getsockopt(sock, SOL_LOCAL, LOCAL_PEEREID, &cred, &len) == 0) {
 		if (asprintf(&name, "pid-%d", (int)cred.unp_pid) >= 0) {
 			return name;
