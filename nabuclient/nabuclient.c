@@ -522,6 +522,8 @@ command_get_image(int argc, char *argv[])
 			printf("*** pkthdr.offset %u != expected %zu\n",
 			    nabu_get_uint16_be(pkthdr.offset), current_offset);
 		}
+#else
+		(void)current_offset;
 #endif
 		if (pkthdr.type & 0x10) {
 			printf("*** LAST PACKET!\n");
