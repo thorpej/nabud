@@ -571,6 +571,19 @@ control_peer_name(struct conn_io *conn, int sock)
 			return name;
 		}
 	}
+#elif defined(SO_PEERCRED)
+	/*
+	 * Linux-like SO_PEERCRED.
+	 */
+	struct ucred cred;
+	socklen_t len = sizeof(cred);
+	char *name;
+
+	if (getsockopt(sock, SOL_SOCKET, SO_PEERCRED, &cred, &len) == 0) {
+		if (asprintf(&name, "pid-%d", (int)cred.pid) >= 0) {
+			return name;
+		}
+	}
 #endif
 	return strdup(conn_io_name(conn));
 }
