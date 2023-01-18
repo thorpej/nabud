@@ -32,6 +32,7 @@
 #include "config.h"
 #endif
 
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #if defined(LOCAL_PEERCRED) && defined(HAVE_SYS_UCRED_H)
@@ -673,6 +674,32 @@ control_init(const char *path)
 	sock = socket(PF_LOCAL, SOCK_STREAM, 0);
 	if (sock >= 0) {
 		if (bind(sock, (struct sockaddr *)&sun, SUN_LEN(&sun)) == 0) {
+			/*
+			 * Make sure a connection can be established
+			 * by anyone who is a member of the group with
+			 * our effective GID.
+			 */
+			log_debug("Changing group on %s to %d.",
+			    path, (int)getegid());
+			if (chown(path, (uid_t)-1, getegid()) == 0) {
+				struct stat sb;
+				if (stat(path, &sb) == 0) {
+					sb.st_mode |= S_IWGRP;
+					log_debug("Cnanging mode on %s to "
+					    "0%03o", path, sb.st_mode & 0777);
+					if (chmod(path, sb.st_mode) < 0) {
+						log_error("chmod(%s, 0%03o): "
+						    "%s", path, sb.st_mode,
+						    strerror(errno));
+					}
+				} else {
+					log_error("stat(%s): %s", path,
+					    strerror(errno));
+				}
+			} else {
+				log_error("chown(%s, -1, %d): %s",
+				    path, (int)getegid(), strerror(errno));
+			}
 			if (listen(sock, 8) == 0) {
 				if (! conn_io_init(conn, strdup(path), sock)) {
 					/* Error already logged. */
