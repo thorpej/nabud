@@ -14196,6 +14196,80 @@ printf "%s\n" "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 
+# Check for struct xucred::cr_pid.  FreeBSD has this, but, while macOS
+# and DragonFly have struct xucred, they do not have the cr_pid member.
+#
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for cr_pid member in struct xucred" >&5
+printf %s "checking for cr_pid member in struct xucred... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+		#include <sys/types.h>
+		#include <sys/ucred.h>
+
+int
+main (void)
+{
+
+		struct xucred dummy;
+		dummy.cr_pid = 0;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+
+
+printf "%s\n" "#define HAVE_XUCRED_CR_PID 1" >>confdefs.h
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else $as_nop
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+
+# Check for struct sockpeercred in <sys/socket.h> (this is an OpenBSD-ism).
+#
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for struct sockpeercred in <sys/socket.h>" >&5
+printf %s "checking for struct sockpeercred in <sys/socket.h>... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+		#include <sys/socket.h>
+
+int
+main (void)
+{
+
+		struct sockpeercred dummy;
+		dummy.pid = 0;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+
+
+printf "%s\n" "#define HAVE_STRUCT_SOCKPEERCRED 1" >>confdefs.h
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else $as_nop
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+
 # Check for some useful BSD functions that, sadly, are not universal.
 #
 ac_fn_c_check_func "$LINENO" "getprogname" "ac_cv_func_getprogname"

@@ -42,6 +42,9 @@
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
 
+/* Define if <sys/socket.h> has struct sockpeercred */
+#undef HAVE_STRUCT_SOCKPEERCRED
+
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
@@ -53,6 +56,9 @@
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
+
+/* Define if the struct xucred has a member cr_pid on your OS */
+#undef HAVE_XUCRED_CR_PID
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR

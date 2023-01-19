@@ -149,6 +149,36 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for struct xucred::cr_pid.  FreeBSD has this, but, while macOS
+# and DragonFly have struct xucred, they do not have the cr_pid member.
+#
+AC_MSG_CHECKING(for cr_pid member in struct xucred)
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/ucred.h>
+	]],[[
+		struct xucred dummy;
+		dummy.cr_pid = 0;
+	]])],[
+		AC_DEFINE(HAVE_XUCRED_CR_PID, 1, [Define if the struct xucred has a member cr_pid on your OS])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
+# Check for struct sockpeercred in <sys/socket.h> (this is an OpenBSD-ism).
+#
+AC_MSG_CHECKING(for struct sockpeercred in <sys/socket.h>)
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/socket.h>
+	]],[[
+		struct sockpeercred dummy;
+		dummy.pid = 0;
+	]])],[
+		AC_DEFINE(HAVE_STRUCT_SOCKPEERCRED, 1, [Define if <sys/socket.h> has struct sockpeercred])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for some useful BSD functions that, sadly, are not universal.
 #
 AC_CHECK_FUNCS(getprogname)
