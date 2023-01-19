@@ -557,7 +557,7 @@ control_peer_name(struct conn_io *conn, int sock)
 			return name;
 		}
 	}
-#elif defined(LOCAL_PEERCRED) && defined(HAVE_SYS_UCRED_H)
+#elif defined(LOCAL_PEERCRED) && defined(HAVE_XUCRED_CR_PID)
 	/*
 	 * FreeBSD-like LOCAL_PEERCRED.
 	 */
@@ -573,9 +573,14 @@ control_peer_name(struct conn_io *conn, int sock)
 	}
 #elif defined(SO_PEERCRED)
 	/*
-	 * Linux-like SO_PEERCRED.
+	 * Linux-like SO_PEERCRED.  OpenBSD also has this, but uses
+	 * a different type to return the data.
 	 */
+#ifdef HAVE_STRUCT_SOCKPEERCRED
+	struct sockpeercred cred;
+#else
 	struct ucred cred;
+#endif
 	socklen_t len = sizeof(cred);
 	char *name;
 
