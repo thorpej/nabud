@@ -770,19 +770,23 @@ fileio_load_file(struct fileio *f, struct fileio_attrs *attrs, size_t extra,
  */
 void *
 fileio_load_file_from_location(const char *location, size_t extra,
-    size_t maxsize, size_t *filesizep)
+    size_t maxsize, struct fileio_attrs *attrs, size_t *filesizep)
 {
-	struct fileio_attrs attrs;
+	struct fileio_attrs attrs_store;
 	uint8_t *filebuf;
 	struct fileio *f;
 
-	f = fileio_open(location, FILEIO_O_RDONLY, NULL, &attrs);
+	if (attrs == NULL) {
+		attrs = &attrs_store;
+	}
+
+	f = fileio_open(location, FILEIO_O_RDONLY, NULL, attrs);
 	if (f == NULL) {
 		log_error("Unable to open %s", location);
 		return NULL;
 	}
 
-	filebuf = fileio_load_file(f, &attrs, extra, maxsize, filesizep);
+	filebuf = fileio_load_file(f, attrs, extra, maxsize, filesizep);
 
 	fileio_close(f);
 

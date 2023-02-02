@@ -65,6 +65,6 @@ void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 			  size_t, size_t *filesizep);
 
 void	*fileio_load_file_from_location(const char *, size_t, size_t,
-					size_t *);
+					struct fileio_attrs *, size_t *);
 
 #endif /* fileio_h_included */

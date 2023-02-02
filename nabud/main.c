@@ -317,7 +317,7 @@ config_load(const char *path)
 	 * so we can ensure NUL-termination.
 	 */
 	file_data = fileio_load_file_from_location(path, 1 /*extra*/,
-	    0 /*maxsize*/, &file_size);
+	    0 /*maxsize*/, NULL, &file_size);
 	if (file_data == NULL) {
 		log_error("Unable to load configuration file.");
 		return false;
