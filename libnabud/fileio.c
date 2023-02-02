@@ -363,6 +363,7 @@ fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 	attrs->is_directory = !!S_ISDIR(sb.st_mode);
 	attrs->is_writable = access(f->location, R_OK | W_OK) == 0;
 	attrs->is_seekable = true;
+	attrs->is_local = true;
 
 	return true;
 }
@@ -471,6 +472,7 @@ fileio_remote_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 	attrs->is_directory = false;
 	attrs->is_writable = false;
 	attrs->is_seekable = false;
+	attrs->is_local = false;
 
 	return true;
 }

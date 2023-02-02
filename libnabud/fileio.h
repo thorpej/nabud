@@ -41,6 +41,7 @@ struct fileio_attrs {
 	bool	is_directory;
 	bool	is_writable;
 	bool	is_seekable;
+	bool	is_local;
 };
 
 struct fileio *	fileio_open(const char *, int, const char *,
