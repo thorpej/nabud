@@ -298,10 +298,16 @@ A more complex example configuration file can be found at:
 XXXdatadirXXX/nabud/examples/nabud.conf
 .Ed
 .\" extras-netbsd .Pp
-.\" extras-netbsd Example rc.conf.d and rc.d files can be found at:
+.\" extras-netbsd rc.conf.d and rc.d files can be found at:
 .\" extras-netbsd .Bd -literal -offset indent
 .\" extras-netbsd XXXdatadirXXX/nabud/rc.conf.d/nabud
 .\" extras-netbsd XXXdatadirXXX/nabud/rc.d/nabud
 .\" extras-netbsd .Ed
+.\" extras-freebsd .Pp
+.\" extras-freebsd rc.conf.d and rc.d files can be found at:
+.\" extras-freebsd .Bd -literal -offset indent
+.\" extras-freebsd XXXdatadirXXX/nabud/rc.conf.d/nabud
+.\" extras-freebsd XXXdatadirXXX/nabud/rc.d/nabud
+.\" extras-freebsd .Ed
 .Sh SEE ALSO
 .Xr nabuctl 1

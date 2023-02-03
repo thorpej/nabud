@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# PROVIDE: nabud
+# REQUIRE: LOGIN FILESYSTEMS
+
+. /etc/rc.subr
+
+name="nabud"
+rcvar=$name
+command="XXXsbindirXXX/${name}"
+
+load_rc_config $name
+run_rc_command "$1"

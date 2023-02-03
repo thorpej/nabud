@@ -51,6 +51,13 @@ case "$CANONICAL_TARGET" in
 				extras/$EXTRAS_OS/rc.d"
 		;;
 
+	*-*-freebsd*)
+		# Provide a service start-up script for FreeBSD.
+		EXTRAS_OS="freebsd"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/rc.conf.d \
+				extras/$EXTRAS_OS/rc.d"
+		;;
+
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
@@ -191,6 +198,8 @@ AC_CHECK_FUNCS(getprogname)
 AC_CONFIG_FILES([
 	Makefile
 	examples/Makefile
+	extras/freebsd/rc.conf.d/Makefile
+	extras/freebsd/rc.d/Makefile
 	extras/netbsd/rc.conf.d/Makefile
 	extras/netbsd/rc.d/Makefile
 	libfetch/Makefile
