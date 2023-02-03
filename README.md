@@ -313,6 +313,11 @@ nabud comes with some extras that help with integration onto operating systems o
 
 * NetBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are installed into $(prefix)/share.
 Tweak them to your liking and copy them into _/etc/rc.d_ and _/etc/rc.conf.d_.
+* FreeBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are installed into $(prefix)/share.
+Tweak them to your liking and copy them into _/etc/rc.d_ and _/etc/rc.conf.d_.
+* OpenBSD - An _rc.d_ script is installed into $(prefix)/share.
+Tweak it to your liking and install it into _/etc/rc.d_.  Make sure to
+update your "pkg_scripts" variable in _/etc/rc.conf_.
 
 If you are interested in providing extras for your favorite operating system, please let me know!
 
