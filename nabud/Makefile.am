@@ -14,3 +14,9 @@ nabud_LDADD		= ../libnabud/libnabud.la \
 			  $(SSL_LDFLAGS) $(SSL_LIBS) \
 			  $(PAK_LDFLAGS) $(PAK_LIBS) \
 			  $(PTHREAD_LIBS)
+
+man8_MANS		= nabud.8
+
+nabud.8: nabud.8.in
+	sed "s,^\..\" extras-$(EXTRAS_OS) ,,g" < nabud.8.in | \
+	    sed "s,XXXdatadirXXX,$(datadir),g" > nabud.8

@@ -1,0 +1,307 @@
+.\"
+.\" Copyright (c) 2023 Jason R. Thorpe.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+.\" IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+.\" BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+.\" LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+.\" AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+.\" OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd January 18, 2023
+.Dt NABUD 8
+.Sh NAME
+.Nm nabud
+.Nd NABU Personal Computer server
+.Sh SYNOPSIS
+.Nm
+.Op Fl c Ar conf
+.Op Fl d
+.Op Fl f
+.Op Fl l Ar logfile
+.Op Fl u Ar user
+.Op Fl U Ar umask
+.Sh DESCRIPTION
+.Nm
+is a server for NABU Personal Computers.
+The NABU Personal Computer is a Z80-based machine system sold briefly
+in Canada in the early 1980s that downloaded all of its software from
+participating cable TV networks using an external appliance called
+the
+.Dq Adaptor .
+The NABU was connected to the Adaptor using an RS422 serial interface
+running at 111,000 baud and sent requests to the Adaptor for indiviual
+segments of numbered images.
+The communication with the cable TV network was one-way, so the content
+was broadcast in a continuous
+.Dq cycle ;
+the Adaptor simply waited for the requested packet to arrive, at which
+point it was relayed to the waiting NABU.
+The content was interleaved such that retrieving the next segment of
+a particular image did not incur an excessively long wait time.
+The Adaptor itself was relatively simple and did very little local
+processing beyond extremely basic packet filtering and that could be
+achieved on a Motorola 6801 MCU.
+The serial interface was based around the Western Digital TR1863P UART.
+.Pp
+.Nm
+emulates the original Adaptor protocol and has the following features:
+.Bl -bullet
+.It
+Serve pre-packetized
+.Dq pak
+files.
+These files can be unencrypted or encrypted using the NabuRetroNet scheme.
+This is the format used to vend the orginal NABU Network cycles from 1984.
+.It
+Serve flat
+.Dq nabu
+files.
+These files are flat binaries that are loaded into a fixed memory
+location by the NABU ROM.
+.It
+Flexible configuration model that allows up to 254 content
+.Dq channels
+from an arbitrary number of
+.Dq sources .
+.It
+Serve an arbitrary number of NABU PCs, limited only by the number of
+serial ports you can connect to the server.
+.It
+Serve an arbitrary number of simulated NABU PCs
+.Pq for example, MAME
+on the local machine or on your local network over TCP/IP.
+.It
+Selection of per-connection alternative files
+.Pq and a per-channel default file
+to be served to the
+NABU when the NABU ROM requests image 000001
+.Pq the boot image .
+.It
+A control program,
+.Xr nabuctl 1 ,
+that lets you get information about channels and connections, as well as
+list the contents if the NabuRetroNet
+.Dq HomeBrew
+channel and select different files to be loaded by the NABU.
+.It
+Support for the NABU HCCA Application Communication Protocol.
+NHACP is a new protocol extension under active development that
+allows programs running on the NABU to access remote storage.
+.It
+Minimal privilege requirements.
+.Nm
+requires the ability to open serial ports for reading and writing in
+order to communicate with NABU PCs.
+If only TCP/IP is used,
+.Nm
+requires no special privileges.
+.It
+Extremely portable implementation that relies mainly on standard
+POSIX and C99 interfaces and keeps external dependencies to a
+minimum.
+.El
+.Pp
+.Nm
+accepts the following options:
+.Bl -tag -width Fl
+.It Fl c Ar conf
+Specifies an alternative location for the
+.Nm
+configuration file.
+.It Fl d
+Enables extremely verbose debugging messages.
+This option also implies the
+.Fl f
+option.
+.It Fl f
+Runs
+.Nm
+in the foreground.
+Without this option,
+.Nm
+detaches from the controlling terminal and runs as a daemon.
+.It Fl l Ar logfile
+Tells
+.Nm
+to write log messages to the specified log file.
+By default,
+.Nm
+logs all messages to the system log using
+.Xr syslog 3
+with the
+.Dv LOG_USER
+facility.
+Note that when
+.Fl f
+is specified, all log message are written to the controlling terminal.
+.It Fl u Ar user
+Specifies an alternative user ID to run
+.Nm
+as.
+Use of this option to specify a minimally-privileged user is highly
+recommended.
+This option is ignored if
+.Nm
+is not started as the super-user.
+.It Fl U Ar umask
+Specifes the file creation mask to use when creating files.
+File creation on the server is suppored by the NHACP protocol.
+.El
+.Sh CONFIGURATION
+.Nm
+requires a configuration file in order to run.
+The configuration file is a JSON-format dictionary with three stanzas in
+the following order:
+.Bl -tag -width "Connections"
+.It Sources
+An array of objects that define channel sources.
+.It Channels
+An array of objects that define the content channels available to
+connected NABUs.
+.It Connections
+An array of objects that define the NABU connections
+.Po
+either serial connections to real hardware or TCP/IP connections to emulators
+.Pc .
+.El
+.Pp
+The next subsections describe the individual stanzas and the object
+definitions they contain.
+The described object properties are required unless specified otherwise.
+.Ss Sources
+The
+.Dq Sources
+stanza is an array of source objects.
+Each source object has the following properties:
+.Bl -tag -width "Location"
+.It Name
+A string that specifies the name of the source.
+.It Location
+A string that specifies the location of the source.
+The location may be a local path name or a URL.
+.El
+.Ss Channels
+The
+.Dq Channels
+stanza is an array of channel objects.
+Each channel object has the following properties:
+.Bl -tag -width "DefaultFile"
+.It Name
+A string that specifies the name of the channel.
+In addition to being the name displayed to the user, this is
+default subdirectory relative to the root of the source that
+contains the content for the channel.
+.It Path
+An optional string that specifies the path relative to the root
+of the source that contains the content for the channel.
+.It Number
+A number between 1 and 255 that specifies the channel's number.
+.It Type
+A string that specifies if the channel contains
+.Dq pak
+or
+.Dq nabu
+files.
+.It Source
+A string that specifies the source of the channel.
+.It ListURL
+An optional string that specifies a listing file in the format
+used by NabuRetroNet that lists the content of the channel.
+This listing can be viewed by
+.Xr nabuctl 1 ,
+which can then also select these files for download on individual
+connections.
+.It DefaultFile
+An optional string that specifes a default file to be loaded when
+the NABU ROM requests image 000001.
+Indiviual connections can override this by selecting a different file.
+.El
+.Ss Connections
+The
+.Dq Connections
+stanza is an array of connection objects.
+Each connection object has the following properties:
+.Bl -tag -width "FileRoot"
+.It Type
+A string that specifies if the connection type, either
+.Dq serial
+or
+.Dq tcp .
+.It Port
+A string that specifies the connect port.
+For
+.Dq serial
+connections, this is the path to the serial port's device special file,
+for example
+.Dq /dev/ttyU0 .
+For
+.Dq tcp
+connections, this is the TCP port number on which
+.Nm
+will listen for incoming connections from NABU emulators.
+.It Channel
+An optional number between 1 and 255 that specifies the connection's
+default channel.
+.It FileRoot
+An optional string that specifies the local file storage root for
+this connection.
+This option must be specified if you wish to use the NHACP storage
+extensions.
+.El
+.Pp
+Here is a simple example configuration file:
+.Bd -literal -offset indent
+{
+  "Sources": [
+    {
+      "Name": "NabuRetroNet",
+      "Location": "https://cloud.nabu.ca",
+    }
+  ],
+  "Channels": [
+    {
+      "Name": "NABU Network 1984 Cycle v1",
+      "Path": "cycle1",
+      "Number": 1,
+      "Type": "pak",
+      "Source": "NabuRetroNet"
+    }
+  ],
+  "Connections": [
+    {
+      "Type": "serial",
+      "Port": "/dev/ttyU0",
+      "Channel": 1,
+    }
+  ]
+}
+.Ed
+.Sh FILES
+A more complex example configuration file can be found at:
+.Bd -literal -offset indent
+XXXdatadirXXX/nabud/examples/nabud.conf
+.Ed
+.\" extras-netbsd .Pp
+.\" extras-netbsd Example rc.conf.d and rc.d files can be found at:
+.\" extras-netbsd .Bd -literal -offset indent
+.\" extras-netbsd XXXdatadirXXX/nabud/rc.conf.d/nabud
+.\" extras-netbsd XXXdatadirXXX/nabud/rc.d/nabud
+.\" extras-netbsd .Ed
+.Sh SEE ALSO
+.Xr nabuctl 1
