@@ -681,6 +681,7 @@ OPENSSL_INCLUDES
 PKG_CONFIG
 WARNCFLAGS
 EXTRAS_SUBDIRS
+EXTRAS_OS
 LT_SYS_LIBRARY_PATH
 OTOOL64
 OTOOL
@@ -12768,7 +12769,9 @@ fi
 case "$CANONICAL_TARGET" in
 	*-*-netbsd*)
 		# Provide a service start-up script for NetBSD.
-		EXTRAS_SUBDIRS="extras/netbsd/rc.conf.d extras/netbsd/rc.d"
+		EXTRAS_OS="netbsd"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/rc.conf.d \
+				extras/$EXTRAS_OS/rc.d"
 		;;
 
 	*-*-linux*)
@@ -12776,6 +12779,7 @@ case "$CANONICAL_TARGET" in
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 		;;
 esac
+
 
 
 

@@ -46,7 +46,9 @@ AS_IF([test "$GCC" = "yes"],
 case "$CANONICAL_TARGET" in
 	*-*-netbsd*)
 		# Provide a service start-up script for NetBSD.
-		EXTRAS_SUBDIRS="extras/netbsd/rc.conf.d extras/netbsd/rc.d"
+		EXTRAS_OS="netbsd"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/rc.conf.d \
+				extras/$EXTRAS_OS/rc.d"
 		;;
 
 	*-*-linux*)
@@ -55,6 +57,7 @@ case "$CANONICAL_TARGET" in
 		;;
 esac
 
+AC_SUBST([EXTRAS_OS])
 AC_SUBST([EXTRAS_SUBDIRS])
 
 # MD5 is marked as deprecated on some platforms, but we're
