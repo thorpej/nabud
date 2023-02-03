@@ -431,10 +431,11 @@ And you can select a file to loaded wnen the NABU boots and requests image 00000
 
 ### nabud-1.0 (in development on main branch)
 * Added support for the NABU HCCA Application Communication Protocol.  This protocol is much
-better specified than the NabuRetroNet protoocl (which doesn't even really have a specification)
+better specified than the NabuRetroNet protocol (which doesn't even really have a specification)
 and is more easily extensible to provide other services besides storage (for example, network
 connection proxy, etc.).  Information about NHACP can be found
 [here](https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md).
+* Added _rc.d_ and _rc.conf.d_ extras for FreeBSD.
 
 ### nabud-0.9.1
 * Fixed a problem with Linux's overly-restrictive cfsetspeed(3) whereby attempting
