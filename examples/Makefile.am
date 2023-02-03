@@ -1,2 +1,2 @@
-exampledir=		$(prefix)/share/nabud/examples
+exampledir=		$(datadir)/nabud/examples
 example_DATA=		nabud.conf
