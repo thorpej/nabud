@@ -1,0 +1,15 @@
+#!/bin/sh
+
+#
+# Recommended options for rc.conf.local:
+#
+# nabud_flags="-u nabu -U 002"
+#
+
+daemon="XXXsbindirXXX/nabud"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+rc_cmd $1

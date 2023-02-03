@@ -309,5 +309,10 @@ XXXdatadirXXX/nabud/examples/nabud.conf
 .\" extras-freebsd XXXdatadirXXX/nabud/rc.conf.d/nabud
 .\" extras-freebsd XXXdatadirXXX/nabud/rc.d/nabud
 .\" extras-freebsd .Ed
+.\" extras-openbsd .Pp
+.\" extras-openbsd An rc.d start-up script can be found at:
+.\" extras-openbsd .Bd -literal -offset indent
+.\" extras-openbsd XXXdatadirXXX/nabud/rc.d/nabud
+.\" extras-openbsd .Ed
 .Sh SEE ALSO
 .Xr nabuctl 1

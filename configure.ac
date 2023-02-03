@@ -58,6 +58,12 @@ case "$CANONICAL_TARGET" in
 				extras/$EXTRAS_OS/rc.d"
 		;;
 
+	*-*-openbsd*)
+		# Provide a service start-up script for OpenBSD.
+		EXTRAS_OS="openbsd"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/rc.d"
+		;;
+
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
@@ -202,6 +208,7 @@ AC_CONFIG_FILES([
 	extras/freebsd/rc.d/Makefile
 	extras/netbsd/rc.conf.d/Makefile
 	extras/netbsd/rc.d/Makefile
+	extras/openbsd/rc.d/Makefile
 	libfetch/Makefile
 	libmj/Makefile
 	libnabud/Makefile
