@@ -12781,6 +12781,12 @@ case "$CANONICAL_TARGET" in
 				extras/$EXTRAS_OS/rc.d"
 		;;
 
+	*-*-openbsd*)
+		# Provide a service start-up script for OpenBSD.
+		EXTRAS_OS="openbsd"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/rc.d"
+		;;
+
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
@@ -14293,7 +14299,7 @@ fi
 
 # Generate the Makefiles
 #
-ac_config_files="$ac_config_files Makefile examples/Makefile extras/freebsd/rc.conf.d/Makefile extras/freebsd/rc.d/Makefile extras/netbsd/rc.conf.d/Makefile extras/netbsd/rc.d/Makefile libfetch/Makefile libmj/Makefile libnabud/Makefile nabud/Makefile nabuclient/Makefile nabuctl/Makefile"
+ac_config_files="$ac_config_files Makefile examples/Makefile extras/freebsd/rc.conf.d/Makefile extras/freebsd/rc.d/Makefile extras/netbsd/rc.conf.d/Makefile extras/netbsd/rc.d/Makefile extras/openbsd/rc.d/Makefile libfetch/Makefile libmj/Makefile libnabud/Makefile nabud/Makefile nabuclient/Makefile nabuctl/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -15313,6 +15319,7 @@ do
     "extras/freebsd/rc.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/freebsd/rc.d/Makefile" ;;
     "extras/netbsd/rc.conf.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/netbsd/rc.conf.d/Makefile" ;;
     "extras/netbsd/rc.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/netbsd/rc.d/Makefile" ;;
+    "extras/openbsd/rc.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/openbsd/rc.d/Makefile" ;;
     "libfetch/Makefile") CONFIG_FILES="$CONFIG_FILES libfetch/Makefile" ;;
     "libmj/Makefile") CONFIG_FILES="$CONFIG_FILES libmj/Makefile" ;;
     "libnabud/Makefile") CONFIG_FILES="$CONFIG_FILES libnabud/Makefile" ;;
