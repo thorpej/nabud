@@ -275,6 +275,7 @@ conn_io_deadline(const struct conn_io *conn, struct timespec *deadline)
 	}
 }
 
+#undef timespecsub	/* just in case a system header file has it, too */
 #define	timespecsub(tsp, usp, vsp)					\
 	do {								\
 		(vsp)->tv_sec = (tsp)->tv_sec - (usp)->tv_sec;		\
@@ -285,6 +286,7 @@ conn_io_deadline(const struct conn_io *conn, struct timespec *deadline)
 		}							\
 	} while (/* CONSTCOND */ 0)
 
+#undef timespec2ns
 #define	timespec2ns(x)	(((uint64_t)(x)->tv_sec) * 1000000000L + (x)->tv_nsec)
 
 /*
