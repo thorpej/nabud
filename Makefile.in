@@ -158,7 +158,6 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = $(SUBDIRS)
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(top_srcdir)/build-aux/ar-lib $(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/config.guess \
@@ -357,9 +356,16 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = examples $(EXTRAS_SUBDIRS) libfetch libmj libnabud \
+GENERAL_SUBDIRS = examples libfetch libmj libnabud \
 			  nabud nabuclient nabuctl
 
+ALL_EXTRAS_SUBDIRS = extras/darwin/launchd \
+			  extras/freebsd/rc.conf.d extras/freebsd/rc.d \
+			  extras/netbsd/rc.conf.d extras/netbsd/rc.d \
+			  extras/openbsd/rc.d
+
+SUBDIRS = $(GENERAL_SUBDIRS) $(EXTRAS_SUBDIRS)
+DIST_SUBDIRS = $(GENERAL_SUBDIRS) $(ALL_EXTRAS_SUBDIRS)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
