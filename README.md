@@ -443,6 +443,8 @@ connection proxy, etc.).  Information about NHACP can be found
 * Added _rc.d_ and _rc.conf.d_ extras for FreeBSD.
 * Added an _rc.d_ extra for OpenBSD.
 * Added a launchd plist extra for macOS.
+* Another change for Linux's over-restrictive cfsetspeed(3).  Thanks to
+tatokis for pointing it out and confirming the fix.
 
 ### nabud-0.9.1
 * Fixed a problem with Linux's overly-restrictive cfsetspeed(3) whereby attempting
