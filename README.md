@@ -442,6 +442,7 @@ connection proxy, etc.).  Information about NHACP can be found
 [here](https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md).
 * Added _rc.d_ and _rc.conf.d_ extras for FreeBSD.
 * Added an _rc.d_ extra for OpenBSD.
+* Added a launchd plist extra for macOS.
 
 ### nabud-0.9.1
 * Fixed a problem with Linux's overly-restrictive cfsetspeed(3) whereby attempting
