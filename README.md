@@ -16,22 +16,22 @@ and _daemon(3)_.
 ## Features
 
 * Define up to 254 content channels (numbered 1-255) from an arbitrary number
-of sources.
+  of sources.
 * Sources can be local or remote (such as NabuRetroNet).
 * Serve an arbitrary number of NABU PCs:
     * As many RS422 serial ports as you can connect to your system for
-    real NABU hardware.
+      real NABU hardware.
     * Support for connections from NABU emulators (such as MAME) over TCP.
 * Decrypt and serve NABU _pak_ files (available from NabuRetroNet).
 * Serve your own or others' homebrew NABU binaries (_nabu_ files).
 * High-performance; nabud implements a content cache to optimize common
-access patterns and avoid redundant I/O.
+  access patterns and avoid redundant I/O.
 * Small footprint; it can run on small machines. The only thing it throws
-memory at is the content cache.
+  memory at is the content cache.
 * A control program, nabuctl, that allows a user to easily change the
-channel used by a NABU connection, select programs to load from homebrew
-channels (that vend ".nabu" files), view listings provided by such channels,
-etc.
+  channel used by a NABU connection, select programs to load from homebrew
+  channels (that vend ".nabu" files), view listings provided by such channels,
+  etc.
 
 ## Configuration
 
@@ -39,39 +39,39 @@ nabud's configuration is held in a JSON-format configuration file.  This
 configuration file must contain 3 stanzas, in the following order:
 
 * Sources: an array of content sources.  Sources provide the content that
-is served by Channels.
+  is served by Channels.
 * Channels: an array of content channels.  Connections get their content
-from Channels.  Each Channel can be served by any source.
+  from Channels.  Each Channel can be served by any source.
 * Connections: an array of connections.
 
 ### Sources
 
 Each Source has 3 properies:
 * Name: a string that idenfies the source.  It's meant both for human
-consumption as well as for specifying which Source provides a Channel.
+  consumption as well as for specifying which Source provides a Channel.
 * Location: a local path or a URL string that specifies the root of the source.
 
 ### Channels
 
 Each Channel has 4 mandatory properites and 3 optional properties:
 * Name: a string that identifies a Channel.  It's meant both for human
-consumption, but also specifies the name of the directory in the Source's
-location that contains the Channel's files.
+  consumption, but also specifies the name of the directory in the Source's
+  location that contains the Channel's files.
 * Path: an optional string that overrides the default directory for the
-Channel's content.
+  Channel's content.
 * ListURL: on optional string that specifes the URL for the Channel's file
-listing.
+  listing.
 * DefaultFile: an optional string that specifies the default file to serve
-when the NABU requests image 000001.  This is used only if the Connection
-has not specified a selected file.
+  when the NABU requests image 000001.  This is used only if the Connection
+  has not specified a selected file.
 * Number: a unique number from 1 to 255 that identifies the Channel to the
-NABU.
+  NABU.
 * Type: a string that specifies the type of files provided by the Channel:
     * pak: NABU _pak_ files (content that is pre-wrapped in packet headers).
-    These are the original NABU Network files and can be downloaded from
-    NabuRetroNet.
+      These are the original NABU Network files and can be downloaded from
+      NabuRetroNet.
     * nabu: Raw _nabu_ binary files, such as those you build yourself.
-    nabud packetizes these files on-the-fly.
+      nabud packetizes these files on-the-fly.
 * Source: a string that specifies the Source that provides the Channel.
 
 ### Connections
@@ -81,13 +81,13 @@ Each Connection has 3 properties:
     * serial: an RS422 serial connection to real NABU hardware.
     * tcp: a TCP listener that accepts connections from emulators (e.g. MAME).
 * Port: a string that specifies the "port" to use for the connection, which
-varies based on the connection type:
+  varies based on the connection type:
     * serial: a string that specifies the path to the serial port to use for
-    the connection.
+      the connection.
     * tcp: a string that specifies the TCP port on which connections will be
-    accepted.
+      accepted.
 * Channel: a numnber from 1 to 255 that specifies which channel to use for
-this connection.
+  this connection.
 
 ### Example configuration file
 
@@ -210,8 +210,8 @@ following cryptographic libraries are currently supported:
 
 * CommonCrypto (the native API on macOS)
 * OpenSSL's _libcrypto_.  This is the native API already provided by many
-Unix-like systems, but you may have to go and install the "development"
-portion of the package in order to get the header files.
+  Unix-like systems, but you may have to go and install the "development"
+  portion of the package in order to get the header files.
 
 In order to download from remote sources, such as NabuRetroNet, an SSL
 library is required.  The following SSL libraries are currently supported:
@@ -257,11 +257,11 @@ nabud understands the following command line options:
 * _-c conf_ -- specifies an alternate name / location for _nabud.conf_.
 * _-d_ -- enables debugging.  This option also implies _-f_.
 * _-f_ -- run in the foreground.  Without this, nabud will detach from the
-controlling terminal and run as a daemon.
+  controlling terminal and run as a daemon.
 * _-l logfile_ -- specifies the path to a log file.  Without this option,
-nabud will log to the system log using _syslog(3)_ using the _LOG_USER_
-facility.  Note that when running in the foreground, log messages are always
-sent to the controlling terminal.
+  nabud will log to the system log using _syslog(3)_ using the _LOG_USER_
+  facility.  Note that when running in the foreground, log messages are always
+  sent to the controlling terminal.
 * _-u user_ -- Specifies the user that nabud should run as.
 * _-U umask_ -- Specifies the file creation mask that nabud should use when
 creating files.
@@ -302,19 +302,20 @@ typically see:
 
 It is recommended that you run nabud as a minimally-privileged user using
 the _-u user_ option.  Typically, you would do this by following these steps:
+
 1. Create a group that will be able to modify any files created by nabud,
-for example _nabu_.
+   for example _nabu_.
 2. Create a user specifically for running nabud, for example _nabu_.  Set
-the default group ID of that user to the group created in step 1.
+   the default group ID of that user to the group created in step 1.
 3. Select a group that will be used to grant permission to open serial ports
-for NABU connections.  Historitcally, a _dialer_ group exists on some Unix
-systems for this purpose.  Create one, if necessary.
+   for NABU connections.  Historitcally, a _dialer_ group exists on some Unix
+   systems for this purpose.  Create one, if necessary.
 4. Add the user created in step 2 to the group you selected in step 3.
 5. Ensure your serial port devices grant read/write permission to the group
-selected in step 3.
+   selected in step 3.
 6. Optionally use the _-U umask_ argument to alter the default file creation
-mask so that users in the group created in step 1 can both read and write
-any files created by nabud.
+   mask so that users in the group created in step 1 can both read and write
+   any files created by nabud.
 
 For example, on my NetBSD system, I have the following user and group
 configuration for nabud:
@@ -344,17 +345,17 @@ nabud comes with some extras that help with integration onto operating
 systems on which it runs.
 
 * NetBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
-installed into $(prefix)/share.  Tweak them to your liking and copy them
-into _/etc/rc.d_ and _/etc/rc.conf.d_.
+  installed into $(prefix)/share.  Tweak them to your liking and copy them
+  into _/etc/rc.d_ and _/etc/rc.conf.d_.
 * FreeBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
-installed into $(prefix)/share.  Tweak them to your liking and copy them
-into _/etc/rc.d_ and _/etc/rc.conf.d_.
+  installed into $(prefix)/share.  Tweak them to your liking and copy them
+  into _/etc/rc.d_ and _/etc/rc.conf.d_.
 * OpenBSD - An _rc.d_ script is installed into $(prefix)/share.
-Tweak it to your liking and install it into _/etc/rc.d_.  Make sure to
-update your "pkg_scripts" variable in _/etc/rc.conf_.
+  Tweak it to your liking and install it into _/etc/rc.d_.  Make sure to
+  update your "pkg_scripts" variable in _/etc/rc.conf_.
 * macOS - A launchd plist file (_nabud.plist_) is installed into
-$(prefix)/share.  Tweak it to your liking and install it into
-_/Library/LaunchDaemons_.
+  $(prefix)/share.  Tweak it to your liking and install it into
+  _/Library/LaunchDaemons_.
 
 If you are interested in providing extras for your favorite operating
 system, please let me know!
@@ -477,53 +478,53 @@ And you can select a file to loaded wnen the NABU boots and requests image
 
 ### nabud-1.0 (in development on main branch)
 * Added support for the NABU HCCA Application Communication Protocol.  This
-protocol is much better specified than the NabuRetroNet protocol (which
-doesn't even really have a specification) and is more easily extensible
-to provide other services besides storage (for example, network connection
-proxy, etc.).  Information about NHACP can be found
-[here](https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md).
+  protocol is much better specified than the NabuRetroNet protocol (which
+  doesn't even really have a specification) and is more easily extensible
+  to provide other services besides storage (for example, network connection
+  proxy, etc.).  Information about NHACP can be found
+  [here](https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md).
 * Added _rc.d_ and _rc.conf.d_ extras for FreeBSD.
 * Added an _rc.d_ extra for OpenBSD.
 * Added a launchd plist extra for macOS.
 * Another change for Linux's over-restrictive cfsetspeed(3).  Thanks to
-tatokis for pointing it out and confirming the fix.
+  tatokis for pointing it out and confirming the fix.
 * Man pages for nabud(8) and nabuctl(1).
 
 ### nabud-0.9.1
 * Fixed a problem with Linux's overly-restrictive cfsetspeed(3) whereby
-attempting to set the native NABU baud rate would cause the entire serial
-port setup to fail rather then falling back to 115.2K baud.
+  attempting to set the native NABU baud rate would cause the entire serial
+  port setup to fail rather then falling back to 115.2K baud.
 
 ### nabud-0.9
 * Added _rc.d_ and _rc.conf.d_ extras for NetBSD and a few other tweaks
-to make it ready for pkgsrc.
+  to make it ready for pkgsrc.
 * Updated example config in preparation for additional NabuRetroNet channels.
 * Fixed the time packet to properly report the day of the week.
 
 ### nabud-0.8
 * Experimental for the NabuRetroNet blob store extensions to the Adaptor
-protocol.  These extensions allow programs running on the NABU to access
-up to 256 "slots" of cloud storage that are cached in the server.  This
-opens up a lot of exciting opportunities for things like downloadable game
-levels, music tracks, etc.  This work is currently unfinished, and is
-provided only as a preview.
+  protocol.  These extensions allow programs running on the NABU to access
+  up to 256 "slots" of cloud storage that are cached in the server.  This
+  opens up a lot of exciting opportunities for things like downloadable game
+  levels, music tracks, etc.  This work is currently unfinished, and is
+  provided only as a preview.
 * nabud now builds on Linux (built and tested on Ubuntu 22.04 LTS).
 * Added _-u user_ and _-U umask_ options for easily running nabud as a
-minimally-privileged user.
+  minimally-privileged user.
 * Added nabuctl, a program for sending control messages to nabud.  This
-allows you to easily change the channel used by individual NABU connections,
-and list and select programs to run from the NabuRetroNet _HomeBrew_ channel.
+  allows you to easily change the channel used by individual NABU connections,
+  and list and select programs to run from the NabuRetroNet _HomeBrew_ channel.
 
 ### nabud-0.7.1
 * Fix a compiler warning that was happening with some versions of Xcode on
-macOS.
+  macOS.
 
 ### nabud-0.7
 * Support for remote sources, including NabuRetroNet, althrough
-NabuRetroNet's "HomeBrew" channel does not work due to how the data
-is vended by that channel.
+  NabuRetroNet's "HomeBrew" channel does not work due to how the data
+  is vended by that channel.
 * Support for SecureTransport on macOS, eliminating the dependency on
-OpenSSL on that platform.
+  OpenSSL on that platform.
 
 ### nabud-0.6
 * Added TCP connection support, for emulators such as MAME.
@@ -540,34 +541,35 @@ Written over the course of a few days during the Christmas 2022 holiday break.
 First off, I want to acknowledge the folks nominally responsible for this
 NABU "Great Awakening":
 * Adrian Black and his [Adrian's Digital Basement](https://www.youtube.com/@adriansdigitalbasement)
-YouTube channel. I'm a Patreon patron of this channel and the early-access
-to Adrian's NABU video is how I first learned of these cool machines.  I
-think it's fair to say that Adrian's video is what spurred the recent
-interest in these machines.
+  YouTube channel. I'm a Patreon patron of this channel and the early-access
+  to Adrian's NABU video is how I first learned of these cool machines.  I
+  think it's fair to say that Adrian's video is what spurred the recent
+  interest in these machines.
 * DJ Sures (his YouTube channel [here](https://www.youtube.com/@DJSures))
-who has some family history with the NABU and did a bunch of reverse
-engineering on the Adaptor protocol and has led the charge on the NabuRetroNet.
+  who has some family history with the NABU and did a bunch of reverse
+  engineering on the Adaptor protocol and has led the charge on the
+  NabuRetroNet.
 * Leo Binkowski (his YouTube channel [here](https://www.youtube.com/@leo.binkowski)),
-a former NABU engineer who preserved a TON of stuff when the NABU company
-folded.
+  a former NABU engineer who preserved a TON of stuff when the NABU company
+  folded.
 * The York University Computer Museum's
-[NABU Network Reconstruction Project](https://museum.eecs.yorku.ca/nabu),
-which has been working with these machines for many years now, and has
-been super gracious even while being bombarded with requests for information.
+  [NABU Network Reconstruction Project](https://museum.eecs.yorku.ca/nabu),
+  which has been working with these machines for many years now, and has
+  been super gracious even while being bombarded with requests for information.
 
 I also want to acknowledge some people whose code I have borrowed or used
 as a reference for this project:
 * Nick Daniels' [NabuNetworkEmulator](https://github.com/GryBsh/NabuNetworkEmulator)
-served as a reference for the NABU Adaptor protocol.  The files _nabu_proto.h_
-and _adaptor.c_ were partially derived from his work.
+  served as a reference for the NABU Adaptor protocol.  The files _nabu_proto.h_
+  and _adaptor.c_ were partially derived from his work.
 * David Kuder's [nabu-tftp](https://github.com/dkgrizzly/nabu-tftp) gateway
-for the Raspberry Pi Pico also served to clarify some bits of the Adaptor
-protocol.
+  for the Raspberry Pi Pico also served to clarify some bits of the Adaptor
+  protocol.
 * Alistair Crooks' "Minimal JSON" (_libmj_) was used to build the
-configuraiton file parser.
+  configuraiton file parser.
 * The _fetch_ library (_libfetch_) was written by primarily by Dag-Erling
-Smørgrav, with additional contributions by Joerg Sonnenberger and
-Thomas Klausner.  The version here comes from The NetBSD Project.
+  Smørgrav, with additional contributions by Joerg Sonnenberger and
+  Thomas Klausner.  The version here comes from The NetBSD Project.
 * [The NetBSD Project](https://www.netbsd.org) is where the file _nbsd_queue.h_
-comes from.  _<sys/queue.h>_ from BSD is one of the handiest system header
-files in existence and I wish it were available everywhere.
+  comes from.  _<sys/queue.h>_ from BSD is one of the handiest system header
+  files in existence and I wish it were available everywhere.
