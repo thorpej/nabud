@@ -445,6 +445,7 @@ connection proxy, etc.).  Information about NHACP can be found
 * Added a launchd plist extra for macOS.
 * Another change for Linux's over-restrictive cfsetspeed(3).  Thanks to
 tatokis for pointing it out and confirming the fix.
+* Man pages for nabud(8) and nabuctl(1).
 
 ### nabud-0.9.1
 * Fixed a problem with Linux's overly-restrictive cfsetspeed(3) whereby attempting
