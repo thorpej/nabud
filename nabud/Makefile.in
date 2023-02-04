@@ -852,7 +852,7 @@ uninstall-man: uninstall-man8
 .PRECIOUS: Makefile
 
 
-nabud.8: nabud.8.in
+nabud.8: nabud.8.in Makefile
 	sed "s,^\..\" extras-$(EXTRAS_OS) ,,g" < nabud.8.in | \
 	    sed "s,XXXsbindirXXX,$(sbindir),g" | \
 	    sed "s,XXXsysconfdirXXX,$(sysconfdir),g" | \
