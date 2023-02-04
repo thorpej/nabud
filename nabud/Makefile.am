@@ -17,6 +17,8 @@ nabud_LDADD		= ../libnabud/libnabud.la \
 
 man8_MANS		= nabud.8
 
+CLEANFILES		= nabud.8
+
 nabud.8: nabud.8.in Makefile
 	sed "s,^\..\" extras-$(EXTRAS_OS) ,,g" < nabud.8.in | \
 	    sed "s,XXXsbindirXXX,$(sbindir),g" | \

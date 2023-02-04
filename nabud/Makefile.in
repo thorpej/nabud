@@ -370,6 +370,7 @@ nabud_LDADD = ../libnabud/libnabud.la \
 			  $(PTHREAD_LIBS)
 
 man8_MANS = nabud.8
+CLEANFILES = nabud.8
 all: all-am
 
 .SUFFIXES:
@@ -741,6 +742,7 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
