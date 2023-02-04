@@ -7,3 +7,5 @@ nabuctl_SOURCES		= nabuctl.c
 nabuctl_CPPFLAGS	=
 
 nabuctl_LDADD		= ../libnabud/libnabud.la
+
+man1_MANS		= nabuctl.1
