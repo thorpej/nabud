@@ -476,7 +476,7 @@ And you can select a file to loaded wnen the NABU boots and requests image
 
 ## Changes
 
-### nabud-1.0 (in development on main branch)
+### nabud-1.0
 * Added support for the NABU HCCA Application Communication Protocol.  This
   protocol is much better specified than the NabuRetroNet protocol (which
   doesn't even really have a specification) and is more easily extensible
