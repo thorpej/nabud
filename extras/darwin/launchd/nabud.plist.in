@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>nabud</string>
+	<key>UserName</key>
+	<string>nabu</string>
+	<key>Umask</key>
+	<string>002</string>
+	<key>InitGroups</key>
+	<true/>
+	<key>Program</key>
+	<string>XXXsbindirXXX/nabud</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>nabud</string>
+		<string>-L</string>
+	</array>
+	<key>KeepAlive</key>
+	<true/>
+	<key>MaterializeDatalessFiles</key>
+	<true/>
+</dict>

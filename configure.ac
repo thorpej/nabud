@@ -64,6 +64,12 @@ case "$CANONICAL_TARGET" in
 		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/rc.d"
 		;;
 
+	*-*-darwin*)
+		# Provide a launchd plist for macOS.
+		EXTRAS_OS="darwin"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/launchd"
+		;;
+
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
@@ -204,6 +210,7 @@ AC_CHECK_FUNCS(getprogname)
 AC_CONFIG_FILES([
 	Makefile
 	examples/Makefile
+	extras/darwin/launchd/Makefile
 	extras/freebsd/rc.conf.d/Makefile
 	extras/freebsd/rc.d/Makefile
 	extras/netbsd/rc.conf.d/Makefile

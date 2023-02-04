@@ -34,6 +34,7 @@
 .Op Fl d
 .Op Fl f
 .Op Fl l Ar logfile
+.\" extras-darwin .Op Fl L
 .Op Fl u Ar user
 .Op Fl U Ar umask
 .Sh DESCRIPTION
@@ -152,6 +153,16 @@ facility.
 Note that when
 .Fl f
 is specified, all log message are written to the controlling terminal.
+.\" extras-darwin .It Fl L
+.\" extras-darwin Runs
+.\" extras-darwin .Nm
+.\" extras-darwin in launchd mode.
+.\" extras-darwin This is similar to the
+.\" extras-darwin .Fl f
+.\" extras-darwin option in that it causes
+.\" extras-darwin .Nm
+.\" extras-darwin to run in the foreground, but differs in that it
+.\" extras-darwin does not alter the logging configuration.
 .It Fl u Ar user
 Specifies an alternative user ID to run
 .Nm
@@ -161,9 +172,29 @@ recommended.
 This option is ignored if
 .Nm
 is not started as the super-user.
+.\" extras-darwin Note that if
+.\" extras-darwin .Nm
+.\" extras-darwin is started via
+.\" extras-darwin .Xr launchd 8 ,
+.\" extras-darwin it is preferable to use the
+.\" extras-darwin .Dq User
+.\" extras-darwin key in the launchd plist for
+.\" extras-darwin .Nm
+.\" extras-darwin rather than using
+.\" extras-darwin .Fl u .
 .It Fl U Ar umask
 Specifes the file creation mask to use when creating files.
 File creation on the server is suppored by the NHACP protocol.
+.\" extras-darwin Note that if
+.\" extras-darwin .Nm
+.\" extras-darwin is started via
+.\" extras-darwin .Xr launchd 8 ,
+.\" extras-darwin it is preferable to use the
+.\" extras-darwin .Dq Umask
+.\" extras-darwin key in the launchd plist for
+.\" extras-darwin .Nm
+.\" extras-darwin rather than using
+.\" extras-darwin .Fl U .
 .El
 .Sh CONFIGURATION
 .Nm
@@ -442,18 +473,23 @@ A more complex example configuration file can be found at:
 .Bd -literal -offset indent
 XXXdatadirXXX/nabud/examples/nabud.conf
 .Ed
-.\" extras-netbsd .Pp
-.\" extras-netbsd rc.conf.d and rc.d files can be found at:
-.\" extras-netbsd .Bd -literal -offset indent
-.\" extras-netbsd XXXdatadirXXX/nabud/rc.conf.d/nabud
-.\" extras-netbsd XXXdatadirXXX/nabud/rc.d/nabud
-.\" extras-netbsd .Ed
+.\" extras-darwin .Pp
+.\" extras-darwin A launchd plist file can be found at:
+.\" extras-darwin .Bd -literal -offset indent
+.\" extras-darwin XXXdatadirXXX/nabud/launchd/nabud.plist
+.\" extras-darwin .Ed
 .\" extras-freebsd .Pp
 .\" extras-freebsd rc.conf.d and rc.d files can be found at:
 .\" extras-freebsd .Bd -literal -offset indent
 .\" extras-freebsd XXXdatadirXXX/nabud/rc.conf.d/nabud
 .\" extras-freebsd XXXdatadirXXX/nabud/rc.d/nabud
 .\" extras-freebsd .Ed
+.\" extras-netbsd .Pp
+.\" extras-netbsd rc.conf.d and rc.d files can be found at:
+.\" extras-netbsd .Bd -literal -offset indent
+.\" extras-netbsd XXXdatadirXXX/nabud/rc.conf.d/nabud
+.\" extras-netbsd XXXdatadirXXX/nabud/rc.d/nabud
+.\" extras-netbsd .Ed
 .\" extras-openbsd .Pp
 .\" extras-openbsd An rc.d start-up script can be found at:
 .\" extras-openbsd .Bd -literal -offset indent
