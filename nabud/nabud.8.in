@@ -55,7 +55,7 @@ point it was relayed to the waiting NABU.
 The content was interleaved such that retrieving the next segment of
 a particular image did not incur an excessively long wait time.
 The Adaptor itself was relatively simple and did very little local
-processing beyond extremely basic packet filtering and that could be
+processing beyond extremely basic packet filtering that could be
 achieved on a Motorola 6801 MCU.
 The serial interface was based around the Western Digital TR1863P UART.
 .Pp
@@ -72,8 +72,10 @@ This is the format used to vend the orginal NABU Network cycles from 1984.
 Serve flat
 .Dq nabu
 files.
-These files are flat binaries that are loaded into a fixed memory
+These files are simply flat binaries that are loaded into a fixed memory
 location by the NABU ROM.
+They are packetized on-the-fly by
+.Nm .
 .It
 Flexible configuration model that allows up to 254 content
 .Dq channels
