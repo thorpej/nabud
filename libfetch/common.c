@@ -1,4 +1,4 @@
-/*	$NetBSD: common.c,v 1.3 2023/01/24 08:01:25 mlelstv Exp $	*/
+/*	$NetBSD: common.c,v 1.4 2023/01/24 08:02:57 mlelstv Exp $	*/
 /*-
  * Copyright (c) 1998-2004 Dag-Erling Coïdan Smørgrav
  * Copyright (c) 2008, 2010 Joerg Sonnenberger <joerg@NetBSD.org>
@@ -898,10 +898,26 @@ fetch_close(conn_t *conn)
 {
 	int ret;
 
-#ifdef HAVE_SECURETRANSPORT
+#if defined(HAVE_SECURETRANSPORT)
 	if (conn->ssl != NULL) {
 		SSLClose(conn->ssl);
 		CFRelease(conn->ssl);
+		conn->ssl = NULL;
+	}
+#elif defined(HAVE_OPENSSL)
+	if (conn->ssl) {
+		SSL_shutdown(conn->ssl);
+		SSL_set_connect_state(conn->ssl);
+		SSL_free(conn->ssl);
+		conn->ssl = NULL;
+	}
+	if (conn->ssl_ctx) {
+		SSL_CTX_free(conn->ssl_ctx);
+		conn->ssl_ctx = NULL;
+	}
+	if (conn->ssl_cert) {
+		X509_free(conn->ssl_cert);
+		conn->ssl_cert = NULL;
 	}
 #endif
 
