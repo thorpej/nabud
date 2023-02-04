@@ -854,6 +854,8 @@ uninstall-man: uninstall-man8
 
 nabud.8: nabud.8.in
 	sed "s,^\..\" extras-$(EXTRAS_OS) ,,g" < nabud.8.in | \
+	    sed "s,XXXsbindirXXX,$(sbindir),g" | \
+	    sed "s,XXXsysconfdirXXX,$(sysconfdir),g" | \
 	    sed "s,XXXdatadirXXX,$(datadir),g" > nabud.8
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

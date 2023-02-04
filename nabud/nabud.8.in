@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd January 18, 2023
+.Dd February 4, 2023
 .Dt NABUD 8
 .Sh NAME
 .Nm nabud
@@ -292,7 +292,150 @@ Here is a simple example configuration file:
   ]
 }
 .Ed
+.Sh RUN-TIME SETUP
+While it is possible to simply run
+.Nm
+without any run-time setup, it is strongly recommended that you do a little
+extra work to run
+.Nm
+as a minimally-privileged user.
+This section is intended to provide some guidance for how to configure
+the run-time environment of
+.Nm
+as well as provide suggestions for file system permissions and group
+management.
+.Pp
+First and foremost, you should create a dedicated group for all users
+on the system that will have permission to do make hanges to files
+accessed by
+.Nm
+and interact with
+.Nm
+using
+.Xr nabuctl 1 .
+In these examples, we will use the group name
+.Dq nabu .
+.Pp
+Next, you should create a dedicated user for running
+.Nm .
+This user does not need a home directory or a login shell, and should have
+no other role on the system.
+In these examples, we will use the user name
+.Dq nabu .
+This user's primary group should also be the
+.Dq nabu
+group created in the first step.
+.Pp
+If you will be using a serial port to communicate with real NABU hardware,
+.Nm
+will need to be able to open the serial port devices for reading and writing.
+Many Unix-like systems provide a system group for the purpose of granting
+permission to specific users to open serial ports for dial-out.  This group
+might be called
+.Dq dialer ,
+.Dq dialout ,
+or
+.Dq uucp .
+If your system does not provide a suitable group, create one.
+In this example, the system provides a
+.Dq dialer
+group, and so we will use that name throughout the examples.
+.Pp
+Ensure the
+.Dq dialer
+group has read-write permission for the serial port that will be used to
+connect to the NABU.
+In this example, the path to the serial port is
+.Dq /dev/ttyU0 .
+.Bd -literal -offset indent
+0 crw-rw----  1 uucp  dialer  66, 0 Dec 31 14:15 /dev/ttyU0
+.Ed
+.Pp
+Once the persmissions on the serial port devices are set correctly, add the
+.Dq nabu
+user to that group.
+.Pp
+If you will be using the storage extensions to the NABU Adaptor protocol
+.Pq such as NHACP ,
+then you should create a directory for your NABU's files.
+This directory will be specified in the
+.Dq FileRoot
+property of your NABU's connection object in the
+.Nm
+configuration file.
+The directory should be owned by the
+.Dq nabu
+user and group, and should have the mode
+.Em 0775
+.Pq octal :
+.Bd -literal -offset indent
+4 drwxrwxr-x  2 nabu  nabu  512 Jan 16 22:05 living-room-nabu/
+.Ed
+.Pp
+This will allow
+.Nm
+to create files in that directory, as necessary
+.Pq e.g. game save files, etc. .
+It is still possible to put more restrictive permissions on files inside
+that directory if you want the NABU to have read-only access to some files
+.Pq such as your Zork CP/M disk image .
+This will also allow other users in the
+.Dq nabu
+group to add files to that directory to be accessed by programs running
+on the NABU.
+.Pp
+Once you have set up the run-time environment as described above, you
+should use the
+.Fl u Ar user
+and
+.Fl U Ar umask
+when running
+.Nm :
+.Bd -literal -offset indent
+XXXsbindirXXX/nabud -u nabu -U 002
+.Ed
+.Pp
+The
+.Fl U Ar umask
+argument ensures that users in the
+.Dq nabu
+group will be able to manipulate any files created by programs running on
+the NABU.
+.Pp
+.Nm
+creates a Unix domain socket to allow the
+.Xr nabuctl 1
+program to send control messages.
+.Nm
+will set the owner and group of this socket to the user ID and
+effective group ID that
+.Nm
+is running as, and allow connections from any user in that group.
+If
+.Nm
+is configured as described above, the permissions on this socket
+.Po
+located at
+.Dq /tmp/nabuctl.sock
+.Pc
+will be:
+.Bd -literal -offset indend
+0 srwxrwxr-x  1 nabu  nabu  0 Feb  4 05:29 /tmp/nabuctl.sock=
+.Ed
 .Sh FILES
+By default,
+.Nm
+will look for its configuration file at:
+.Bd -literal -offset indent
+XXXsysconfdirXXX/nabud.conf
+.Ed
+.Pp
+.Nm
+creates a control message socket at:
+.Bd -literal -offset indent
+/tmp/nabuctl.sock
+.Ed
+.Pp
 A more complex example configuration file can be found at:
 .Bd -literal -offset indent
 XXXdatadirXXX/nabud/examples/nabud.conf
