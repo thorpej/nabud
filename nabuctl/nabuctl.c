@@ -1263,7 +1263,7 @@ static const struct cmdtab channel_cmdtab[] = {
 static bool
 command_channel(int argc, char *argv[])
 {
-	if (argc < 2) {
+	if (argc < 3) {
 		return command_channel_usage(argc, argv);
 	}
 	return cli_subcommand(channel_cmdtab, argc, argv, 2);
