@@ -377,6 +377,14 @@ config_load(const char *path)
 
 const char nabud_version[] = VERSION;
 
+#define	GETOPT_FLAGS	"c:dfl:u:U:"
+
+#if defined(__APPLE__)
+#define	PLATFORM_GETOPT_FLAGS	"L"
+#else
+#define	PLATFORM_GETOPT_FLAGS	/* nothing */
+#endif
+
 static void __attribute__((__noreturn__))
 usage(void)
 {
@@ -387,6 +395,9 @@ usage(void)
 	fprintf(stderr, "       -d         enable debugging (implies -f)\n");
 	fprintf(stderr, "       -f         run in the foreground\n");
 	fprintf(stderr, "       -l logfile specifies the log file\n");
+#if defined(__APPLE__)
+	fprintf(stderr, "       -L         run in launchd mode\n");
+#endif
 	fprintf(stderr, "       -u user    specifies user to run as\n");
 	fprintf(stderr, "       -U umask   specifies umask for file creation\n");
 	exit(EXIT_FAILURE);
@@ -404,7 +415,8 @@ main(int argc, char *argv[])
 
 	setprogname(argv[0]);
 
-	while ((ch = getopt(argc, argv, "c:dfl:u:U:")) != -1) {
+	while ((ch = getopt(argc, argv,
+			    GETOPT_FLAGS PLATFORM_GETOPT_FLAGS)) != -1) {
 		switch (ch) {
 		case 'c':
 			nabud_conf = optarg;
@@ -423,6 +435,13 @@ main(int argc, char *argv[])
 		case 'l':
 			logfile = optarg;
 			break;
+
+#if defined(__APPLE__)
+		case 'L':
+			/* Run in foreground, but with normal logging. */
+			foreground = true;
+			break;
+#endif
 
 		case 'u':
 			as_user = optarg;
