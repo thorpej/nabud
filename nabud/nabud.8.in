@@ -339,7 +339,7 @@ as well as provide suggestions for file system permissions and group
 management.
 .Pp
 First and foremost, you should create a dedicated group for all users
-on the system that will have permission to do make hanges to files
+on the system that will have permission to do make changes to files
 accessed by
 .Nm
 and interact with
