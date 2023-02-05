@@ -533,8 +533,8 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 
 	log_debug("[%s] Sending segment %u of image %06X.",
 	    conn_name(conn), segment, image);
-	adaptor_send_image(conn, image, segment, img);
-	image_release(img);
+	image_unload(conn, img,
+	    adaptor_send_image(conn, image, segment, img));
 }
 
 /*

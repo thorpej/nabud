@@ -84,6 +84,7 @@ char *	image_channel_copy_listing(struct image_channel *, size_t *);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);
+void	image_unload(struct nabu_connection *, struct nabu_image *, bool);
 void	image_release(struct nabu_image *);
 
 #endif /* image_h_included */

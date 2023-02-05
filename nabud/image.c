@@ -920,3 +920,16 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	}
 	return img;
 }
+
+/*
+ * image_unload --
+ *	The reverse of image_load().  We release our references, and
+ *	maybe free the image completely.
+ */
+void
+image_unload(struct nabu_connection *conn, struct nabu_image *img,
+    bool lastuse)
+{
+	/* This is just a basic release for now. */
+	image_release(img);
+}
