@@ -400,7 +400,7 @@ conn_destroy(struct nabu_connection *conn)
 {
 	conn_remove(conn);
 
-	image_release(conn_set_last_image(conn, NULL));
+	image_release(conn_set_last_image(conn, NULL), true);
 
 	pthread_mutex_destroy(&conn->mutex);
 

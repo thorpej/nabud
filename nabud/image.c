@@ -117,7 +117,7 @@ image_free(struct nabu_image *img)
  *	Relase an image.  This version is visible to outsiders.
  */
 void
-image_release(struct nabu_image *img)
+image_release(struct nabu_image *img, bool lastuse)
 {
 	pthread_mutex_lock(&image_cache_lock);
 	img = image_release_locked(img);
@@ -394,7 +394,7 @@ image_cache_clear(struct image_channel *chan)
 
 	while ((img = LIST_FIRST(&old_cache)) != NULL) {
 		LIST_REMOVE(img, link);
-		image_release(img);
+		image_release(img, true);
 	}
 
 	if (listing != NULL) {
