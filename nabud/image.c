@@ -378,6 +378,26 @@ image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 }
 
 /*
+ * image_cache_remove_locked --
+ *	Remove an image from its channel's image cache.  Caller is
+ *	responsible for dropping the retain if non-NULL is returned.
+ */
+static struct nabu_image *
+image_cache_remove_locked(struct nabu_image *img)
+{
+	if (img->cached) {
+		image_cache_size -= img->length;
+		log_debug("[Channel %u] Removing image %s from cache; "
+		    "total cache size: %zu",
+		    img->channel->number, img->name, image_cache_size);
+		LIST_REMOVE(img, link);
+		img->cached = false;
+		return img;
+	}
+	return NULL;
+}
+
+/*
  * image_cache_clear --
  *	Clear the image cache for a channel.
  */
@@ -391,9 +411,8 @@ image_cache_clear(struct image_channel *chan)
 	LIST_INIT(&old_cache);
 	pthread_mutex_lock(&image_cache_lock);
 	while ((img = LIST_FIRST(&chan->image_cache)) != NULL) {
-		image_cache_size -= img->length;
-		LIST_REMOVE(img, link);
-		img->cached = false;
+		assert(img->cached == true);
+		image_cache_remove_locked(img);
 		LIST_INSERT_HEAD(&old_cache, img, link);
 	}
 	listing = chan->listing;
@@ -957,6 +976,17 @@ image_unload(struct nabu_connection *conn, struct nabu_image *img,
 		oimg = conn_set_last_image(conn, NULL);
 		assert(oimg == img);
 		image_release_locked(oimg);
+
+		if (img->is_local) {
+			log_debug("[%s] Removing %s from channel cache.",
+			    conn_name(conn), img->name);
+			oimg = image_cache_remove_locked(img);
+			if (oimg != NULL) {
+				log_debug("[%s] Dropping cache retain for %s.",
+				    conn_name(conn), img->name);
+				image_release_locked(oimg);
+			}
+		}
 	}
 
 	img = image_release_locked(img);
