@@ -422,7 +422,7 @@ should use the
 .Fl u Ar user
 and
 .Fl U Ar umask
-when running
+options when running
 .Nm :
 .Bd -literal -offset indent
 XXXsbindirXXX/nabud -u nabu -U 002
