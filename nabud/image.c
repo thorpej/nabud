@@ -930,6 +930,25 @@ void
 image_unload(struct nabu_connection *conn, struct nabu_image *img,
     bool lastuse)
 {
-	/* This is just a basic release for now. */
-	image_release(img);
+	struct nabu_image *oimg;
+
+	pthread_mutex_lock(&image_cache_lock);
+
+	/*
+	 * If this is the last-use of an image by the connection, then
+	 * get rid of caching retains before dropping the primary retain.
+	 */
+	if (lastuse) {
+		log_debug("[%s] dropping last-image retain of %s.",
+		    conn_name(conn), img->name);
+		oimg = conn_set_last_image(conn, NULL);
+		assert(oimg == img);
+		image_release_locked(oimg);
+	}
+
+	img = image_release_locked(img);
+
+	pthread_mutex_unlock(&image_cache_lock);
+
+	image_free(img);
 }
