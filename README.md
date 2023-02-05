@@ -476,6 +476,14 @@ And you can select a file to loaded wnen the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.1
+* Tweaks to image cache management: images from local sources are cached
+  less aggressively.  This reduces the memory footprint of nabud at very
+  little cost to overall performance, and also makes local NABU program
+  development a bit easier as there is no need to manually clear the cache
+  each time a new image is dropped into a local channel being used for
+  that purpose.
+
 ### nabud-1.0
 * Added support for the NABU HCCA Application Communication Protocol.  This
   protocol is much better specified than the NabuRetroNet protocol (which
