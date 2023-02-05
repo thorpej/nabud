@@ -721,9 +721,10 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 	struct nabu_image *img;
 	uint8_t *filebuf;
 	size_t filesize;
+	struct fileio_attrs attrs;
 
 	filebuf = fileio_load_file_from_location(url, 0, NABU_MAXSEGMENTSIZE,
-	    NULL, &filesize);
+	    &attrs, &filesize);
 	if (filebuf == NULL) {
 		/* Error already logged. */
 		return NULL;
@@ -736,6 +737,9 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 		img = image_from_nabu(chan, image, image_name, filebuf,
 		    filesize);
 	}
+
+	/* For cache management decisions later. */
+	img->is_local = attrs.is_local;
 
 	return img;
 }

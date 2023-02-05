@@ -68,6 +68,7 @@ struct nabu_image {
 	size_t		length;
 	uint32_t	number;
 	uint32_t	refcnt;
+	bool		is_local;
 };
 
 struct nabu_connection;
