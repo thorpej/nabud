@@ -105,7 +105,10 @@ static void
 image_free(struct nabu_image *img)
 {
 	if (img != NULL) {
+		log_debug("[Channel %u] Freeing image %s.",
+		    img->channel->number, img->name);
 		assert(img->refcnt == 0);
+		assert(img->cached == false);
 		free(img->name);
 		free(img->data);
 		free(img);
@@ -351,6 +354,8 @@ image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 {
 	struct nabu_image *img;
 
+	assert(newimg->cached == false);
+
 	if (newimg->number == IMAGE_NUMBER_NAMED) {
 		img = image_cache_lookup_named_locked(chan, newimg->name);
 	} else {
@@ -360,11 +365,14 @@ image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 		image_retain_locked(newimg);
 		LIST_INSERT_HEAD(&chan->image_cache, newimg, link);
 		image_cache_size += newimg->length;
+		newimg->cached = true;
 
 		log_info("Cached %s on Channel %u; "
 		    "total cache size: %zu", newimg->name, chan->number,
 		        image_cache_size);
 		img = newimg;
+	} else {
+		assert(img->cached == true);
 	}
 	return img;
 }
@@ -385,6 +393,7 @@ image_cache_clear(struct image_channel *chan)
 	while ((img = LIST_FIRST(&chan->image_cache)) != NULL) {
 		image_cache_size -= img->length;
 		LIST_REMOVE(img, link);
+		img->cached = false;
 		LIST_INSERT_HEAD(&old_cache, img, link);
 	}
 	listing = chan->listing;
