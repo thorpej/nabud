@@ -60,7 +60,7 @@
 
 struct nhacp_context {
 	struct nabu_connection *conn;
-	LIST_HEAD(, nhacp_file) files;
+	LIST_HEAD(, stext_file) files;
 
 	union {
 		struct nhacp_request request;
@@ -68,10 +68,10 @@ struct nhacp_context {
 	};
 };
 
-struct nhacp_file {
-	LIST_ENTRY(nhacp_file) link;
+struct stext_file {
+	LIST_ENTRY(stext_file) link;
 	uint8_t		slot;
-	const struct nhacp_fileops *ops;
+	const struct stext_fileops *ops;
 
 	union {
 		struct {
@@ -84,12 +84,12 @@ struct nhacp_file {
 	};
 };
 
-struct nhacp_fileops {
-	int	(*file_read)(struct nhacp_context *, struct nhacp_file *,
+struct stext_fileops {
+	int	(*file_read)(struct nhacp_context *, struct stext_file *,
 		    uint32_t, uint16_t *);
-	int	(*file_write)(struct nhacp_context *, struct nhacp_file *,
+	int	(*file_write)(struct nhacp_context *, struct stext_file *,
 		    uint32_t, uint16_t);
-	void	(*file_close)(struct nhacp_context *, struct nhacp_file *);
+	void	(*file_close)(struct nhacp_context *, struct stext_file *);
 };
 
 /*
@@ -103,16 +103,16 @@ struct nhacp_fileops {
 				 sizeof(struct nhacp_request_storage_put))
 
 /*
- * nhacp_file_insert --
+ * stext_file_insert --
  *	Insert a file into the list, allocating a slot number if
  *	necessary.  This always succeeds, and returns the old
  *	file object that needs to be freed if there's a collision.
  */
 static bool
-nhacp_file_insert(struct nhacp_context *ctx, struct nhacp_file *f,
-    uint8_t reqslot, struct nhacp_file **oldfp)
+stext_file_insert(struct nhacp_context *ctx, struct stext_file *f,
+    uint8_t reqslot, struct stext_file **oldfp)
 {
-	struct nhacp_file *lf, *prevf = NULL;
+	struct stext_file *lf, *prevf = NULL;
 	uint8_t slot;
 
 	*oldfp = NULL;
@@ -174,10 +174,10 @@ nhacp_file_insert(struct nhacp_context *ctx, struct nhacp_file *f,
 	return true;
 }
 
-static struct nhacp_file *
-nhacp_file_find(struct nhacp_context *ctx, uint8_t slot)
+static struct stext_file *
+stext_file_find(struct nhacp_context *ctx, uint8_t slot)
 {
-	struct nhacp_file *f;
+	struct stext_file *f;
 
 	if (slot == 0xff) {
 		return NULL;
@@ -196,7 +196,7 @@ nhacp_file_find(struct nhacp_context *ctx, uint8_t slot)
 }
 
 static void
-nhacp_file_free(struct nhacp_context *ctx, struct nhacp_file *f)
+stext_file_free(struct nhacp_context *ctx, struct stext_file *f)
 {
 	if (f->ops != NULL) {
 		(*f->ops->file_close)(ctx, f);
@@ -281,19 +281,19 @@ nhacp_send_data_buffer(struct nhacp_context *ctx, uint16_t length)
 }
 
 /*
- * nhacp_file_closeall --
+ * stext_file_closeall --
  *	Close all files associated with this connection.
  */
 static void
-nhacp_file_closeall(struct nhacp_context *ctx)
+stext_file_closeall(struct nhacp_context *ctx)
 {
-	struct nhacp_file *f;
+	struct stext_file *f;
 
 	while ((f = LIST_FIRST(&ctx->files)) != NULL) {
 		log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
 		    f->slot);
 		LIST_REMOVE(f, link);
-		nhacp_file_free(ctx, f);
+		stext_file_free(ctx, f);
 	}
 }
 
@@ -302,7 +302,7 @@ nhacp_file_closeall(struct nhacp_context *ctx)
  *****************************************************************************/
 
 static int
-nhacp_fileop_read_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
+stext_fileop_read_fileio(struct nhacp_context *ctx, struct stext_file *f,
     uint32_t offset, uint16_t *lengthp)
 {
 	uint8_t *buf = ctx->reply.data_buffer.data;
@@ -334,7 +334,7 @@ nhacp_fileop_read_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 }
 
 static int
-nhacp_fileop_write_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
+stext_fileop_write_fileio(struct nhacp_context *ctx, struct stext_file *f,
     uint32_t offset, uint16_t length)
 {
 	uint8_t *buf = ctx->request.storage_put.data;
@@ -361,17 +361,17 @@ nhacp_fileop_write_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 }
 
 static void
-nhacp_fileop_close_fileio(struct nhacp_context *ctx, struct nhacp_file *f)
+stext_fileop_close_fileio(struct nhacp_context *ctx, struct stext_file *f)
 {
 	if (f->fileio.fileio != NULL) {
 		fileio_close(f->fileio.fileio);
 	}
 }
 
-static const struct nhacp_fileops nhacp_fileops_fileio = {
-	.file_read	= nhacp_fileop_read_fileio,
-	.file_write	= nhacp_fileop_write_fileio,
-	.file_close	= nhacp_fileop_close_fileio,
+static const struct stext_fileops stext_fileops_fileio = {
+	.file_read	= stext_fileop_read_fileio,
+	.file_write	= stext_fileop_write_fileio,
+	.file_close	= stext_fileop_close_fileio,
 };
 
 /*****************************************************************************
@@ -379,7 +379,7 @@ static const struct nhacp_fileops nhacp_fileops_fileio = {
  *****************************************************************************/
 
 static int
-nhacp_fileop_read_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
+stext_fileop_read_shadow(struct nhacp_context *ctx, struct stext_file *f,
     uint32_t offset, uint16_t *lengthp)
 {
 	uint16_t length = *lengthp;
@@ -398,7 +398,7 @@ nhacp_fileop_read_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
 }
 
 static int
-nhacp_fileop_write_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
+stext_fileop_write_shadow(struct nhacp_context *ctx, struct stext_file *f,
     uint32_t offset, uint16_t length)
 {
 	if (length > MAX_SHADOW_LENGTH - offset) {
@@ -424,17 +424,17 @@ nhacp_fileop_write_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
 }
 
 static void
-nhacp_fileop_close_shadow(struct nhacp_context *ctx, struct nhacp_file *f)
+stext_fileop_close_shadow(struct nhacp_context *ctx, struct stext_file *f)
 {
 	if (f->shadow.data != NULL) {
 		free(f->shadow.data);
 	}
 }
 
-static const struct nhacp_fileops nhacp_fileops_shadow = {
-	.file_read	= nhacp_fileop_read_shadow,
-	.file_write	= nhacp_fileop_write_shadow,
-	.file_close	= nhacp_fileop_close_shadow,
+static const struct stext_fileops stext_fileops_shadow = {
+	.file_read	= stext_fileop_read_shadow,
+	.file_write	= stext_fileop_write_shadow,
+	.file_close	= stext_fileop_close_shadow,
 };
 
 /*****************************************************************************
@@ -448,7 +448,7 @@ static const struct nhacp_fileops nhacp_fileops_shadow = {
 static void
 nhacp_req_storage_open(struct nhacp_context *ctx)
 {
-	struct nhacp_file *f = NULL, *of = NULL;
+	struct stext_file *f = NULL, *of = NULL;
 	struct fileio_attrs attrs;
 	struct fileio *fileio = NULL;
 	const char *filename;
@@ -528,7 +528,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 
 		f->shadow.data = fileio_load_file(fileio, &attrs,
 		    0 /*extra*/, 0 /*maxsize XXX*/, &f->shadow.length);
-		f->ops = &nhacp_fileops_shadow;
+		f->ops = &stext_fileops_shadow;
 	} else {
 		if (attrs.size > MAX_FILEIO_LENGTH) {
 			log_debug("[%s] '%s' exceeds maximum file size %u.",
@@ -540,10 +540,10 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		}
 		f->fileio.fileio = fileio;
 		fileio = NULL;		/* file owns it now */
-		f->ops = &nhacp_fileops_fileio;
+		f->ops = &stext_fileops_fileio;
 	}
 
-	if (! nhacp_file_insert(ctx, f,
+	if (! stext_file_insert(ctx, f,
 				ctx->request.storage_open.req_slot, &of)) {
 		log_error("[%s] Unable to insert %s at requsted slot %u.",
 		    conn_name(ctx->conn), filename,
@@ -563,10 +563,10 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		fileio_close(fileio);
 	}
 	if (f != NULL) {
-		nhacp_file_free(ctx, f);
+		stext_file_free(ctx, f);
 	}
 	if (of != NULL) {
-		nhacp_file_free(ctx, of);
+		stext_file_free(ctx, of);
 	}
 }
 
@@ -577,9 +577,9 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 static void
 nhacp_req_storage_get(struct nhacp_context *ctx)
 {
-	struct nhacp_file *f;
+	struct stext_file *f;
 
-	f = nhacp_file_find(ctx, ctx->request.storage_get.slot);
+	f = stext_file_find(ctx, ctx->request.storage_get.slot);
 	if (f == NULL) {
 		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
 		    ctx->request.storage_get.slot);
@@ -613,9 +613,9 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 static void
 nhacp_req_storage_put(struct nhacp_context *ctx)
 {
-	struct nhacp_file *f;
+	struct stext_file *f;
 
-	f = nhacp_file_find(ctx, ctx->request.storage_put.slot);
+	f = stext_file_find(ctx, ctx->request.storage_put.slot);
 	if (f == NULL) {
 		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
 		    ctx->request.storage_put.slot);
@@ -686,9 +686,9 @@ nhacp_req_get_date_time(struct nhacp_context *ctx)
 static void
 nhacp_req_storage_close(struct nhacp_context *ctx)
 {
-	struct nhacp_file *f;
+	struct stext_file *f;
 
-	f = nhacp_file_find(ctx, ctx->request.storage_close.slot);
+	f = stext_file_find(ctx, ctx->request.storage_close.slot);
 	if (f == NULL) {
 		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
 		    ctx->request.storage_close.slot);
@@ -697,7 +697,7 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 	log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
 	    f->slot);
 	LIST_REMOVE(f, link);
-	nhacp_file_free(ctx, f);
+	stext_file_free(ctx, f);
 }
 
 #define	HANDLER_ENTRY(v, n)						\
@@ -745,7 +745,7 @@ nhacp_context_alloc(struct nabu_connection *conn)
 static void
 nhacp_context_free(struct nhacp_context *ctx)
 {
-	nhacp_file_closeall(ctx);
+	stext_file_closeall(ctx);
 	free(ctx);
 }
 
