@@ -291,10 +291,6 @@ stext_fileop_pwrite_fileio(struct stext_file *f, const void *vbuf,
 	size_t resid = length;
 	ssize_t actual;
 
-	if (resid > MAX_FILEIO_LENGTH - offset) {
-		return EFBIG;
-	}
-
 	while (resid != 0) {
 		actual = fileio_pwrite(f->fileio.fileio, buf, resid, offset);
 		if (actual <= 0) {
@@ -399,10 +395,6 @@ static int
 stext_fileop_pwrite_shadow(struct stext_file *f, const void *vbuf,
     uint32_t offset, uint16_t length)
 {
-	if (length > MAX_SHADOW_LENGTH - offset) {
-		return EFBIG;
-	}
-
 	if (offset + length > f->shadow.length) {
 		uint8_t *newbuf = realloc(f->shadow.data, offset + length);
 		if (newbuf == NULL) {
@@ -674,6 +666,10 @@ int
 stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
     uint16_t length)
 {
+	if (length > f->ops->max_length - offset) {
+		return EFBIG;
+	}
+
 	return (*f->ops->file_pwrite)(f, vbuf, offset, length);
 }
 
