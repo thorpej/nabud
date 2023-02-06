@@ -47,5 +47,6 @@ void	stext_file_close(struct stext_file *);
 int	stext_file_pread(struct stext_file *, void *, uint32_t, uint16_t *);
 int	stext_file_pwrite(struct stext_file *, const void *, uint32_t,
 	    uint16_t);
+int	stext_file_seek(struct stext_file *, int32_t *, int);
 
 #endif /* stext_h_included */

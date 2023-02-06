@@ -63,14 +63,17 @@ struct stext_file {
 		struct {
 			uint8_t		*data;
 			size_t		length;
+			uint32_t	cursor;
 		} shadow;
 	};
 };
 
 struct stext_fileops {
+	off_t	max_length;
 	int	(*file_read)(struct stext_file *, void *, uint32_t, uint16_t *);
 	int	(*file_write)(struct stext_file *, const void *, uint32_t,
 		    uint16_t);
+	off_t	(*file_seek)(struct stext_file *, off_t, int);
 	void	(*file_close)(struct stext_file *);
 };
 
@@ -255,6 +258,12 @@ stext_fileop_write_fileio(struct stext_file *f, const void *vbuf,
 	return 0;
 }
 
+static off_t
+stext_fileop_seek_fileio(struct stext_file *f, off_t offset, int whence)
+{
+	return fileio_seek(f->fileio.fileio, offset, whence);
+}
+
 static void
 stext_fileop_close_fileio(struct stext_file *f)
 {
@@ -264,8 +273,10 @@ stext_fileop_close_fileio(struct stext_file *f)
 }
 
 static const struct stext_fileops stext_fileops_fileio = {
+	.max_length	= MAX_FILEIO_LENGTH,
 	.file_read	= stext_fileop_read_fileio,
 	.file_write	= stext_fileop_write_fileio,
+	.file_seek	= stext_fileop_seek_fileio,
 	.file_close	= stext_fileop_close_fileio,
 };
 
@@ -316,6 +327,40 @@ stext_fileop_write_shadow(struct stext_file *f, const void *vbuf,
 	return 0;
 }
 
+static off_t
+stext_fileop_seek_shadow(struct stext_file *f, off_t offset, int whence)
+{
+	switch (whence) {
+	case SEEK_SET:
+		if (offset < 0) {
+			goto invalid;
+		}
+		f->shadow.cursor = offset;
+		break;
+
+	case SEEK_CUR:
+		if (offset < 0 && -offset > f->shadow.cursor) {
+			goto invalid;
+		}
+		f->shadow.cursor += offset;
+		break;
+
+	case SEEK_END:
+		if (offset < 0 && -offset > f->shadow.length) {
+			goto invalid;
+		}
+		f->shadow.cursor = f->shadow.length + offset;
+		break;
+
+	default:
+	invalid:
+		errno = EINVAL;
+		return -1;
+	}
+
+	return f->shadow.cursor;
+}
+
 static void
 stext_fileop_close_shadow(struct stext_file *f)
 {
@@ -325,8 +370,10 @@ stext_fileop_close_shadow(struct stext_file *f)
 }
 
 static const struct stext_fileops stext_fileops_shadow = {
+	.max_length	= MAX_SHADOW_LENGTH,
 	.file_read	= stext_fileop_read_shadow,
 	.file_write	= stext_fileop_write_shadow,
+	.file_seek	= stext_fileop_seek_shadow,
 	.file_close	= stext_fileop_close_shadow,
 };
 
@@ -492,4 +539,34 @@ stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
     uint16_t length)
 {
 	return (*f->ops->file_write)(f, vbuf, offset, length);
+}
+
+/*
+ * stext_file_seek --
+ *	Reposition the read/write cursor.
+ */
+int
+stext_file_seek(struct stext_file *f, int32_t *offsetp, int whence)
+{
+	off_t ooff, noff;
+
+	/* Get current position in case we have to unwind. */
+	ooff = (*f->ops->file_seek)(f, 0, SEEK_CUR);
+	if (ooff < 0) {
+		return EIO;
+	}
+
+	/* Seek to the new position. */
+	noff = (*f->ops->file_seek)(f, *offsetp, whence);
+	if (noff < 0) {
+		return EINVAL;
+	}
+
+	if (noff >= f->ops->max_length) {
+		(*f->ops->file_seek)(f, ooff, SEEK_SET);
+		return E2BIG;
+	}
+
+	*offsetp = (int32_t)noff;
+	return 0;
 }
