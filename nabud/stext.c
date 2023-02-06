@@ -473,22 +473,22 @@ stext_file_close(struct stext_file *f)
 }
 
 /*
- * stext_file_read --
+ * stext_file_pread --
  *	Positional file read.
  */
 int
-stext_file_read(struct stext_file *f, void *vbuf, uint32_t offset,
+stext_file_pread(struct stext_file *f, void *vbuf, uint32_t offset,
     uint16_t *lengthp)
 {
 	return (*f->ops->file_read)(f, vbuf, offset, lengthp);
 }
 
 /*
- * stext_file_write --
+ * stext_file_pwrite --
  *	Positional file write.
  */
 int
-stext_file_write(struct stext_file *f, const void *vbuf, uint32_t offset,
+stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
     uint16_t length)
 {
 	return (*f->ops->file_write)(f, vbuf, offset, length);

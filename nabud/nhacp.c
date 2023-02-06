@@ -222,7 +222,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 		return;
 	}
 
-	int error = stext_file_read(f, ctx->reply.data_buffer.data,
+	int error = stext_file_pread(f, ctx->reply.data_buffer.data,
 	    offset, &length);
 	if (error != 0) {
 		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
@@ -260,7 +260,7 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 		return;
 	}
 
-	int error = stext_file_write(f, ctx->request.storage_put.data,
+	int error = stext_file_pwrite(f, ctx->request.storage_put.data,
 	    offset, length);
 	if (error != 0) {
 		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
