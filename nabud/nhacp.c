@@ -92,6 +92,7 @@ static const char error_message_ebadf[] = "INVALID FILE";
 static const char error_message_efbig[] = "FILE TOO BIG";
 static const char error_message_enomem[] = "OUT OF MEMORY";
 static const char error_message_enoent[] = "NO SUCH FILE";
+static const char error_message_emfile[] = "TOO MANY OPEN FILES";
 
 static const char *
 nhacp_errno_to_message(int error)
@@ -104,6 +105,8 @@ nhacp_errno_to_message(int error)
 	case EFBIG:	return error_message_efbig;
 	case ENOMEM:	return error_message_enomem;
 	case ENOENT:	return error_message_enoent;
+	case ENFILE:	/* FALLTHROUGH */
+	case EMFILE:	return error_message_emfile;
 	}
 }
 
@@ -160,11 +163,9 @@ nhacp_send_data_buffer(struct nhacp_context *ctx, uint16_t length)
 static void
 nhacp_req_storage_open(struct nhacp_context *ctx)
 {
-	struct stext_file *f = NULL, *of = NULL;
 	struct fileio_attrs attrs;
-	struct fileio *fileio = NULL;
-	const char *filename;
-	bool need_shadow = false;
+	struct stext_file *f;
+	int error;
 
 	/*
 	 * The requested URL is no more than 255 bytes long, and we
@@ -174,111 +175,19 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	 */
 	ctx->request.storage_open.url_string[
 	    ctx->request.storage_open.url_length] = '\0';
-	filename = (const char *)ctx->request.storage_open.url_string;
 
-	f = calloc(1, sizeof(*f));
-	if (f == NULL) {
-		log_error("[%s] Unable to allocate NHACP file object for '%s'",
-		    conn_name(ctx->stext.conn), filename);
-		nhacp_send_error(ctx, 0, error_message_enomem);
-		goto out;
-	}
+	error = stext_file_open(&ctx->stext,
+	    (const char *)ctx->request.storage_open.url_string,
+	    ctx->request.storage_open.req_slot, &attrs, &f);
 
-	log_debug("[%s] Opening '%s'", conn_name(ctx->stext.conn), filename);
-	fileio = fileio_open(filename,
-	    FILEIO_O_CREAT | FILEIO_O_LOCAL_ROOT | FILEIO_O_RDWR,
-	    ctx->stext.conn->file_root, &attrs);
-	if (fileio == NULL) {
-		/*
-		 * Try opening read-only.  If that succeeds, then we just
-		 * allocate a shadow file.
-		 */
-		fileio = fileio_open(filename,
-		    FILEIO_O_LOCAL_ROOT | FILEIO_O_RDONLY,
-		    ctx->stext.conn->file_root, &attrs);
-		if (fileio != NULL) {
-			log_debug("[%s] Need R/W shadow buffer for '%s'",
-			    conn_name(ctx->stext.conn), filename);
-			need_shadow = true;
-		}
-	}
-	if (fileio == NULL) {
-		log_error("[%s] Unable to open file '%s': %s",
-		    conn_name(ctx->stext.conn), filename, strerror(errno));
-		nhacp_send_error(ctx, 0, error_message_enoent);
-		goto out;
-	}
-
-	/* Opening directories is not allowed. */
-	if (attrs.is_directory) {
-		log_error("[%s] '%s': Opening directories is not permitted.",
-		    conn_name(ctx->stext.conn), fileio_location(fileio));
-		nhacp_send_error(ctx, 0, error_message_einval);
-		goto out;
-	}
-
-	/*
-	 * If the underlying file object is not seekable, then we need
-	 * to allocate a shadow file, because the NHACP API has only
-	 * positional I/O.
-	 */
-	if (! attrs.is_seekable) {
-		log_debug("[%s] Need seekable shadow buffer for '%s'",
-		    conn_name(ctx->stext.conn), fileio_location(fileio));
-		need_shadow = true;
-	}
-
-	if (need_shadow) {
-		if (attrs.size > MAX_SHADOW_LENGTH) {
-			log_debug("[%s] '%s' exceeds maximum shadow length %u.",
-			    conn_name(ctx->stext.conn),
-			    fileio_location(fileio),
-			    MAX_SHADOW_LENGTH);
-			nhacp_send_error(ctx, 0, error_message_efbig);
-			goto out;
-		}
-
-		f->shadow.data = fileio_load_file(fileio, &attrs,
-		    0 /*extra*/, 0 /*maxsize XXX*/, &f->shadow.length);
-		f->ops = &stext_fileops_shadow;
+	if (error != 0) {
+		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
 	} else {
-		if (attrs.size > MAX_FILEIO_LENGTH) {
-			log_debug("[%s] '%s' exceeds maximum file size %u.",
-			    conn_name(ctx->stext.conn),
-			    fileio_location(f->fileio.fileio),
-			    MAX_FILEIO_LENGTH);
-			nhacp_send_error(ctx, 0, error_message_efbig);
-			goto out;
-		}
-		f->fileio.fileio = fileio;
-		fileio = NULL;		/* file owns it now */
-		f->ops = &stext_fileops_fileio;
-	}
-
-	if (! stext_file_insert(&ctx->stext, f,
-				ctx->request.storage_open.req_slot, &of)) {
-		log_error("[%s] Unable to insert %s at requsted slot %u.",
-		    conn_name(ctx->stext.conn), filename,
-		    ctx->request.storage_open.req_slot);
-		goto out;
-	}
-	uint8_t slot = f->slot;
-	f = NULL;
-
-	ctx->reply.storage_loaded.slot = slot;
-	nabu_set_uint32(ctx->reply.storage_loaded.length, (uint32_t)attrs.size);
-	nhacp_send_reply(ctx, NHACP_RESP_STORAGE_LOADED,
-	    sizeof(ctx->reply.storage_loaded));
-
- out:
-	if (fileio != NULL) {
-		fileio_close(fileio);
-	}
-	if (f != NULL) {
-		stext_file_close(f);
-	}
-	if (of != NULL) {
-		stext_file_close(of);
+		ctx->reply.storage_loaded.slot = f->slot;
+		nabu_set_uint32(ctx->reply.storage_loaded.length,
+		    (uint32_t)attrs.size);
+		nhacp_send_reply(ctx, NHACP_RESP_STORAGE_LOADED,
+		    sizeof(ctx->reply.storage_loaded));
 	}
 }
 
@@ -313,10 +222,10 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 
 	int error = stext_file_read(f, ctx->reply.data_buffer.data,
 	    offset, &length);
-	if (error == 0) {
-		nhacp_send_data_buffer(ctx, length);
-	} else {
+	if (error != 0) {
 		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
+	} else {
+		nhacp_send_data_buffer(ctx, length);
 	}
 }
 
@@ -351,10 +260,10 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 
 	int error = stext_file_write(f, ctx->request.storage_put.data,
 	    offset, length);
-	if (error == 0) {
-		nhacp_send_ok(ctx);
-	} else {
+	if (error != 0) {
 		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
+	} else {
+		nhacp_send_ok(ctx);
 	}
 }
 

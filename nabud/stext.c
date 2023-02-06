@@ -143,15 +143,6 @@ stext_file_find(struct stext_context *ctx, uint8_t slot)
 	return NULL;
 }
 
-void
-stext_file_close(struct stext_file *f)
-{
-	if (f->ops != NULL) {
-		(*f->ops->file_close)(f);
-	}
-	free(f);
-}
-
 /*
  * stext_context_init --
  *	Initlaize a storage extension context.
@@ -317,3 +308,134 @@ const struct stext_fileops stext_fileops_shadow = {
 	.file_write	= stext_fileop_write_shadow,
 	.file_close	= stext_fileop_close_shadow,
 };
+
+/*
+ * stext_open_file --
+ *	Open a file.
+ */
+int
+stext_file_open(struct stext_context *ctx, const char *filename,
+    uint8_t reqslot, struct fileio_attrs *attrs, struct stext_file **outfp)
+{
+	struct stext_file *f = NULL, *of = NULL;
+	struct fileio *fileio = NULL;
+	bool need_shadow = false;
+	int error = 0;
+
+	*outfp = NULL;
+
+	f = calloc(1, sizeof(*f));
+	if (f == NULL) {
+		log_error("[%s] Unable to allocate file object for '%s'",
+		    conn_name(ctx->conn), filename);
+		error = ENOMEM;
+		goto out;
+	}
+
+	log_debug("[%s] Opening '%s'", conn_name(ctx->conn), filename);
+	fileio = fileio_open(filename,
+	    FILEIO_O_CREAT | FILEIO_O_LOCAL_ROOT | FILEIO_O_RDWR,
+	    ctx->conn->file_root, attrs);
+	if (fileio == NULL) {
+		/*
+		 * Try opening read-only.  If that succeeds, then we just
+		 * allocate a shadow file.
+		 */
+		fileio = fileio_open(filename,
+		    FILEIO_O_LOCAL_ROOT | FILEIO_O_RDONLY,
+		    ctx->conn->file_root, attrs);
+		if (fileio != NULL) {
+			log_debug("[%s] Need R/W shadow buffer for '%s'",
+			    conn_name(ctx->conn), filename);
+			need_shadow = true;
+		}
+	}
+	if (fileio == NULL) {
+		log_error("[%s] Unable to open file '%s': %s",
+		    conn_name(ctx->conn), filename, strerror(errno));
+		error = ENOENT;
+		goto out;
+	}
+
+	/* Opening directories is not allowed. */
+	if (attrs->is_directory) {
+		log_error("[%s] '%s': Opening directories is not permitted.",
+		    conn_name(ctx->conn), fileio_location(fileio));
+		error = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * If the underlying file object is not seekable, then we need
+	 * to allocate a shadow file, because the wire protocol only has
+	 * positional I/O.
+	 */
+	if (! attrs->is_seekable) {
+		log_debug("[%s] Need seekable shadow buffer for '%s'",
+		    conn_name(ctx->conn), fileio_location(fileio));
+		need_shadow = true;
+	}
+
+	if (need_shadow) {
+		if (attrs->size > MAX_SHADOW_LENGTH) {
+			log_debug("[%s] '%s' exceeds maximum shadow length %u.",
+			    conn_name(ctx->conn),
+			    fileio_location(fileio),
+			    MAX_SHADOW_LENGTH);
+			error = EFBIG;
+			goto out;
+		}
+
+		f->shadow.data = fileio_load_file(fileio, attrs,
+		    0 /*extra*/, 0 /*maxsize XXX*/, &f->shadow.length);
+		f->ops = &stext_fileops_shadow;
+	} else {
+		if (attrs->size > MAX_FILEIO_LENGTH) {
+			log_debug("[%s] '%s' exceeds maximum file size %u.",
+			    conn_name(ctx->conn),
+			    fileio_location(f->fileio.fileio),
+			    MAX_FILEIO_LENGTH);
+			error = EFBIG;
+			goto out;
+		}
+		f->fileio.fileio = fileio;
+		fileio = NULL;		/* file owns it now */
+		f->ops = &stext_fileops_fileio;
+	}
+
+	if (! stext_file_insert(ctx, f, reqslot, &of)) {
+		log_error("[%s] Unable to insert %s at requsted slot %u.",
+		    conn_name(ctx->conn), filename, reqslot);
+		error = EMFILE;
+		goto out;
+	}
+	*outfp = f;
+	f = NULL;
+
+ out:
+	if (fileio != NULL) {
+		fileio_close(fileio);
+	}
+	if (f != NULL) {
+		stext_file_close(f);
+	}
+	if (of != NULL) {
+		stext_file_close(of);
+	}
+	assert((error == 0 && *outfp != NULL) ||
+	       (error != 0 && *outfp == NULL));
+	return error;
+}
+
+/*
+ * stext_file_close --
+ *	Close a file.  Must be unlinked from the stext_context.
+ */
+void
+stext_file_close(struct stext_file *f)
+{
+	if (f->ops != NULL) {
+		(*f->ops->file_close)(f);
+	}
+	free(f);
+}
