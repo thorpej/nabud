@@ -220,9 +220,23 @@ nhacp_send_reply(struct nhacp_context *ctx, uint8_t type, uint16_t length)
 static const char error_message_eio[] = "I/O ERROR";
 static const char error_message_einval[] = "BAD REQUEST";
 static const char error_message_ebadf[] = "INVALID FILE";
-static const char error_message_etoobig[] = "FILE TOO BIG";
+static const char error_message_efbig[] = "FILE TOO BIG";
 static const char error_message_enomem[] = "OUT OF MEMORY";
 static const char error_message_enoent[] = "NO SUCH FILE";
+
+static const char *
+nhacp_errno_to_message(int error)
+{
+	switch (error) {
+	default:	/* FALLTHROUGH */
+	case EIO:	return error_message_eio;
+	case EINVAL:	return error_message_einval;
+	case EBADF:	return error_message_ebadf;
+	case EFBIG:	return error_message_efbig;
+	case ENOMEM:	return error_message_enomem;
+	case ENOENT:	return error_message_enoent;
+	}
+}
 
 /*
  * nhacp_send_error --
@@ -328,7 +342,7 @@ nhacp_fileop_write_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 	ssize_t actual;
 
 	if (resid > MAX_FILEIO_LENGTH - offset) {
-		nhacp_send_error(ctx, 0, error_message_etoobig);
+		nhacp_send_error(ctx, 0, error_message_efbig);
 		return;
 	}
 
@@ -390,7 +404,7 @@ nhacp_fileop_write_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
     uint32_t offset, uint16_t length)
 {
 	if (length > MAX_SHADOW_LENGTH - offset) {
-		nhacp_send_error(ctx, 0, error_message_etoobig);
+		nhacp_send_error(ctx, 0, error_message_efbig);
 		return;
 	}
 
@@ -512,7 +526,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 			    conn_name(ctx->conn),
 			    fileio_location(fileio),
 			    MAX_SHADOW_LENGTH);
-			nhacp_send_error(ctx, 0, error_message_etoobig);
+			nhacp_send_error(ctx, 0, error_message_efbig);
 			goto out;
 		}
 
@@ -525,7 +539,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 			    conn_name(ctx->conn),
 			    fileio_location(f->fileio.fileio),
 			    MAX_FILEIO_LENGTH);
-			nhacp_send_error(ctx, 0, error_message_etoobig);
+			nhacp_send_error(ctx, 0, error_message_efbig);
 			goto out;
 		}
 		f->fileio.fileio = fileio;
@@ -588,10 +602,11 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 		return;
 	}
 
-	if ((*f->ops->file_read)(ctx, f, offset, &length) == 0) {
+	int error = (*f->ops->file_read)(ctx, f, offset, &length);
+	if (error == 0) {
 		nhacp_send_data_buffer(ctx, length);
 	} else {
-		nhacp_send_error(ctx, 0, error_message_eio);
+		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
 	}
 }
 
