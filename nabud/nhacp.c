@@ -58,9 +58,13 @@
 /* 32-bit limit on fileio file length (due to wire protocol). */
 #define	MAX_FILEIO_LENGTH	UINT32_MAX
 
-struct nhacp_context {
+struct stext_context {
 	struct nabu_connection *conn;
 	LIST_HEAD(, stext_file) files;
+};
+
+struct nhacp_context {
+	struct stext_context stext;
 
 	union {
 		struct nhacp_request request;
@@ -108,7 +112,7 @@ struct stext_fileops {
  *	file object that needs to be freed if there's a collision.
  */
 static bool
-stext_file_insert(struct nhacp_context *ctx, struct stext_file *f,
+stext_file_insert(struct stext_context *ctx, struct stext_file *f,
     uint8_t reqslot, struct stext_file **oldfp)
 {
 	struct stext_file *lf, *prevf = NULL;
@@ -174,7 +178,7 @@ stext_file_insert(struct nhacp_context *ctx, struct stext_file *f,
 }
 
 static struct stext_file *
-stext_file_find(struct nhacp_context *ctx, uint8_t slot)
+stext_file_find(struct stext_context *ctx, uint8_t slot)
 {
 	struct stext_file *f;
 
@@ -195,12 +199,40 @@ stext_file_find(struct nhacp_context *ctx, uint8_t slot)
 }
 
 static void
-stext_file_free(struct nhacp_context *ctx, struct stext_file *f)
+stext_file_free(struct stext_file *f)
 {
 	if (f->ops != NULL) {
 		(*f->ops->file_close)(f);
 	}
 	free(f);
+}
+
+/*
+ * stext_context_init --
+ *	Initlaize a storage extension context.
+ */
+static void
+stext_context_init(struct stext_context *ctx, struct nabu_connection *conn)
+{
+	LIST_INIT(&ctx->files);
+	ctx->conn = conn;
+}
+
+/*
+ * stext_context_fini --
+ *	Close all files associated with this connection.
+ */
+static void
+stext_context_fini(struct stext_context *ctx)
+{
+	struct stext_file *f;
+
+	while ((f = LIST_FIRST(&ctx->files)) != NULL) {
+		log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
+		    f->slot);
+		LIST_REMOVE(f, link);
+		stext_file_free(f);
+	}
 }
 
 /*
@@ -212,7 +244,8 @@ nhacp_send_reply(struct nhacp_context *ctx, uint8_t type, uint16_t length)
 {
 	nabu_set_uint16(ctx->reply.length, length);
 	ctx->reply.generic.type = type;
-	conn_send(ctx->conn, &ctx->reply, length + sizeof(ctx->reply.length));
+	conn_send(ctx->stext.conn, &ctx->reply,
+	    length + sizeof(ctx->reply.length));
 }
 
 /* Handy error strings. */
@@ -277,23 +310,6 @@ nhacp_send_data_buffer(struct nhacp_context *ctx, uint16_t length)
 	nabu_set_uint16(ctx->reply.data_buffer.length, length);
 	nhacp_send_reply(ctx, NHACP_RESP_DATA_BUFFER,
 	    sizeof(ctx->reply.data_buffer) + length);
-}
-
-/*
- * stext_file_closeall --
- *	Close all files associated with this connection.
- */
-static void
-stext_file_closeall(struct nhacp_context *ctx)
-{
-	struct stext_file *f;
-
-	while ((f = LIST_FIRST(&ctx->files)) != NULL) {
-		log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
-		    f->slot);
-		LIST_REMOVE(f, link);
-		stext_file_free(ctx, f);
-	}
 }
 
 /*****************************************************************************
@@ -464,15 +480,15 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	f = calloc(1, sizeof(*f));
 	if (f == NULL) {
 		log_error("[%s] Unable to allocate NHACP file object for '%s'",
-		    conn_name(ctx->conn), filename);
+		    conn_name(ctx->stext.conn), filename);
 		nhacp_send_error(ctx, 0, error_message_enomem);
 		goto out;
 	}
 
-	log_debug("[%s] Opening '%s'", conn_name(ctx->conn), filename);
+	log_debug("[%s] Opening '%s'", conn_name(ctx->stext.conn), filename);
 	fileio = fileio_open(filename,
 	    FILEIO_O_CREAT | FILEIO_O_LOCAL_ROOT | FILEIO_O_RDWR,
-	    ctx->conn->file_root, &attrs);
+	    ctx->stext.conn->file_root, &attrs);
 	if (fileio == NULL) {
 		/*
 		 * Try opening read-only.  If that succeeds, then we just
@@ -480,16 +496,16 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		 */
 		fileio = fileio_open(filename,
 		    FILEIO_O_LOCAL_ROOT | FILEIO_O_RDONLY,
-		    ctx->conn->file_root, &attrs);
+		    ctx->stext.conn->file_root, &attrs);
 		if (fileio != NULL) {
 			log_debug("[%s] Need R/W shadow buffer for '%s'",
-			    conn_name(ctx->conn), filename);
+			    conn_name(ctx->stext.conn), filename);
 			need_shadow = true;
 		}
 	}
 	if (fileio == NULL) {
 		log_error("[%s] Unable to open file '%s': %s",
-		    conn_name(ctx->conn), filename, strerror(errno));
+		    conn_name(ctx->stext.conn), filename, strerror(errno));
 		nhacp_send_error(ctx, 0, error_message_enoent);
 		goto out;
 	}
@@ -497,7 +513,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	/* Opening directories is not allowed. */
 	if (attrs.is_directory) {
 		log_error("[%s] '%s': Opening directories is not permitted.",
-		    conn_name(ctx->conn), fileio_location(fileio));
+		    conn_name(ctx->stext.conn), fileio_location(fileio));
 		nhacp_send_error(ctx, 0, error_message_einval);
 		goto out;
 	}
@@ -509,14 +525,14 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	 */
 	if (! attrs.is_seekable) {
 		log_debug("[%s] Need seekable shadow buffer for '%s'",
-		    conn_name(ctx->conn), fileio_location(fileio));
+		    conn_name(ctx->stext.conn), fileio_location(fileio));
 		need_shadow = true;
 	}
 
 	if (need_shadow) {
 		if (attrs.size > MAX_SHADOW_LENGTH) {
 			log_debug("[%s] '%s' exceeds maximum shadow length %u.",
-			    conn_name(ctx->conn),
+			    conn_name(ctx->stext.conn),
 			    fileio_location(fileio),
 			    MAX_SHADOW_LENGTH);
 			nhacp_send_error(ctx, 0, error_message_efbig);
@@ -529,7 +545,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	} else {
 		if (attrs.size > MAX_FILEIO_LENGTH) {
 			log_debug("[%s] '%s' exceeds maximum file size %u.",
-			    conn_name(ctx->conn),
+			    conn_name(ctx->stext.conn),
 			    fileio_location(f->fileio.fileio),
 			    MAX_FILEIO_LENGTH);
 			nhacp_send_error(ctx, 0, error_message_efbig);
@@ -540,10 +556,10 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		f->ops = &stext_fileops_fileio;
 	}
 
-	if (! stext_file_insert(ctx, f,
+	if (! stext_file_insert(&ctx->stext, f,
 				ctx->request.storage_open.req_slot, &of)) {
 		log_error("[%s] Unable to insert %s at requsted slot %u.",
-		    conn_name(ctx->conn), filename,
+		    conn_name(ctx->stext.conn), filename,
 		    ctx->request.storage_open.req_slot);
 		goto out;
 	}
@@ -560,10 +576,10 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		fileio_close(fileio);
 	}
 	if (f != NULL) {
-		stext_file_free(ctx, f);
+		stext_file_free(f);
 	}
 	if (of != NULL) {
-		stext_file_free(ctx, of);
+		stext_file_free(of);
 	}
 }
 
@@ -576,10 +592,10 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(ctx, ctx->request.storage_get.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.storage_get.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
-		    ctx->request.storage_get.slot);
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.storage_get.slot);
 		nhacp_send_error(ctx, 0, error_message_ebadf);
 		return;
 	}
@@ -587,8 +603,9 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_get.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_get.length);
 
-	log_debug("[%s] slot %u offset %u length %u", conn_name(ctx->conn),
-	    ctx->request.storage_put.slot, offset, length);
+	log_debug("[%s] slot %u offset %u length %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
+	    offset, length);
 
 	if (length > MAX_STORAGE_GET_LENGTH) {
 		nhacp_send_error(ctx, 0, error_message_einval);
@@ -613,10 +630,10 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(ctx, ctx->request.storage_put.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.storage_put.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
-		    ctx->request.storage_put.slot);
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.storage_put.slot);
 		nhacp_send_error(ctx, 0, error_message_ebadf);
 		return;
 	}
@@ -624,8 +641,9 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_put.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_put.length);
 
-	log_debug("[%s] slot %u offset %u length %u", conn_name(ctx->conn),
-	    ctx->request.storage_put.slot, offset, length);
+	log_debug("[%s] slot %u offset %u length %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
+	    offset, length);
 
 	if (length > MAX_STORAGE_PUT_LENGTH) {
 		nhacp_send_error(ctx, 0, error_message_einval);
@@ -653,7 +671,7 @@ nhacp_req_get_date_time(struct nhacp_context *ctx)
 
 	if (now == (time_t)-1) {
 		log_error("[%s] unable to get current time: %s",
-		    conn_name(ctx->conn), strerror(errno));
+		    conn_name(ctx->stext.conn), strerror(errno));
 		memset(&tm_store, 0, sizeof(tm_store));
 		tm = &tm_store;
 	} else {
@@ -687,16 +705,17 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(ctx, ctx->request.storage_close.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.storage_close.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.", conn_name(ctx->conn),
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
 		    ctx->request.storage_close.slot);
 		return;
 	}
-	log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
+	log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->stext.conn),
 	    f->slot);
 	LIST_REMOVE(f, link);
-	stext_file_free(ctx, f);
+	stext_file_free(f);
 }
 
 #define	HANDLER_ENTRY(v, n)						\
@@ -731,8 +750,7 @@ nhacp_context_alloc(struct nabu_connection *conn)
 {
 	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
 	if (ctx != NULL) {
-		LIST_INIT(&ctx->files);
-		ctx->conn = conn;
+		stext_context_init(&ctx->stext, conn);
 	}
 	return ctx;
 }
@@ -744,7 +762,7 @@ nhacp_context_alloc(struct nabu_connection *conn)
 static void
 nhacp_context_free(struct nhacp_context *ctx)
 {
-	stext_file_closeall(ctx);
+	stext_context_fini(&ctx->stext);
 	free(ctx);
 }
 
@@ -781,7 +799,7 @@ nhacp_request_check(uint8_t req, uint16_t length)
 static inline void
 nhacp_request(struct nhacp_context *ctx)
 {
-	log_debug("[%s] Got %s.", conn_name(ctx->conn),
+	log_debug("[%s] Got %s.", conn_name(ctx->stext.conn),
 	    nhacp_request_types[ctx->request.generic.type].debug_desc);
 	(*nhacp_request_types[ctx->request.generic.type].handler)(ctx);
 }
