@@ -93,6 +93,7 @@ static const char error_message_efbig[] = "FILE TOO BIG";
 static const char error_message_enomem[] = "OUT OF MEMORY";
 static const char error_message_enoent[] = "NO SUCH FILE";
 static const char error_message_emfile[] = "TOO MANY OPEN FILES";
+static const char error_message_ebusy[] = "FILE BUSY";
 
 static const char *
 nhacp_errno_to_message(int error)
@@ -107,6 +108,7 @@ nhacp_errno_to_message(int error)
 	case ENOENT:	return error_message_enoent;
 	case ENFILE:	/* FALLTHROUGH */
 	case EMFILE:	return error_message_emfile;
+	case EBUSY:	return error_message_ebusy;
 	}
 }
 
