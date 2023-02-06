@@ -70,6 +70,8 @@ struct stext_file {
 
 struct stext_fileops {
 	off_t	max_length;
+	int	(*file_read)(struct stext_file *, void *, uint16_t *);
+	int	(*file_write)(struct stext_file *, const void *, uint16_t);
 	int	(*file_pread)(struct stext_file *, void *, uint32_t,
 		    uint16_t *);
 	int	(*file_pwrite)(struct stext_file *, const void *, uint32_t,
@@ -201,6 +203,54 @@ stext_context_fini(struct stext_context *ctx)
  *****************************************************************************/
 
 static int
+stext_fileop_read_fileio(struct stext_file *f, void *vbuf, uint16_t *lengthp)
+{
+	uint8_t *buf = vbuf;
+	size_t resid = *lengthp;
+	ssize_t actual;
+
+	while (resid != 0) {
+		actual = fileio_read(f->fileio.fileio, buf, resid);
+		if (actual < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			return errno;
+		}
+		if (actual == 0) {
+			/* EOF. */
+			break;
+		}
+		buf += actual;
+		resid -= actual;
+	}
+	*lengthp -= resid;
+	return 0;
+}
+
+static int
+stext_fileop_write_fileio(struct stext_file *f, const void *vbuf,
+    uint16_t length)
+{
+	const uint8_t *buf = vbuf;
+	size_t resid = length;
+	ssize_t actual;
+
+	while (resid != 0) {
+		actual = fileio_write(f->fileio.fileio, buf, resid);
+		if (actual <= 0) {
+			if (actual < 0 && errno == EINTR) {
+				continue;
+			}
+			return errno;
+		}
+		buf += actual;
+		resid -= actual;
+	}
+	return 0;
+}
+
+static int
 stext_fileop_pread_fileio(struct stext_file *f, void *vbuf, uint32_t offset,
     uint16_t *lengthp)
 {
@@ -275,6 +325,8 @@ stext_fileop_close_fileio(struct stext_file *f)
 
 static const struct stext_fileops stext_fileops_fileio = {
 	.max_length	= MAX_FILEIO_LENGTH,
+	.file_read	= stext_fileop_read_fileio,
+	.file_write	= stext_fileop_write_fileio,
 	.file_pread	= stext_fileop_pread_fileio,
 	.file_pwrite	= stext_fileop_pwrite_fileio,
 	.file_seek	= stext_fileop_seek_fileio,
@@ -284,6 +336,35 @@ static const struct stext_fileops stext_fileops_fileio = {
 /*****************************************************************************
  * File ops for shadow buffered files.
  *****************************************************************************/
+
+static int
+stext_fileop_read_shadow(struct stext_file *f, void *vbuf, uint16_t *lengthp)
+{
+	uint32_t offset;
+	int error;
+
+	offset = (uint32_t)f->shadow.cursor;
+
+	error = stext_file_pread(f, vbuf, offset, lengthp);
+	if (error == 0) {
+		f->shadow.cursor += *lengthp;
+	}
+	return error;
+}
+
+static int
+stext_fileop_write_shadow(struct stext_file *f, const void *vbuf,
+    uint16_t length)
+{
+	uint32_t offset = (uint32_t)f->shadow.cursor;
+	int error;
+
+	error = stext_file_pwrite(f, vbuf, offset, length);
+	if (error == 0) {
+		f->shadow.cursor += length;
+	}
+	return error;
+}
 
 static int
 stext_fileop_pread_shadow(struct stext_file *f, void *vbuf, uint32_t offset,
@@ -372,6 +453,8 @@ stext_fileop_close_shadow(struct stext_file *f)
 
 static const struct stext_fileops stext_fileops_shadow = {
 	.max_length	= MAX_SHADOW_LENGTH,
+	.file_read	= stext_fileop_read_shadow,
+	.file_write	= stext_fileop_write_shadow,
 	.file_pread	= stext_fileop_pread_shadow,
 	.file_pwrite	= stext_fileop_pwrite_shadow,
 	.file_seek	= stext_fileop_seek_shadow,
