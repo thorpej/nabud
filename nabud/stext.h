@@ -27,6 +27,12 @@
 #ifndef stext_h_included
 #define	stext_h_included
 
+/* 1MB limit on shadow file length. */
+#define	MAX_SHADOW_LENGTH	(1U * 1024 * 1024)
+
+/* 32-bit limit on fileio file length (due to wire protocol). */
+#define	MAX_FILEIO_LENGTH	UINT32_MAX
+
 struct nabu_connection;
 
 struct stext_context {
@@ -56,6 +62,16 @@ struct stext_fileops {
 		    uint16_t);
 	void	(*file_close)(struct stext_file *);
 };
+
+extern const struct stext_fileops stext_fileops_fileio;
+extern const struct stext_fileops stext_fileops_shadow;
+
+bool	stext_file_insert(struct stext_context *, struct stext_file *,
+	    uint8_t, struct stext_file **);
+struct stext_file *stext_file_find(struct stext_context *, uint8_t);
+void	stext_file_close(struct stext_file *);
+void	stext_context_init(struct stext_context *, struct nabu_connection *);
+void	stext_context_fini(struct stext_context *);
 
 static inline int
 stext_file_read(struct stext_file *f, void *vbuf, uint32_t offset,

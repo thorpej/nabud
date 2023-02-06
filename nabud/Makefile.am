@@ -3,7 +3,8 @@ CC			= $(PTHREAD_CC)
 
 sbin_PROGRAMS		= nabud
 
-nabud_SOURCES		= adaptor.c conn.c control.c image.c main.c nhacp.c
+nabud_SOURCES		= adaptor.c conn.c control.c image.c main.c nhacp.c \
+			  stext.c
 
 nabud_CPPFLAGS		= -DINSTALL_PREFIX=\"$(prefix)\" \
 			  $(SSL_INCLUDES) $(PAK_INCLUDES)
