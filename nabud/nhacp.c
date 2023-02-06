@@ -87,7 +87,7 @@ struct nhacp_file {
 struct nhacp_fileops {
 	int	(*file_read)(struct nhacp_context *, struct nhacp_file *,
 		    uint32_t, uint16_t *);
-	void	(*file_write)(struct nhacp_context *, struct nhacp_file *,
+	int	(*file_write)(struct nhacp_context *, struct nhacp_file *,
 		    uint32_t, uint16_t);
 	void	(*file_close)(struct nhacp_context *, struct nhacp_file *);
 };
@@ -333,7 +333,7 @@ nhacp_fileop_read_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 	return 0;
 }
 
-static void
+static int
 nhacp_fileop_write_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
     uint32_t offset, uint16_t length)
 {
@@ -342,8 +342,7 @@ nhacp_fileop_write_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 	ssize_t actual;
 
 	if (resid > MAX_FILEIO_LENGTH - offset) {
-		nhacp_send_error(ctx, 0, error_message_efbig);
-		return;
+		return EFBIG;
 	}
 
 	while (resid != 0) {
@@ -352,14 +351,13 @@ nhacp_fileop_write_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 			if (actual < 0 && errno == EINTR) {
 				continue;
 			}
-			nhacp_send_error(ctx, 0, error_message_eio);
-			return;
+			return errno;
 		}
 		buf += actual;
 		offset += actual;
 		resid -= actual;
 	}
-	nhacp_send_ok(ctx);
+	return 0;
 }
 
 static void
@@ -399,20 +397,18 @@ nhacp_fileop_read_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
 	return 0;
 }
 
-static void
+static int
 nhacp_fileop_write_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
     uint32_t offset, uint16_t length)
 {
 	if (length > MAX_SHADOW_LENGTH - offset) {
-		nhacp_send_error(ctx, 0, error_message_efbig);
-		return;
+		return EFBIG;
 	}
 
 	if (offset + length > f->shadow.length) {
 		uint8_t *newbuf = realloc(f->shadow.data, offset + length);
 		if (newbuf == NULL) {
-			nhacp_send_error(ctx, 0, error_message_eio);
-			return;
+			return EIO;
 		}
 		memset(newbuf + f->shadow.length, 0,
 		    offset + length - f->shadow.length);
@@ -424,7 +420,7 @@ nhacp_fileop_write_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
 	}
 	memcpy(f->shadow.data + offset, ctx->request.storage_put.data,
 	    length);
-	nhacp_send_ok(ctx);
+	return 0;
 }
 
 static void
@@ -638,7 +634,12 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 		return;
 	}
 
-	(*f->ops->file_write)(ctx, f, offset, length);
+	int error = (*f->ops->file_write)(ctx, f, offset, length);
+	if (error == 0) {
+		nhacp_send_ok(ctx);
+	} else {
+		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
+	}
 }
 
 /*
