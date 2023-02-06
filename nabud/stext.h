@@ -43,8 +43,9 @@ struct stext_context {
 
 struct stext_file {
 	LIST_ENTRY(stext_file) link;
-	uint8_t		slot;
 	const struct stext_fileops *ops;
+	uint8_t		slot;
+	bool		linked;
 
 	union {
 		struct {

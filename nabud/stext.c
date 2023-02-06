@@ -119,6 +119,7 @@ stext_file_insert(struct stext_context *ctx, struct stext_file *f,
  success:
 	assert(f->slot != 0xff);
 	assert((lf = LIST_NEXT(f, link)) == NULL || lf->slot > f->slot);
+	f->linked = true;
 	return true;
 }
 
@@ -166,7 +167,6 @@ stext_context_fini(struct stext_context *ctx)
 	while ((f = LIST_FIRST(&ctx->files)) != NULL) {
 		log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
 		    f->slot);
-		LIST_REMOVE(f, link);
 		stext_file_close(f);
 	}
 }
@@ -436,6 +436,9 @@ stext_file_close(struct stext_file *f)
 {
 	if (f->ops != NULL) {
 		(*f->ops->file_close)(f);
+	}
+	if (f->linked) {
+		LIST_REMOVE(f, link);
 	}
 	free(f);
 }

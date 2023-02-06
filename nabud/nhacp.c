@@ -322,7 +322,6 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 	}
 	log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->stext.conn),
 	    f->slot);
-	LIST_REMOVE(f, link);
 	stext_file_close(f);
 }
 
