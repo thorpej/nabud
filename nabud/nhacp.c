@@ -51,17 +51,13 @@
 
 #include "conn.h"
 #include "nhacp.h"
+#include "stext.h"
 
 /* 1MB limit on shadow file length. */
 #define	MAX_SHADOW_LENGTH	(1U * 1024 * 1024)
 
 /* 32-bit limit on fileio file length (due to wire protocol). */
 #define	MAX_FILEIO_LENGTH	UINT32_MAX
-
-struct stext_context {
-	struct nabu_connection *conn;
-	LIST_HEAD(, stext_file) files;
-};
 
 struct nhacp_context {
 	struct stext_context stext;
@@ -71,43 +67,6 @@ struct nhacp_context {
 		struct nhacp_response reply;
 	};
 };
-
-struct stext_file {
-	LIST_ENTRY(stext_file) link;
-	uint8_t		slot;
-	const struct stext_fileops *ops;
-
-	union {
-		struct {
-			struct fileio	*fileio;
-		} fileio;
-		struct {
-			uint8_t		*data;
-			size_t		length;
-		} shadow;
-	};
-};
-
-struct stext_fileops {
-	int	(*file_read)(struct stext_file *, void *, uint32_t, uint16_t *);
-	int	(*file_write)(struct stext_file *, const void *, uint32_t,
-		    uint16_t);
-	void	(*file_close)(struct stext_file *);
-};
-
-static inline int
-stext_file_read(struct stext_file *f, void *vbuf, uint32_t offset,
-    uint16_t *lengthp)
-{
-	return (*f->ops->file_read)(f, vbuf, offset, lengthp);
-}
-
-static inline int
-stext_file_write(struct stext_file *f, const void *vbuf, uint32_t offset,
-    uint16_t length)
-{
-	return (*f->ops->file_write)(f, vbuf, offset, length);
-}
 
 /*
  * The messages that contain a variable-sized data payload need to
