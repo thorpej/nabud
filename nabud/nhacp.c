@@ -85,8 +85,8 @@ struct nhacp_file {
 };
 
 struct nhacp_fileops {
-	void	(*file_read)(struct nhacp_context *, struct nhacp_file *,
-		    uint32_t, uint16_t);
+	int	(*file_read)(struct nhacp_context *, struct nhacp_file *,
+		    uint32_t, uint16_t *);
 	void	(*file_write)(struct nhacp_context *, struct nhacp_file *,
 		    uint32_t, uint16_t);
 	void	(*file_close)(struct nhacp_context *, struct nhacp_file *);
@@ -287,12 +287,12 @@ nhacp_file_closeall(struct nhacp_context *ctx)
  * File ops for live read/write files.
  *****************************************************************************/
 
-static void
+static int
 nhacp_fileop_read_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
-    uint32_t offset, uint16_t length)
+    uint32_t offset, uint16_t *lengthp)
 {
 	uint8_t *buf = ctx->reply.data_buffer.data;
-	size_t resid = length;
+	size_t resid = *lengthp;
 	ssize_t actual;
 
 	if (resid > MAX_FILEIO_LENGTH - offset) {
@@ -302,11 +302,12 @@ nhacp_fileop_read_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 	while (resid != 0) {
 		actual = fileio_pread(f->fileio.fileio, buf, resid, offset);
 		if (actual < 0) {
+			int rv = errno;
 			if (errno == EINTR) {
 				continue;
 			}
 			nhacp_send_error(ctx, 0, error_message_eio);
-			return;
+			return rv;
 		}
 		if (actual == 0) {
 			/* EOF. */
@@ -316,8 +317,8 @@ nhacp_fileop_read_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 		offset += actual;
 		resid -= actual;
 	}
-
-	nhacp_send_data_buffer(ctx, length - resid);
+	*lengthp -= resid;
+	return 0;
 }
 
 static void
@@ -367,10 +368,12 @@ static const struct nhacp_fileops nhacp_fileops_fileio = {
  * File ops for shadow buffered files.
  *****************************************************************************/
 
-static void
+static int
 nhacp_fileop_read_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
-    uint32_t offset, uint16_t length)
+    uint32_t offset, uint16_t *lengthp)
 {
+	uint16_t length = *lengthp;
+
 	if (offset >= f->shadow.length) {
 		length = 0;
 	} else if (length > f->shadow.length - offset) {
@@ -380,7 +383,8 @@ nhacp_fileop_read_shadow(struct nhacp_context *ctx, struct nhacp_file *f,
 		memcpy(ctx->reply.data_buffer.data,
 		    f->shadow.data + offset, length);
 	}
-	nhacp_send_data_buffer(ctx, length);
+	*lengthp = length;
+	return 0;
 }
 
 static void
@@ -586,7 +590,9 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 		return;
 	}
 
-	(*f->ops->file_read)(ctx, f, offset, length);
+	if ((*f->ops->file_read)(ctx, f, offset, &length) == 0) {
+		nhacp_send_data_buffer(ctx, length);
+	}
 }
 
 /*
