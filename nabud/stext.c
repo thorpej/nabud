@@ -77,6 +77,7 @@ struct stext_fileops {
 	int	(*file_pwrite)(struct stext_file *, const void *, uint32_t,
 		    uint16_t);
 	off_t	(*file_seek)(struct stext_file *, off_t, int);
+	int	(*file_truncate)(struct stext_file *, uint32_t);
 	void	(*file_close)(struct stext_file *);
 };
 
@@ -315,6 +316,15 @@ stext_fileop_seek_fileio(struct stext_file *f, off_t offset, int whence)
 	return fileio_seek(f->fileio.fileio, offset, whence);
 }
 
+static int
+stext_fileop_truncate_fileio(struct stext_file *f, uint32_t size)
+{
+	if (! fileio_truncate(f->fileio.fileio, size)) {
+		return errno;
+	}
+	return 0;
+}
+
 static void
 stext_fileop_close_fileio(struct stext_file *f)
 {
@@ -330,6 +340,7 @@ static const struct stext_fileops stext_fileops_fileio = {
 	.file_pread	= stext_fileop_pread_fileio,
 	.file_pwrite	= stext_fileop_pwrite_fileio,
 	.file_seek	= stext_fileop_seek_fileio,
+	.file_truncate	= stext_fileop_truncate_fileio,
 	.file_close	= stext_fileop_close_fileio,
 };
 
@@ -443,6 +454,26 @@ stext_fileop_seek_shadow(struct stext_file *f, off_t offset, int whence)
 	return f->shadow.cursor;
 }
 
+static int
+stext_fileop_truncate_shadow(struct stext_file *f, uint32_t size)
+{
+	if (size <= f->shadow.length) {
+		f->shadow.length = size;
+		return 0;
+	}
+
+	uint8_t *newbuf = realloc(f->shadow.data, size);
+	if (newbuf == NULL) {
+		return ENOMEM;
+	}
+	memset(newbuf + f->shadow.length, 0, size - f->shadow.length);
+	if (f->shadow.data != newbuf) {
+		free(f->shadow.data);
+		f->shadow.data = newbuf;
+	}
+	return 0;
+}
+
 static void
 stext_fileop_close_shadow(struct stext_file *f)
 {
@@ -458,6 +489,7 @@ static const struct stext_fileops stext_fileops_shadow = {
 	.file_pread	= stext_fileop_pread_shadow,
 	.file_pwrite	= stext_fileop_pwrite_shadow,
 	.file_seek	= stext_fileop_seek_shadow,
+	.file_truncate	= stext_fileop_truncate_shadow,
 	.file_close	= stext_fileop_close_shadow,
 };
 
@@ -668,9 +700,23 @@ stext_file_seek(struct stext_file *f, int32_t *offsetp, int whence)
 
 	if (noff >= f->ops->max_length) {
 		(*f->ops->file_seek)(f, ooff, SEEK_SET);
-		return E2BIG;
+		return EFBIG;
 	}
 
 	*offsetp = (int32_t)noff;
 	return 0;
+}
+
+/*
+ * stext_file_truncate --
+ *	Trucate a file to the specified size.
+ */
+int
+stext_file_truncate(struct stext_file *f, uint32_t size)
+{
+	if (size > f->ops->max_length) {
+		return EFBIG;
+	}
+
+	return (*f->ops->file_truncate)(f, size);
 }
