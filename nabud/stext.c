@@ -429,6 +429,17 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 }
 
 /*
+ * stext_file_slot --
+ *	Return the storage slot occupied by a file.
+ */
+uint8_t
+stext_file_slot(struct stext_file *f)
+{
+	assert(f->linked == true);
+	return f->slot;
+}
+
+/*
  * stext_file_close --
  *	Close a file.  Must be unlinked from the stext_context.
  */

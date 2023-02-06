@@ -185,7 +185,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	if (error != 0) {
 		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
 	} else {
-		ctx->reply.storage_loaded.slot = f->slot;
+		ctx->reply.storage_loaded.slot = stext_file_slot(f);
 		nabu_set_uint32(ctx->reply.storage_loaded.length,
 		    (uint32_t)attrs.size);
 		nhacp_send_reply(ctx, NHACP_RESP_STORAGE_LOADED,
@@ -322,8 +322,8 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 		    ctx->request.storage_close.slot);
 		return;
 	}
-	log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->stext.conn),
-	    f->slot);
+	log_debug("[%s] Closing file at slot %u.", conn_name(ctx->stext.conn),
+	    stext_file_slot(f));
 	stext_file_close(f);
 }
 
