@@ -95,6 +95,20 @@ struct stext_fileops {
 	void	(*file_close)(struct stext_file *);
 };
 
+static inline int
+stext_file_read(struct stext_file *f, void *vbuf, uint32_t offset,
+    uint16_t *lengthp)
+{
+	return (*f->ops->file_read)(f, vbuf, offset, lengthp);
+}
+
+static inline int
+stext_file_write(struct stext_file *f, const void *vbuf, uint32_t offset,
+    uint16_t length)
+{
+	return (*f->ops->file_write)(f, vbuf, offset, length);
+}
+
 /*
  * The messages that contain a variable-sized data payload need to
  * sanity check that payload's length against how much of the max
@@ -199,7 +213,7 @@ stext_file_find(struct stext_context *ctx, uint8_t slot)
 }
 
 static void
-stext_file_free(struct stext_file *f)
+stext_file_close(struct stext_file *f)
 {
 	if (f->ops != NULL) {
 		(*f->ops->file_close)(f);
@@ -231,7 +245,7 @@ stext_context_fini(struct stext_context *ctx)
 		log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
 		    f->slot);
 		LIST_REMOVE(f, link);
-		stext_file_free(f);
+		stext_file_close(f);
 	}
 }
 
@@ -576,10 +590,10 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		fileio_close(fileio);
 	}
 	if (f != NULL) {
-		stext_file_free(f);
+		stext_file_close(f);
 	}
 	if (of != NULL) {
-		stext_file_free(of);
+		stext_file_close(of);
 	}
 }
 
@@ -612,7 +626,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 		return;
 	}
 
-	int error = (*f->ops->file_read)(f, ctx->reply.data_buffer.data,
+	int error = stext_file_read(f, ctx->reply.data_buffer.data,
 	    offset, &length);
 	if (error == 0) {
 		nhacp_send_data_buffer(ctx, length);
@@ -650,7 +664,7 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 		return;
 	}
 
-	int error = (*f->ops->file_write)(f, ctx->request.storage_put.data,
+	int error = stext_file_write(f, ctx->request.storage_put.data,
 	    offset, length);
 	if (error == 0) {
 		nhacp_send_ok(ctx);
@@ -715,7 +729,7 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 	log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->stext.conn),
 	    f->slot);
 	LIST_REMOVE(f, link);
-	stext_file_free(f);
+	stext_file_close(f);
 }
 
 #define	HANDLER_ENTRY(v, n)						\
