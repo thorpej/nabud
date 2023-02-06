@@ -62,8 +62,8 @@ struct stext_fileops {
 extern const struct stext_fileops stext_fileops_fileio;
 extern const struct stext_fileops stext_fileops_shadow;
 
-bool	stext_file_insert(struct stext_context *, struct stext_file *,
-	    uint8_t, struct stext_file **);
+int	stext_file_insert(struct stext_context *, struct stext_file *,
+	    uint8_t);
 struct stext_file *stext_file_find(struct stext_context *, uint8_t);
 void	stext_context_init(struct stext_context *, struct nabu_connection *);
 void	stext_context_fini(struct stext_context *);

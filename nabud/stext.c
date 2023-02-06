@@ -56,14 +56,12 @@
  *	necessary.  This always succeeds, and returns the old
  *	file object that needs to be freed if there's a collision.
  */
-bool
+int
 stext_file_insert(struct stext_context *ctx, struct stext_file *f,
-    uint8_t reqslot, struct stext_file **oldfp)
+    uint8_t reqslot)
 {
 	struct stext_file *lf, *prevf = NULL;
 	uint8_t slot;
-
-	*oldfp = NULL;
 
 	if (reqslot == 0xff) {
 		/*
@@ -82,7 +80,7 @@ stext_file_insert(struct stext_context *ctx, struct stext_file *f,
 			slot = lf->slot + 1;
 			if (slot == 0xff) {
 				/* File table is full. */
-				return false;
+				return EMFILE;
 			}
 			prevf = lf;
 		}
@@ -91,8 +89,8 @@ stext_file_insert(struct stext_context *ctx, struct stext_file *f,
 	}
 
 	/*
-	 * We're being asked to allocate a specific slot, possibly
-	 * replacing another file.
+	 * We're being asked to allocate a specific slot.  If we find
+	 * another file there, fail the request.
 	 */
 	slot = f->slot = reqslot;
 	LIST_FOREACH(lf, &ctx->files, link) {
@@ -101,9 +99,8 @@ stext_file_insert(struct stext_context *ctx, struct stext_file *f,
 			continue;
 		}
 		if (slot == lf->slot) {
-			LIST_REMOVE(lf, link);
-			*oldfp = lf;
-			goto insert_after;
+			/* This slot is in-use. */
+			return EBUSY;
 		}
 		if (slot < lf->slot) {
 			LIST_INSERT_BEFORE(lf, f, link);
@@ -120,7 +117,7 @@ stext_file_insert(struct stext_context *ctx, struct stext_file *f,
 	assert(f->slot != 0xff);
 	assert((lf = LIST_NEXT(f, link)) == NULL || lf->slot > f->slot);
 	f->linked = true;
-	return true;
+	return 0;
 }
 
 struct stext_file *
@@ -317,7 +314,7 @@ int
 stext_file_open(struct stext_context *ctx, const char *filename,
     uint8_t reqslot, struct fileio_attrs *attrs, struct stext_file **outfp)
 {
-	struct stext_file *f = NULL, *of = NULL;
+	struct stext_file *f = NULL;
 	struct fileio *fileio = NULL;
 	bool need_shadow = false;
 	int error = 0;
@@ -403,10 +400,10 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		f->ops = &stext_fileops_fileio;
 	}
 
-	if (! stext_file_insert(ctx, f, reqslot, &of)) {
-		log_error("[%s] Unable to insert %s at requsted slot %u.",
-		    conn_name(ctx->conn), filename, reqslot);
-		error = EMFILE;
+	error = stext_file_insert(ctx, f, reqslot);
+	if (error != 0) {
+		log_error("[%s] Unable to insert %s at requsted slot %u: %s.",
+		    conn_name(ctx->conn), filename, reqslot, strerror(error));
 		goto out;
 	}
 	*outfp = f;
@@ -418,9 +415,6 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 	}
 	if (f != NULL) {
 		stext_file_close(f);
-	}
-	if (of != NULL) {
-		stext_file_close(of);
 	}
 	assert((error == 0 && *outfp != NULL) ||
 	       (error != 0 && *outfp == NULL));
