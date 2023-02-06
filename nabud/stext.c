@@ -70,8 +70,9 @@ struct stext_file {
 
 struct stext_fileops {
 	off_t	max_length;
-	int	(*file_read)(struct stext_file *, void *, uint32_t, uint16_t *);
-	int	(*file_write)(struct stext_file *, const void *, uint32_t,
+	int	(*file_pread)(struct stext_file *, void *, uint32_t,
+		    uint16_t *);
+	int	(*file_pwrite)(struct stext_file *, const void *, uint32_t,
 		    uint16_t);
 	off_t	(*file_seek)(struct stext_file *, off_t, int);
 	void	(*file_close)(struct stext_file *);
@@ -200,7 +201,7 @@ stext_context_fini(struct stext_context *ctx)
  *****************************************************************************/
 
 static int
-stext_fileop_read_fileio(struct stext_file *f, void *vbuf, uint32_t offset,
+stext_fileop_pread_fileio(struct stext_file *f, void *vbuf, uint32_t offset,
     uint16_t *lengthp)
 {
 	uint8_t *buf = vbuf;
@@ -232,7 +233,7 @@ stext_fileop_read_fileio(struct stext_file *f, void *vbuf, uint32_t offset,
 }
 
 static int
-stext_fileop_write_fileio(struct stext_file *f, const void *vbuf,
+stext_fileop_pwrite_fileio(struct stext_file *f, const void *vbuf,
     uint32_t offset, uint16_t length)
 {
 	const uint8_t *buf = vbuf;
@@ -274,8 +275,8 @@ stext_fileop_close_fileio(struct stext_file *f)
 
 static const struct stext_fileops stext_fileops_fileio = {
 	.max_length	= MAX_FILEIO_LENGTH,
-	.file_read	= stext_fileop_read_fileio,
-	.file_write	= stext_fileop_write_fileio,
+	.file_pread	= stext_fileop_pread_fileio,
+	.file_pwrite	= stext_fileop_pwrite_fileio,
 	.file_seek	= stext_fileop_seek_fileio,
 	.file_close	= stext_fileop_close_fileio,
 };
@@ -285,7 +286,7 @@ static const struct stext_fileops stext_fileops_fileio = {
  *****************************************************************************/
 
 static int
-stext_fileop_read_shadow(struct stext_file *f, void *vbuf, uint32_t offset,
+stext_fileop_pread_shadow(struct stext_file *f, void *vbuf, uint32_t offset,
     uint16_t *lengthp)
 {
 	uint16_t length = *lengthp;
@@ -303,7 +304,7 @@ stext_fileop_read_shadow(struct stext_file *f, void *vbuf, uint32_t offset,
 }
 
 static int
-stext_fileop_write_shadow(struct stext_file *f, const void *vbuf,
+stext_fileop_pwrite_shadow(struct stext_file *f, const void *vbuf,
     uint32_t offset, uint16_t length)
 {
 	if (length > MAX_SHADOW_LENGTH - offset) {
@@ -371,8 +372,8 @@ stext_fileop_close_shadow(struct stext_file *f)
 
 static const struct stext_fileops stext_fileops_shadow = {
 	.max_length	= MAX_SHADOW_LENGTH,
-	.file_read	= stext_fileop_read_shadow,
-	.file_write	= stext_fileop_write_shadow,
+	.file_pread	= stext_fileop_pread_shadow,
+	.file_pwrite	= stext_fileop_pwrite_shadow,
 	.file_seek	= stext_fileop_seek_shadow,
 	.file_close	= stext_fileop_close_shadow,
 };
@@ -527,7 +528,7 @@ int
 stext_file_pread(struct stext_file *f, void *vbuf, uint32_t offset,
     uint16_t *lengthp)
 {
-	return (*f->ops->file_read)(f, vbuf, offset, lengthp);
+	return (*f->ops->file_pread)(f, vbuf, offset, lengthp);
 }
 
 /*
@@ -538,7 +539,7 @@ int
 stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
     uint16_t length)
 {
-	return (*f->ops->file_write)(f, vbuf, offset, length);
+	return (*f->ops->file_pwrite)(f, vbuf, offset, length);
 }
 
 /*
