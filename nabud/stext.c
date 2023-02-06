@@ -604,6 +604,26 @@ stext_file_close(struct stext_file *f)
 }
 
 /*
+ * stext_file_read --
+ *	File read.
+ */
+int
+stext_file_read(struct stext_file *f, void *vbuf, uint16_t *lengthp)
+{
+	return (*f->ops->file_read)(f, vbuf, lengthp);
+}
+
+/*
+ * stext_file_write --
+ *	File write.
+ */
+int
+stext_file_write(struct stext_file *f, const void *vbuf, uint16_t length)
+{
+	return (*f->ops->file_write)(f, vbuf, length);
+}
+
+/*
  * stext_file_pread --
  *	Positional file read.
  */
