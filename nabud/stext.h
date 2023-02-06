@@ -35,23 +35,6 @@ struct stext_context {
 	LIST_HEAD(, stext_file) files;
 };
 
-struct stext_file {
-	LIST_ENTRY(stext_file) link;
-	const struct stext_fileops *ops;
-	uint8_t		slot;
-	bool		linked;
-
-	union {
-		struct {
-			struct fileio	*fileio;
-		} fileio;
-		struct {
-			uint8_t		*data;
-			size_t		length;
-		} shadow;
-	};
-};
-
 void	stext_context_init(struct stext_context *, struct nabu_connection *);
 void	stext_context_fini(struct stext_context *);
 

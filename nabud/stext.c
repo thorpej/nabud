@@ -50,6 +50,23 @@
 /* 32-bit limit on fileio file length (due to wire protocol). */
 #define	MAX_FILEIO_LENGTH	UINT32_MAX
 
+struct stext_file {
+	LIST_ENTRY(stext_file) link;
+	const struct stext_fileops *ops;
+	uint8_t		slot;
+	bool		linked;
+
+	union {
+		struct {
+			struct fileio	*fileio;
+		} fileio;
+		struct {
+			uint8_t		*data;
+			size_t		length;
+		} shadow;
+	};
+};
+
 struct stext_fileops {
 	int	(*file_read)(struct stext_file *, void *, uint32_t, uint16_t *);
 	int	(*file_write)(struct stext_file *, const void *, uint32_t,
