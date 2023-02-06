@@ -302,12 +302,10 @@ nhacp_fileop_read_fileio(struct nhacp_context *ctx, struct nhacp_file *f,
 	while (resid != 0) {
 		actual = fileio_pread(f->fileio.fileio, buf, resid, offset);
 		if (actual < 0) {
-			int rv = errno;
 			if (errno == EINTR) {
 				continue;
 			}
-			nhacp_send_error(ctx, 0, error_message_eio);
-			return rv;
+			return errno;
 		}
 		if (actual == 0) {
 			/* EOF. */
@@ -592,6 +590,8 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 
 	if ((*f->ops->file_read)(ctx, f, offset, &length) == 0) {
 		nhacp_send_data_buffer(ctx, length);
+	} else {
+		nhacp_send_error(ctx, 0, error_message_eio);
 	}
 }
 
