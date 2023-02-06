@@ -55,7 +55,7 @@
 /* 1MB limit on shadow file length. */
 #define	MAX_SHADOW_LENGTH	(1U * 1024 * 1024)
 
-/* 32-bit limit on fileio file length (due to NHACP protocol). */
+/* 32-bit limit on fileio file length (due to wire protocol). */
 #define	MAX_FILEIO_LENGTH	UINT32_MAX
 
 struct nhacp_context {
