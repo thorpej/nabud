@@ -85,11 +85,10 @@ struct stext_file {
 };
 
 struct stext_fileops {
-	int	(*file_read)(struct nhacp_context *, struct stext_file *,
-		    void *, uint32_t, uint16_t *);
-	int	(*file_write)(struct nhacp_context *, struct stext_file *,
-		    const void *, uint32_t, uint16_t);
-	void	(*file_close)(struct nhacp_context *, struct stext_file *);
+	int	(*file_read)(struct stext_file *, void *, uint32_t, uint16_t *);
+	int	(*file_write)(struct stext_file *, const void *, uint32_t,
+		    uint16_t);
+	void	(*file_close)(struct stext_file *);
 };
 
 /*
@@ -199,7 +198,7 @@ static void
 stext_file_free(struct nhacp_context *ctx, struct stext_file *f)
 {
 	if (f->ops != NULL) {
-		(*f->ops->file_close)(ctx, f);
+		(*f->ops->file_close)(f);
 	}
 	free(f);
 }
@@ -302,8 +301,8 @@ stext_file_closeall(struct nhacp_context *ctx)
  *****************************************************************************/
 
 static int
-stext_fileop_read_fileio(struct nhacp_context *ctx, struct stext_file *f,
-    void *vbuf, uint32_t offset, uint16_t *lengthp)
+stext_fileop_read_fileio(struct stext_file *f, void *vbuf, uint32_t offset,
+    uint16_t *lengthp)
 {
 	uint8_t *buf = vbuf;
 	size_t resid = *lengthp;
@@ -334,8 +333,8 @@ stext_fileop_read_fileio(struct nhacp_context *ctx, struct stext_file *f,
 }
 
 static int
-stext_fileop_write_fileio(struct nhacp_context *ctx, struct stext_file *f,
-    const void *vbuf, uint32_t offset, uint16_t length)
+stext_fileop_write_fileio(struct stext_file *f, const void *vbuf,
+    uint32_t offset, uint16_t length)
 {
 	const uint8_t *buf = vbuf;
 	size_t resid = length;
@@ -361,7 +360,7 @@ stext_fileop_write_fileio(struct nhacp_context *ctx, struct stext_file *f,
 }
 
 static void
-stext_fileop_close_fileio(struct nhacp_context *ctx, struct stext_file *f)
+stext_fileop_close_fileio(struct stext_file *f)
 {
 	if (f->fileio.fileio != NULL) {
 		fileio_close(f->fileio.fileio);
@@ -379,8 +378,8 @@ static const struct stext_fileops stext_fileops_fileio = {
  *****************************************************************************/
 
 static int
-stext_fileop_read_shadow(struct nhacp_context *ctx, struct stext_file *f,
-    void *vbuf, uint32_t offset, uint16_t *lengthp)
+stext_fileop_read_shadow(struct stext_file *f, void *vbuf, uint32_t offset,
+    uint16_t *lengthp)
 {
 	uint16_t length = *lengthp;
 
@@ -397,8 +396,8 @@ stext_fileop_read_shadow(struct nhacp_context *ctx, struct stext_file *f,
 }
 
 static int
-stext_fileop_write_shadow(struct nhacp_context *ctx, struct stext_file *f,
-    const void *vbuf, uint32_t offset, uint16_t length)
+stext_fileop_write_shadow(struct stext_file *f, const void *vbuf,
+    uint32_t offset, uint16_t length)
 {
 	if (length > MAX_SHADOW_LENGTH - offset) {
 		return EFBIG;
@@ -422,7 +421,7 @@ stext_fileop_write_shadow(struct nhacp_context *ctx, struct stext_file *f,
 }
 
 static void
-stext_fileop_close_shadow(struct nhacp_context *ctx, struct stext_file *f)
+stext_fileop_close_shadow(struct stext_file *f)
 {
 	if (f->shadow.data != NULL) {
 		free(f->shadow.data);
@@ -596,7 +595,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 		return;
 	}
 
-	int error = (*f->ops->file_read)(ctx, f, ctx->reply.data_buffer.data,
+	int error = (*f->ops->file_read)(f, ctx->reply.data_buffer.data,
 	    offset, &length);
 	if (error == 0) {
 		nhacp_send_data_buffer(ctx, length);
@@ -633,7 +632,7 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 		return;
 	}
 
-	int error = (*f->ops->file_write)(ctx, f, ctx->request.storage_put.data,
+	int error = (*f->ops->file_write)(f, ctx->request.storage_put.data,
 	    offset, length);
 	if (error == 0) {
 		nhacp_send_ok(ctx);
