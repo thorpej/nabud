@@ -52,38 +52,15 @@ struct stext_file {
 	};
 };
 
-struct stext_fileops {
-	int	(*file_read)(struct stext_file *, void *, uint32_t, uint16_t *);
-	int	(*file_write)(struct stext_file *, const void *, uint32_t,
-		    uint16_t);
-	void	(*file_close)(struct stext_file *);
-};
-
-extern const struct stext_fileops stext_fileops_fileio;
-extern const struct stext_fileops stext_fileops_shadow;
-
-int	stext_file_insert(struct stext_context *, struct stext_file *,
-	    uint8_t);
-struct stext_file *stext_file_find(struct stext_context *, uint8_t);
 void	stext_context_init(struct stext_context *, struct nabu_connection *);
 void	stext_context_fini(struct stext_context *);
+
+struct stext_file *stext_file_find(struct stext_context *, uint8_t);
 
 int	stext_file_open(struct stext_context *, const char *, uint8_t,
 	    struct fileio_attrs *, struct stext_file **);
 void	stext_file_close(struct stext_file *);
-
-static inline int
-stext_file_read(struct stext_file *f, void *vbuf, uint32_t offset,
-    uint16_t *lengthp)
-{
-	return (*f->ops->file_read)(f, vbuf, offset, lengthp);
-}
-
-static inline int
-stext_file_write(struct stext_file *f, const void *vbuf, uint32_t offset,
-    uint16_t length)
-{
-	return (*f->ops->file_write)(f, vbuf, offset, length);
-}
+int	stext_file_read(struct stext_file *, void *, uint32_t, uint16_t *);
+int	stext_file_write(struct stext_file *, const void *, uint32_t, uint16_t);
 
 #endif /* stext_h_included */

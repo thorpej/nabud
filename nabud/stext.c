@@ -50,13 +50,20 @@
 /* 32-bit limit on fileio file length (due to wire protocol). */
 #define	MAX_FILEIO_LENGTH	UINT32_MAX
 
+struct stext_fileops {
+	int	(*file_read)(struct stext_file *, void *, uint32_t, uint16_t *);
+	int	(*file_write)(struct stext_file *, const void *, uint32_t,
+		    uint16_t);
+	void	(*file_close)(struct stext_file *);
+};
+
 /*
  * stext_file_insert --
  *	Insert a file into the list, allocating a slot number if
  *	necessary.  This always succeeds, and returns the old
  *	file object that needs to be freed if there's a collision.
  */
-int
+static int
 stext_file_insert(struct stext_context *ctx, struct stext_file *f,
     uint8_t reqslot)
 {
@@ -239,7 +246,7 @@ stext_fileop_close_fileio(struct stext_file *f)
 	}
 }
 
-const struct stext_fileops stext_fileops_fileio = {
+static const struct stext_fileops stext_fileops_fileio = {
 	.file_read	= stext_fileop_read_fileio,
 	.file_write	= stext_fileop_write_fileio,
 	.file_close	= stext_fileop_close_fileio,
@@ -300,7 +307,7 @@ stext_fileop_close_shadow(struct stext_file *f)
 	}
 }
 
-const struct stext_fileops stext_fileops_shadow = {
+static const struct stext_fileops stext_fileops_shadow = {
 	.file_read	= stext_fileop_read_shadow,
 	.file_write	= stext_fileop_write_shadow,
 	.file_close	= stext_fileop_close_shadow,
@@ -435,4 +442,26 @@ stext_file_close(struct stext_file *f)
 		LIST_REMOVE(f, link);
 	}
 	free(f);
+}
+
+/*
+ * stext_file_read --
+ *	Positional file read.
+ */
+int
+stext_file_read(struct stext_file *f, void *vbuf, uint32_t offset,
+    uint16_t *lengthp)
+{
+	return (*f->ops->file_read)(f, vbuf, offset, lengthp);
+}
+
+/*
+ * stext_file_write --
+ *	Positional file write.
+ */
+int
+stext_file_write(struct stext_file *f, const void *vbuf, uint32_t offset,
+    uint16_t length)
+{
+	return (*f->ops->file_write)(f, vbuf, offset, length);
 }
