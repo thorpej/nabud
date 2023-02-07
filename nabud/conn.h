@@ -76,6 +76,13 @@ struct nabu_connection {
 	 */
 	char		*file_root;
 
+	/*
+	 * RetroNet extensions context.  Alas, RetroNet is not modal,
+	 * so knowlege of it has to leak out to connection state.
+	 */
+	struct retronet_context *retronet;
+	bool		retronet_enabled;
+
 	/* Lock that protects the data below. */
 	pthread_mutex_t mutex;
 
