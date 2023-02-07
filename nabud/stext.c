@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "libnabud/fileio.h"
 #include "libnabud/log.h"
@@ -63,6 +64,7 @@ struct stext_file {
 		struct {
 			uint8_t		*data;
 			size_t		length;
+			time_t		mtime;
 			uint32_t	cursor;
 		} shadow;
 	};
@@ -78,6 +80,7 @@ struct stext_fileops {
 		    uint16_t);
 	off_t	(*file_seek)(struct stext_file *, off_t, int);
 	int	(*file_truncate)(struct stext_file *, uint32_t);
+	int	(*file_getattr)(struct stext_file *, struct fileio_attrs *);
 	void	(*file_close)(struct stext_file *);
 };
 
@@ -321,6 +324,15 @@ stext_fileop_truncate_fileio(struct stext_file *f, uint32_t size)
 	return 0;
 }
 
+static int
+stext_fileop_getattr_fileio(struct stext_file *f, struct fileio_attrs *attrs)
+{
+	if (! fileio_getattr(f->fileio.fileio, attrs)) {
+		return errno;
+	}
+	return 0;
+}
+
 static void
 stext_fileop_close_fileio(struct stext_file *f)
 {
@@ -337,6 +349,7 @@ static const struct stext_fileops stext_fileops_fileio = {
 	.file_pwrite	= stext_fileop_pwrite_fileio,
 	.file_seek	= stext_fileop_seek_fileio,
 	.file_truncate	= stext_fileop_truncate_fileio,
+	.file_getattr	= stext_fileop_getattr_fileio,
 	.file_close	= stext_fileop_close_fileio,
 };
 
@@ -409,6 +422,7 @@ stext_fileop_pwrite_shadow(struct stext_file *f, const void *vbuf,
 		f->shadow.length = offset + length;
 	}
 	memcpy(f->shadow.data + offset, vbuf, length);
+	f->shadow.mtime = time(NULL);
 	return 0;
 }
 
@@ -466,6 +480,19 @@ stext_fileop_truncate_shadow(struct stext_file *f, uint32_t size)
 	return 0;
 }
 
+static int
+stext_fileop_getattr_shadow(struct stext_file *f, struct fileio_attrs *attrs)
+{
+	memset(attrs, 0, sizeof(*attrs));
+
+	attrs->size = f->shadow.length;
+	attrs->mtime = f->shadow.mtime;
+	attrs->is_writable = true;
+	attrs->is_seekable = true;
+
+	return 0;
+}
+
 static void
 stext_fileop_close_shadow(struct stext_file *f)
 {
@@ -482,6 +509,7 @@ static const struct stext_fileops stext_fileops_shadow = {
 	.file_pwrite	= stext_fileop_pwrite_shadow,
 	.file_seek	= stext_fileop_seek_shadow,
 	.file_truncate	= stext_fileop_truncate_shadow,
+	.file_getattr	= stext_fileop_getattr_shadow,
 	.file_close	= stext_fileop_close_shadow,
 };
 
@@ -564,6 +592,7 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 
 		f->shadow.data = fileio_load_file(fileio, attrs,
 		    0 /*extra*/, 0 /*maxsize XXX*/, &f->shadow.length);
+		f->shadow.mtime = attrs->mtime;
 		f->ops = &stext_fileops_shadow;
 	} else {
 		if (attrs->size > MAX_FILEIO_LENGTH) {
@@ -715,4 +744,14 @@ stext_file_truncate(struct stext_file *f, uint32_t size)
 	}
 
 	return (*f->ops->file_truncate)(f, size);
+}
+
+/*
+ * stext_file_getattr --
+ *	Get attributes of a file.
+ */
+int
+stext_file_getattr(struct stext_file *f, struct fileio_attrs *attrs)
+{
+	return (*f->ops->file_getattr)(f, attrs);
 }
