@@ -680,6 +680,31 @@ rn_req_file_move(struct retronet_context *ctx)
 static void
 rn_req_fh_truncate(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_truncate,
+			sizeof(ctx->request.fh_truncate))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_truncate.fileHandle);
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_truncate.fileHandle);
+		return;
+	}
+
+	error = stext_file_truncate(f, 0);
+	if (error != 0) {
+		log_error("[%s] stext_file_truncate() failed: %s",
+		    conn_name(conn), strerror(error));
+	}
 }
 
 /*
