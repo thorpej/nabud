@@ -168,6 +168,43 @@ rn_req_file_open(struct retronet_context *ctx)
 static void
 rn_req_fh_size(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct fileio_attrs attrs;
+	struct stext_file *f;
+	int32_t size;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_size,
+			sizeof(ctx->request.fh_size))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_read.fileHandle);
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_read.fileHandle);
+		size = -1;
+	} else {
+		error = stext_file_getattr(f, &attrs);
+		if (error != 0) {
+			log_error("[%s] stext_file_getattr() failed: %s",
+			    conn_name(conn), strerror(error));
+			size = -1;
+		} else {
+			if (attrs.size > INT32_MAX) {
+				/* Saturate to INT32_MAX. */
+				size = INT32_MAX;
+			} else {
+				size = (int32_t)attrs.size;
+			}
+		}
+	}
+	nabu_set_uint32(ctx->reply.fh_size.fileSize, (uint32_t)size);
+	conn_send(conn, &ctx->reply.fh_size, sizeof(ctx->reply.fh_size));
 }
 
 /*
@@ -259,6 +296,61 @@ rn_req_file_size(struct retronet_context *ctx)
 static void
 rn_req_fh_append(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct fileio_attrs attrs;
+	struct stext_file *f;
+	uint32_t size;
+	int error;
+
+	/*
+	 * Get the first few bytes of the request so we know how
+	 * much data we'll need to read.
+	 */
+	if (! conn_recv(conn, &ctx->request.fh_append,
+			offsetof(struct rn_fh_append_req, data))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_append.fileHandle);
+
+	uint16_t length = nabu_get_uint16(ctx->request.fh_append.length);
+
+	/* And now receive the data payload. */
+	if (! conn_recv(conn, ctx->request.fh_append.data, length)) {
+		log_error("[%s] Failed to receive data.",
+		    conn_name(conn));
+		return;
+	}
+
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(conn), ctx->request.fh_append.fileHandle);
+		return;
+	}
+
+	error = stext_file_getattr(f, &attrs);
+	if (error != 0) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		return;
+	} else {
+		if (attrs.size >= UINT32_MAX) {
+			log_error("[%s] file is already too large (%lld).",
+			    conn_name(conn), (long long)attrs.size);
+			return;
+		} else {
+			size = (uint32_t)attrs.size;
+		}
+	}
+
+	error = stext_file_pwrite(f, ctx->request.fh_append.data,
+	    size, length);
+	if (error != 0) {
+		log_error("[%s] stext_file_pwrite() failed: %s",
+		    conn_name(conn), strerror(error));
+	}
 }
 
 /*
@@ -291,7 +383,7 @@ rn_req_fh_replace(struct retronet_context *ctx)
 	struct stext_file *f;
 
 	/*
-	 * Get the first 7 bytes of the request so we know how
+	 * Get the first few bytes of the request so we know how
 	 * much data we'll need to read.
 	 */
 	if (! conn_recv(conn, &ctx->request.fh_replace,
