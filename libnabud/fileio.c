@@ -586,6 +586,33 @@ fileio_open(const char *location, int flags, const char *local_root,
 }
 
 /*
+ * fileio_resolve_path --
+ *	Resolve a file location into a local path.  If the file's
+ *	location is not local, NULL will be returned.  Caller is
+ *	responsible for freeing the resulting path string.
+ */
+char *
+fileio_resolve_path(const char *location, const char *local_root, int oflags)
+{
+	const struct fileio_scheme_ops *fso;
+	char *path;
+	int error;
+
+	fso = fileio_ops_for_location(location);
+	if (fso->ops != &fileio_local_ops) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	error = fileio_local_resolve_path(location, local_root, oflags, &path);
+	if (error != 0) {
+		errno = error;
+		return NULL;
+	}
+	return path;
+}
+
+/*
  * fileio_close --
  *	Close a file.
  */
