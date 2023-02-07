@@ -405,6 +405,40 @@ rn_req_fh_append(struct retronet_context *ctx)
 static void
 rn_req_fh_insert(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+
+	/*
+	 * Get the first few bytes of the request so we know how
+	 * much data we'll need to read.
+	 */
+	if (! conn_recv(conn, &ctx->request.fh_insert,
+			offsetof(struct rn_fh_insert_req, data))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_insert.fileHandle);
+
+	uint32_t offset = nabu_get_uint32(ctx->request.fh_insert.offset);
+	uint16_t length = nabu_get_uint16(ctx->request.fh_insert.length);
+
+	/* And now receive the data payload. */
+	if (! conn_recv(conn, ctx->request.fh_insert.data, length)) {
+		log_error("[%s] Failed to receive data.",
+		    conn_name(conn));
+		return;
+	}
+
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(conn), ctx->request.fh_replace.fileHandle);
+		return;
+	}
+
+	/* XXX implement FH-INSERT */
+	(void)offset;
 }
 
 /*
@@ -414,6 +448,33 @@ rn_req_fh_insert(struct retronet_context *ctx)
 static void
 rn_req_fh_delete_range(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_delete_range,
+			sizeof(ctx->request.fh_delete_range))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext,
+	    ctx->request.fh_delete_range.fileHandle);
+
+	uint32_t offset = nabu_get_uint32(ctx->request.fh_delete_range.offset);
+	uint16_t length =
+	    nabu_get_uint16(ctx->request.fh_delete_range.deleteLen);
+
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(conn), ctx->request.fh_replace.fileHandle);
+		return;
+	}
+
+	/* XXX implement FH-DELETE-RANGE */
+	(void)offset;
+	(void)length;
 }
 
 /*
@@ -471,6 +532,103 @@ rn_req_fh_replace(struct retronet_context *ctx)
 static void
 rn_req_file_delete(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+
+	/* First we have to get the file name length. */
+	if (! conn_recv_byte(conn, &ctx->request.file_delete.fileNameLen)) {
+		log_error("[%s] Failed to receive fileNameLen.",
+		    conn_name(conn));
+		return;
+	}
+
+	/* Now we can receive the rest of the payload. */
+	if (! conn_recv(conn, ctx->request.file_delete.fileName,
+			ctx->request.file_size.fileNameLen)) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	/* NUL-terminate the name. */
+	ctx->request.file_delete.fileName[
+	    ctx->request.file_delete.fileNameLen] = '\0';
+
+	/* XXX implement FILE-DELETE */
+}
+
+static bool
+rn_file_copy_mode_getargs(struct retronet_context *ctx,
+    const char **src_fnamep, const char **dst_fnamep, uint8_t *flagsp)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	char *src_fname = NULL, *dst_fname = NULL;
+	uint8_t src_fname_len, dst_fname_len, flags;
+	uint8_t *cp;
+
+	/*
+	 * This request "structure" is a friggin' mess.  We just have
+	 * to treat it like a free-form blob because it contains variable-
+	 * length fields in the middle.
+	 */
+	cp = ctx->request.file_copy.ugh;
+
+	/* Source name length. */
+	if (! conn_recv_byte(conn, cp)) {
+		log_error("[%s] Failed to receive srcFileNameLen.",
+		    conn_name(conn));
+		return false;
+	}
+	src_fname_len = *cp;
+	cp++;
+
+	/* Source name. */
+	if (! conn_recv(conn, cp, src_fname_len)) {
+		log_error("[%s] Failed to receive srcFileName.",
+		    conn_name(conn));
+		return false;
+	}
+	src_fname = (char *)cp;
+	cp += src_fname_len;
+
+	/* Destination name length. */
+	if (! conn_recv_byte(conn, cp)) {
+		log_error("[%s] Failed to receive dstFileNameLen.",
+		    conn_name(conn));
+		return false;
+	}
+	dst_fname_len = *cp;
+	cp++;
+
+	/* Destination name. */
+	if (! conn_recv(conn, cp, dst_fname_len)) {
+		log_error("[%s] Failed to receive dstFileName.",
+		    conn_name(conn));
+		return false;
+	}
+	dst_fname = (char *)cp;
+	cp += dst_fname_len;
+
+	/* ...and the flags. */
+	if (! conn_recv_byte(conn, cp)) {
+		log_error("[%s] Failed to receive copyFlags.",
+		    conn_name(conn));
+		return false;
+	}
+	flags = *cp;
+	cp++;
+
+	/*
+	 * All of the other info after the file names has now been
+	 * saved off so we can NUL-terminate the names.
+	 */
+	src_fname[src_fname_len] = '\0';
+	dst_fname[dst_fname_len] = '\0';
+
+	*src_fnamep = src_fname;
+	*dst_fnamep = dst_fname;
+	*flagsp = flags;
+
+	return true;
 }
 
 /*
@@ -480,6 +638,18 @@ rn_req_file_delete(struct retronet_context *ctx)
 static void
 rn_req_file_copy(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	const char *src_fname, *dst_fname;
+	uint8_t flags;
+
+	/* FILE-COPY and FILE-MOVE have the same args "structure". */
+	if (! rn_file_copy_mode_getargs(ctx, &src_fname, &dst_fname, &flags)) {
+		log_error("[%s] Failed to get arguments.",
+		    conn_name(conn));
+		return;
+	}
+
+	/* XXX implement FILE-COPY */
 }
 
 /*
@@ -489,6 +659,18 @@ rn_req_file_copy(struct retronet_context *ctx)
 static void
 rn_req_file_move(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	const char *src_fname, *dst_fname;
+	uint8_t flags;
+
+	/* FILE-COPY and FILE-MOVE have the same args "structure". */
+	if (! rn_file_copy_mode_getargs(ctx, &src_fname, &dst_fname, &flags)) {
+		log_error("[%s] Failed to get arguments.",
+		    conn_name(conn));
+		return;
+	}
+
+	/* XXX implement FILE-MOVE */
 }
 
 /*
