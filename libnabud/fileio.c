@@ -258,13 +258,14 @@ check_local_root_escape(const char *location)
 	return depth < 0;
 }
 
-static bool
-fileio_local_io_open(struct fileio *f, const char *location,
-    const char *local_root)
+static int
+fileio_local_resolve_path(const char *location, const char *local_root,
+    int flags, char **fnamep)
 {
-	if ((f->flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
-		errno = EINVAL;
-		return false;
+	char *fname;
+
+	if ((flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
+		return EINVAL;
 	}
 
 	/*
@@ -286,37 +287,50 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	}
 
 	if (strlen(location) == 0) {
-		errno = EINVAL;
-		return false;
+		return EINVAL;
 	}
 
 	if (local_root != NULL) {
 		/* The local root must be an absolute path. */
 		if (*local_root != '/') {
-			errno = EINVAL;
-			return false;
+			return EINVAL;
 		}
 		if (check_local_root_escape(location)) {
-			errno = EPERM;
-			return false;
+			return EPERM;
 		}
 		/* local_root/location\0 */
-		f->location = malloc(strlen(local_root) + 1 +
+		fname = malloc(strlen(local_root) + 1 +
 		    strlen(location) + 1);
-		if (f->location != NULL) {
-			sprintf(f->location, "%s/%s", local_root, location);
+		if (fname != NULL) {
+			sprintf(fname, "%s/%s", local_root, location);
 		}
 	} else {
-		if (f->flags & FILEIO_O_LOCAL_ROOT) {
-			errno = EPERM;
-			return false;
+		if (flags & FILEIO_O_LOCAL_ROOT) {
+			return EPERM;
 		}
-		f->location = strdup(location);
+		fname = strdup(location);
 	}
-	if (f->location == NULL) {
-		errno = ENOMEM;
+	if (fname == NULL) {
+		return ENOMEM;
+	}
+
+	*fnamep = fname;
+	return 0;
+}
+
+static bool
+fileio_local_io_open(struct fileio *f, const char *location,
+    const char *local_root)
+{
+	int error;
+
+	error = fileio_local_resolve_path(location, local_root, f->flags,
+	    &f->location);
+	if (error != 0) {
+		errno = error;
 		return false;
 	}
+
 	/* If open fails, caller will free f->location. */
 
 	int open_flags = (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY;
