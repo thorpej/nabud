@@ -176,32 +176,6 @@ struct nabu_time {
 	uint8_t		second;
 };
 
-/*
- * NabuRetroNet file details structure.
- */
-struct rn_file_details {
-	uint8_t		file_size[4];
-#define	NR_ISDIR	((uint32_t)-1)
-#define	NR_NOENT	((uint32_t)-2)
-
-	uint8_t		c_year[2];
-	uint8_t		c_month;
-	uint8_t		c_day;
-	uint8_t		c_hour;
-	uint8_t		c_minute;
-	uint8_t		c_second;
-
-	uint8_t		m_year[2];
-	uint8_t		m_month;
-	uint8_t		m_day;
-	uint8_t		m_hour;
-	uint8_t		m_minute;
-	uint8_t		m_second;
-
-	uint8_t		name_length;
-	uint8_t		name[64];
-};
-
 #ifdef NABU_PROTO_INLINES
 
 /*
