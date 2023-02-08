@@ -852,6 +852,39 @@ rn_req_fh_details(struct retronet_context *ctx)
 static void
 rn_req_fh_readseq(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_readseq,
+			sizeof(ctx->request.fh_readseq))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_readseq.fileHandle);
+
+	uint16_t length = nabu_get_uint16(ctx->request.fh_readseq.length);
+
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_readseq.fileHandle);
+		length = 0;
+	} else {
+		log_debug("[%s] slot %u length %u",
+		    conn_name(conn), ctx->request.fh_readseq.fileHandle,
+		    length);
+
+		int error = stext_file_read(f, ctx->reply.fh_readseq.data,
+		    &length);
+		if (error != 0) {
+			length = 0;
+		}
+	}
+	nabu_set_uint16(ctx->reply.fh_readseq.returnLength, length);
+	conn_send(conn, &ctx->reply.fh_readseq, length + 2);
 }
 
 /*
@@ -861,6 +894,55 @@ rn_req_fh_readseq(struct retronet_context *ctx)
 static void
 rn_req_fh_seek(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_seek,
+			sizeof(ctx->request.fh_seek))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_seek.fileHandle);
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_seek.fileHandle);
+		return;
+	}
+
+	int32_t offset = (int32_t)nabu_get_uint32(ctx->request.fh_seek.offset);
+	int whence;
+
+	switch (ctx->request.fh_seek.whence) {
+	case RN_SEEK_SET:	whence = SEEK_SET;	break;
+	case RN_SEEK_CUR:	whence = SEEK_CUR;	break;
+	case RN_SEEK_END:	whence = SEEK_END;	break;
+	default:
+		log_info("[%s] Bad whence value from client: %u",
+		    conn_name(conn), ctx->request.fh_seek.whence);
+		goto bad;
+	}
+
+	error = stext_file_seek(f, &offset, whence);
+	if (error) {
+		log_error("[%s] stext_file_seek() failed: %s",
+		    conn_name(conn), strerror(error));
+ bad:
+		/*
+		 * Just try to get the current position to return.
+		 * It's just so incredibly dumb to not have a way
+		 * to return errors :-(
+		 */
+		offset = 0;
+		(void) stext_file_seek(f, &offset, SEEK_CUR);
+	}
+
+	nabu_set_uint32(ctx->reply.fh_seek.offset, (uint32_t)offset);
+	conn_send(conn, &ctx->reply.fh_seek, sizeof(ctx->reply.fh_seek));
 }
 
 #define	HANDLER_INDEX(v)	((v) - NABU_MSG_RN_FIRST)
