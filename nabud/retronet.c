@@ -254,11 +254,11 @@ rn_req_fh_size(struct retronet_context *ctx)
 		return;
 	}
 
-	f = stext_file_find(&ctx->stext, ctx->request.fh_read.fileHandle);
+	f = stext_file_find(&ctx->stext, ctx->request.fh_size.fileHandle);
 	if (f == NULL) {
 		log_debug("[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.fh_read.fileHandle);
+		    ctx->request.fh_size.fileHandle);
 		size = -1;
 	} else {
 		error = stext_file_getattr(f, &attrs);
@@ -540,7 +540,7 @@ rn_req_fh_delete_range(struct retronet_context *ctx)
 
 	if (f == NULL) {
 		log_debug("[%s] No file for slot %u.",
-		    conn_name(conn), ctx->request.fh_replace.fileHandle);
+		    conn_name(conn), ctx->request.fh_delete_range.fileHandle);
 		return;
 	}
 
@@ -819,18 +819,18 @@ rn_req_fh_details(struct retronet_context *ctx)
 	int error;
 
 	/* Receive the request. */
-	if (! conn_recv(conn, &ctx->request.fh_truncate,
-			sizeof(ctx->request.fh_truncate))) {
+	if (! conn_recv(conn, &ctx->request.fh_details,
+			sizeof(ctx->request.fh_details))) {
 		log_error("[%s] Failed to receive request.",
 		    conn_name(conn));
 		return;
 	}
 
-	f = stext_file_find(&ctx->stext, ctx->request.fh_truncate.fileHandle);
+	f = stext_file_find(&ctx->stext, ctx->request.fh_details.fileHandle);
 	if (f == NULL) {
 		log_debug("[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.fh_truncate.fileHandle);
+		    ctx->request.fh_details.fileHandle);
 		return;
 	}
 
