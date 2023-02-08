@@ -646,7 +646,21 @@ rn_req_file_delete(struct retronet_context *ctx)
 	ctx->request.file_delete.fileName[
 	    ctx->request.file_delete.fileNameLen] = '\0';
 
-	/* XXX implement FILE-DELETE */
+	char *path =
+	    fileio_resolve_path((char *)ctx->request.file_delete.fileName,
+				conn->file_root, FILEIO_O_LOCAL_ROOT);
+	if (path != NULL) {
+		if (unlink((char *)ctx->request.file_delete.fileName) < 0) {
+			log_info("[%s] unlink(%s) failed: %s",
+			    conn_name(conn),
+			    (char *)ctx->request.file_delete.fileName,
+			    strerror(errno));
+		}
+	} else {
+		log_debug("[%s] Unable to resolve path: %s",
+		    conn_name(conn),
+		    (char *)ctx->request.file_delete.fileName);
+	}
 }
 
 static bool
