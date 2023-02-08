@@ -66,6 +66,7 @@ struct stext_file {
 			size_t		length;
 			time_t		mtime;
 			uint32_t	cursor;
+			char		*location;
 		} shadow;
 	};
 };
@@ -81,6 +82,7 @@ struct stext_fileops {
 	off_t	(*file_seek)(struct stext_file *, off_t, int);
 	int	(*file_truncate)(struct stext_file *, uint32_t);
 	int	(*file_getattr)(struct stext_file *, struct fileio_attrs *);
+	const char * (*file_location)(struct stext_file *);
 	void	(*file_close)(struct stext_file *);
 };
 
@@ -333,6 +335,12 @@ stext_fileop_getattr_fileio(struct stext_file *f, struct fileio_attrs *attrs)
 	return 0;
 }
 
+static const char *
+stext_fileop_location_fileio(struct stext_file *f)
+{
+	return fileio_location(f->fileio.fileio);
+}
+
 static void
 stext_fileop_close_fileio(struct stext_file *f)
 {
@@ -350,6 +358,7 @@ static const struct stext_fileops stext_fileops_fileio = {
 	.file_seek	= stext_fileop_seek_fileio,
 	.file_truncate	= stext_fileop_truncate_fileio,
 	.file_getattr	= stext_fileop_getattr_fileio,
+	.file_location	= stext_fileop_location_fileio,
 	.file_close	= stext_fileop_close_fileio,
 };
 
@@ -493,6 +502,12 @@ stext_fileop_getattr_shadow(struct stext_file *f, struct fileio_attrs *attrs)
 	return 0;
 }
 
+static const char *
+stext_fileop_location_shadow(struct stext_file *f)
+{
+	return f->shadow.location;
+}
+
 static void
 stext_fileop_close_shadow(struct stext_file *f)
 {
@@ -510,6 +525,7 @@ static const struct stext_fileops stext_fileops_shadow = {
 	.file_seek	= stext_fileop_seek_shadow,
 	.file_truncate	= stext_fileop_truncate_shadow,
 	.file_getattr	= stext_fileop_getattr_shadow,
+	.file_location	= stext_fileop_location_shadow,
 	.file_close	= stext_fileop_close_shadow,
 };
 
@@ -593,6 +609,7 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		f->shadow.data = fileio_load_file(fileio, attrs,
 		    0 /*extra*/, 0 /*maxsize XXX*/, &f->shadow.length);
 		f->shadow.mtime = attrs->mtime;
+		f->shadow.location = strdup(fileio_location(fileio));
 		f->ops = &stext_fileops_shadow;
 	} else {
 		if (attrs->size > MAX_FILEIO_LENGTH) {
@@ -754,4 +771,14 @@ int
 stext_file_getattr(struct stext_file *f, struct fileio_attrs *attrs)
 {
 	return (*f->ops->file_getattr)(f, attrs);
+}
+
+/*
+ * stext_file_location --
+ *	Get the location of a file.
+ */
+const char *
+stext_file_location(struct stext_file *f)
+{
+	return (*f->ops->file_location)(f);
 }
