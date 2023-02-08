@@ -113,18 +113,25 @@ rn_fileio_attrs_to_file_details(const char *location,
 		/*
 		 * For now, we're going to assume that the time fields in the
 		 * FileDetails map 1:1 to POSIX "struct tm" fields.
+		 *
+		 * Note that POSIX tm_year and tm_mon is actually:
+		 *
+		 *	year - 1900
+		 *	month of year (0 - 11)
+		 *
+		 * ...and NABULIB is expecting just raw values.
 		 */
 		tm = localtime_r(&a->btime, &tm_store);
-		nabu_set_uint16(d->c_year, tm->tm_year);	/* + 1900 ?? */
-		d->c_month  = tm->tm_mon;			/* + 1 ?? */
+		nabu_set_uint16(d->c_year, tm->tm_year + 1900);
+		d->c_month  = tm->tm_mon + 1;
 		d->c_day    = tm->tm_mday;
 		d->c_hour   = tm->tm_hour;
 		d->c_minute = tm->tm_min;
 		d->c_second = tm->tm_sec;
 
 		tm = localtime_r(&a->mtime, &tm_store);
-		nabu_set_uint16(d->m_year, tm->tm_year);	/* + 1900 ?? */
-		d->m_month  = tm->tm_mon;			/* + 1 ?? */
+		nabu_set_uint16(d->m_year, tm->tm_year + 1900);
+		d->m_month  = tm->tm_mon + 1;
 		d->m_day    = tm->tm_mday;
 		d->m_hour   = tm->tm_hour;
 		d->m_minute = tm->tm_min;
