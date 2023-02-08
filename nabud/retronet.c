@@ -825,6 +825,23 @@ rn_req_file_list_item(struct retronet_context *ctx)
 static void
 rn_req_file_details(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct fileio_attrs attrs, *ap = &attrs;
+	char *fname;
+	int error;
+
+	error = rn_file_getattr(ctx, ap);
+	if (error != 0) {
+		log_error("[%s] rn_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		ap = NULL;
+	}
+	/* Copy the name before we scribble over it. */
+	fname = strdup((char *)ctx->request.file_details.fileName);
+	rn_fileio_attrs_to_file_details(fname, ap, &ctx->reply.file_details);
+	free(fname);
+	conn_send(conn, &ctx->reply.file_details,
+	    sizeof(ctx->reply.file_details));
 }
 
 /*
