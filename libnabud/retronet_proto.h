@@ -284,8 +284,70 @@ struct rn_file_list_item_req {
 	uint8_t		itemIndex[2];
 };
 
+/*
+ * NABU_MSG_RN_FILE_DETAILS	0xb3
+ *	uint8_t			fileNameLen
+ *	[fileNameLen bytes]	fileName
+ *
+ * ->	RnFileDetails structure (83 bytes)
+ */
+#define	NABU_MSG_RN_FILE_DETAILS 0xb3
+struct rn_file_details_req {
+	uint8_t		fileNameLen;
+	uint8_t		fileName[255];
+};
+
+/*
+ * NABU_MSG_RN_FH_DETAILS	0xb4
+ *	uint8_t			fileHandle
+ *
+ * ->	No return
+ */
+#define	NABU_MSG_RN_FH_DETAILS	0xb4
+struct rn_fh_details_req {
+	uint8_t		fileHandle;
+};
+
+/*
+ * NABU_MSG_RN_FH_READSEQ	0xb5
+ *	uint8_t			fileHandle
+ *
+ * ->	No return
+ */
+#define	NABU_MSG_RN_FH_READSEQ	0xb5
+struct rn_fh_readseq_req {
+	uint8_t		fileHandle;
+	uint8_t		length[2];
+};
+
+struct rn_fh_readseq_repl {
+	uint8_t		returnLength[2];
+	uint8_t		data[65535];
+};
+
+/*
+ * NABU_MSG_RN_FH_SEEK		0xb6
+ *	uint8_t			fileHandle
+ *	uint32_t		offset
+ *	uint8_t			whence
+ */
+#define	NABU_MSG_RN_FH_SEEK	0xb6
+struct rn_fh_seek_req {
+	uint8_t		fileHandle;
+	uint8_t		offset[4];
+	uint8_t		whence;
+};
+
+#define	RN_SEEK_SET		1
+#define	RN_SEEK_CUR		2
+#define	RN_SEEK_END		3
+
+struct rn_fh_seek_repl {
+	uint8_t		offset[4];
+};
+
 #define	NABU_MSG_RN_FIRST	NABU_MSG_RN_FILE_OPEN
-#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FILE_LIST_ITEM
+#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FH_SEEK
 
 #define	NABU_MSG_IS_RETRONET(x)	((x) >= NABU_MSG_RN_FIRST &&	\
 				 (x) <= NABU_MSG_RN_LAST)

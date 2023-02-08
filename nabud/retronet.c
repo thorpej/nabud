@@ -68,6 +68,10 @@ union retronet_request {
 	struct rn_fh_truncate_req	fh_truncate;
 	struct rn_file_list_req		file_list;
 	struct rn_file_list_item_req	file_list_item;
+	struct rn_file_details_req	file_details;
+	struct rn_fh_details_req	fh_details;
+	struct rn_fh_readseq_req	fh_readseq;
+	struct rn_fh_seek_req		fh_seek;
 };
 
 union retronet_reply {
@@ -77,6 +81,10 @@ union retronet_reply {
 	struct rn_file_size_repl	file_size;
 	struct rn_file_list_repl	file_list;
 	struct rn_file_details		file_list_item;
+	struct rn_file_details		file_details;
+	struct rn_file_details		fh_details;
+	struct rn_fh_readseq_repl	fh_readseq;
+	struct rn_fh_seek_repl		fh_seek;
 };
 
 struct retronet_context {
@@ -725,6 +733,42 @@ rn_req_file_list_item(struct retronet_context *ctx)
 {
 }
 
+/*
+ * rn_req_file_details --
+ *	Handle the FILE-DETAILS request.
+ */
+static void
+rn_req_file_details(struct retronet_context *ctx)
+{
+}
+
+/*
+ * rn_req_fh_details --
+ *	Handle the FH-DETAILS request.
+ */
+static void
+rn_req_fh_details(struct retronet_context *ctx)
+{
+}
+
+/*
+ * rn_req_fh_readseq --
+ *	Handle the FH-READSEQ request.
+ */
+static void
+rn_req_fh_readseq(struct retronet_context *ctx)
+{
+}
+
+/*
+ * rn_req_fh_seek --
+ *	Handle the FH-SEEK request.
+ */
+static void
+rn_req_fh_seek(struct retronet_context *ctx)
+{
+}
+
 #define	HANDLER_INDEX(v)	((v) - NABU_MSG_RN_FIRST)
 #define	HANDLER_ENTRY(v, n)						\
 	[HANDLER_INDEX(v)] = {						\
@@ -751,6 +795,10 @@ static const struct {
 	HANDLER_ENTRY(NABU_MSG_RN_FH_TRUNCATE,     fh_truncate),
 	HANDLER_ENTRY(NABU_MSG_RN_FILE_LIST,       file_list),
 	HANDLER_ENTRY(NABU_MSG_RN_FILE_LIST_ITEM,  file_list_item),
+	HANDLER_ENTRY(NABU_MSG_RN_FILE_DETAILS,    file_details),
+	HANDLER_ENTRY(NABU_MSG_RN_FH_DETAILS,      fh_details),
+	HANDLER_ENTRY(NABU_MSG_RN_FH_READSEQ,      fh_readseq),
+	HANDLER_ENTRY(NABU_MSG_RN_FH_SEEK,         fh_seek),
 };
 static const unsigned int retronet_request_type_count =
     sizeof(retronet_request_types) / sizeof(retronet_request_types[0]);
