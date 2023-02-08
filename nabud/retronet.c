@@ -164,6 +164,54 @@ rn_fileio_attrs_to_file_details(const char *location,
 	memcpy(d->name, fname, fnamelen);
 }
 
+static int
+rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct fileio *f;
+
+	/*
+	 * Used for FILE-SIZE and FILE-DETAILS -- they both have the
+	 * same request structure.
+	 */
+
+	/* First we have to get the file name length. */
+	if (! conn_recv_byte(conn, &ctx->request.file_size.fileNameLen)) {
+		log_error("[%s] Failed to receive fileNameLen.",
+		    conn_name(conn));
+		return ETIMEDOUT;
+	}
+
+	/* Now we can receive the rest of the payload. */
+	if (! conn_recv(conn, ctx->request.file_size.fileName,
+			ctx->request.file_size.fileNameLen)) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return ETIMEDOUT;
+	}
+
+	/* NUL-terminate the name. */
+	ctx->request.file_size.fileName[
+	    ctx->request.file_size.fileNameLen] = '\0';
+
+	/*
+	 * Open the file so we can get the size.  Yes, open.
+	 * This is necessary for remote files on the other
+	 * end of an HTTP connection, for example.
+	 */
+	f = fileio_open((const char *)ctx->request.file_size.fileName,
+	    FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT, conn->file_root,
+	    attrs);
+	if (f == NULL) {
+		return ENOENT;
+	}
+
+	/* Now have the attrs; close the file. */
+	fileio_close(f);
+
+	return 0;
+}
+
 /*
  * rn_req_file_open --
  *	Handle the FILE-OPEN request.
@@ -360,45 +408,18 @@ static void
 rn_req_file_size(struct retronet_context *ctx)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
-	struct fileio *f;
 	struct fileio_attrs attrs;
 	int32_t size;
+	int error;
 
-	/* First we have to get the file name length. */
-	if (! conn_recv_byte(conn, &ctx->request.file_size.fileNameLen)) {
-		log_error("[%s] Failed to receive fileNameLen.",
-		    conn_name(conn));
-		return;
-	}
-
-	/* Now we can receive the rest of the payload. */
-	if (! conn_recv(conn, ctx->request.file_size.fileName,
-			ctx->request.file_size.fileNameLen)) {
-		log_error("[%s] Failed to receive request.",
-		    conn_name(conn));
-		return;
-	}
-
-	/* NUL-terminate the name. */
-	ctx->request.file_size.fileName[
-	    ctx->request.file_size.fileNameLen] = '\0';
-
-	/*
-	 * Open the file so we can get the size.  Yes, open.
-	 * This is necessary for remote files on the other
-	 * end of an HTTP connection, for example.
-	 */
-	f = fileio_open((const char *)ctx->request.file_size.fileName,
-	    FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT, conn->file_root,
-	    &attrs);
-	if (f != NULL) {
+	error = rn_file_getattr(ctx, &attrs);
+	if (error == 0) {
 		if (attrs.size > INT32_MAX) {
 			/* Saturate to INT32_MAX. */
 			size = INT32_MAX;
 		} else {
 			size = (int32_t)attrs.size;
 		}
-		fileio_close(f);
 	} else {
 		size = -1;
 	}
