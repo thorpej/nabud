@@ -100,6 +100,63 @@ struct retronet_context {
  * Request handling
  *****************************************************************************/
 
+static void
+rn_fileio_attrs_to_file_details(const char *location,
+    const struct fileio_attrs *a, struct rn_file_details *d)
+{
+	struct tm tm_store, *tm;
+	uint32_t size;
+
+	memset(d, 0, sizeof(*d));
+
+	if (a != NULL) {
+		/*
+		 * For now, we're going to assume that the time fields in the
+		 * FileDetails map 1:1 to POSIX "struct tm" fields.
+		 */
+		tm = localtime_r(&a->btime, &tm_store);
+		nabu_set_uint16(d->c_year, tm->tm_year);	/* + 1900 ?? */
+		d->c_month  = tm->tm_mon;			/* + 1 ?? */
+		d->c_day    = tm->tm_mday;
+		d->c_hour   = tm->tm_hour;
+		d->c_minute = tm->tm_min;
+		d->c_second = tm->tm_sec;
+
+		tm = localtime_r(&a->mtime, &tm_store);
+		nabu_set_uint16(d->m_year, tm->tm_year);	/* + 1900 ?? */
+		d->m_month  = tm->tm_mon;			/* + 1 ?? */
+		d->m_day    = tm->tm_mday;
+		d->m_hour   = tm->tm_hour;
+		d->m_minute = tm->tm_min;
+		d->m_second = tm->tm_sec;
+
+		if (a->is_directory) {
+			size = NR_ISDIR;
+		} else {
+			if (a->size > UINT32_MAX) {
+				size = UINT32_MAX;
+			} else {
+				size = (uint32_t)a->size;
+			}
+		}
+	} else {
+		/* NULL attrs == file does not exist. */
+		size = NR_NOENT;
+	}
+	nabu_set_uint32(d->file_size, size);
+
+	const char *fname = strrchr(location, '/');
+	if (fname == NULL) {
+		fname = location;
+	}
+	size_t fnamelen = strlen(fname);
+	if (fnamelen > sizeof(d->name)) {
+		fnamelen = sizeof(d->name);
+	}
+	d->name_length = (uint8_t)fnamelen;
+	memcpy(d->name, fname, fnamelen);
+}
+
 /*
  * rn_req_file_open --
  *	Handle the FILE-OPEN request.
@@ -749,6 +806,36 @@ rn_req_file_details(struct retronet_context *ctx)
 static void
 rn_req_fh_details(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct fileio_attrs attrs, *ap = &attrs;
+	struct stext_file *f;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_truncate,
+			sizeof(ctx->request.fh_truncate))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_truncate.fileHandle);
+	if (f == NULL) {
+		log_debug("[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_truncate.fileHandle);
+		return;
+	}
+
+	error = stext_file_getattr(f, ap);
+	if (error != 0) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		ap = NULL;
+	}
+	rn_fileio_attrs_to_file_details(stext_file_location(f),
+	    ap, &ctx->reply.fh_details);
+	conn_send(conn, &ctx->reply.fh_details, sizeof(ctx->reply.fh_details));
 }
 
 /*
