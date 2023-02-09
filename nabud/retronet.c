@@ -100,6 +100,39 @@ struct retronet_context {
  * Request handling
  *****************************************************************************/
 
+static int
+rn_recv_filename(struct nabu_connection *conn, const char *which,
+    uint8_t **cursorp, char **fnamep, uint8_t *fnamelenp)
+{
+	uint8_t *bp = *cursorp;
+	char *cp /* , *endcp */;
+	uint8_t len;
+
+	/* First we have to get the file name length. */
+	if (! conn_recv_byte(conn, bp)) {
+		log_error("[%s] Failed to receive %sLen.",
+		    conn_name(conn), which);
+		return ETIMEDOUT;
+	}
+	len = *bp++;
+
+	/* Now we can receive the file name itself. */
+	if (! conn_recv(conn, bp, len)) {
+		log_error("[%s] Failed to receive %s.",
+		    conn_name(conn), which);
+		return ETIMEDOUT;
+	}
+	cp = (char *)bp;
+	/* endcp = cp + len; */
+	bp += len;
+
+	*cursorp = bp;
+	*fnamep = cp;
+	*fnamelenp = len;
+
+	return 0;
+}
+
 static void
 rn_fileio_attrs_to_file_details(const char *location,
     const struct fileio_attrs *a, struct rn_file_details *d)
@@ -169,39 +202,31 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
 	struct fileio *f;
+	char *fname;
+	uint8_t fnamelen;
 
 	/*
 	 * Used for FILE-SIZE and FILE-DETAILS -- they both have the
 	 * same request structure.
 	 */
 
-	/* First we have to get the file name length. */
-	if (! conn_recv_byte(conn, &ctx->request.file_size.fileNameLen)) {
-		log_error("[%s] Failed to receive fileNameLen.",
-		    conn_name(conn));
-		return ETIMEDOUT;
+	uint8_t *req = &ctx->request.file_size.fileNameLen;
+	int error = rn_recv_filename(conn, "fileName", &req, &fname, &fnamelen);
+	if (error != 0) {
+		/* Error already logged. */
+		return error;
 	}
 
-	/* Now we can receive the rest of the payload. */
-	if (! conn_recv(conn, ctx->request.file_size.fileName,
-			ctx->request.file_size.fileNameLen)) {
-		log_error("[%s] Failed to receive request.",
-		    conn_name(conn));
-		return ETIMEDOUT;
-	}
-
-	/* NUL-terminate the name. */
-	ctx->request.file_size.fileName[
-	    ctx->request.file_size.fileNameLen] = '\0';
+	/* Have all the args -- we can safely NUL-terminate the name. */
+	fname[fnamelen] = '\0';
 
 	/*
 	 * Open the file so we can get the size.  Yes, open.
 	 * This is necessary for remote files on the other
 	 * end of an HTTP connection, for example.
 	 */
-	f = fileio_open((const char *)ctx->request.file_size.fileName,
-	    FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT, conn->file_root,
-	    attrs);
+	f = fileio_open(fname, FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT,
+	    conn->file_root, attrs);
 	if (f == NULL) {
 		return ENOENT;
 	}
@@ -222,49 +247,40 @@ rn_req_file_open(struct retronet_context *ctx)
 	struct nabu_connection *conn = ctx->stext.conn;
 	struct fileio_attrs attrs;
 	struct stext_file *f;
-	int error;
-	uint16_t flags;
-	uint8_t reqslot;
+	char *fname;
+	uint8_t fnamelen;
 
-	/* First we have to get the file name length. */
-	if (! conn_recv_byte(conn, &ctx->request.file_open.fileNameLen)) {
-		log_error("[%s] Failed to receive fileNameLen.",
-		    conn_name(conn));
+	uint8_t *req = &ctx->request.file_size.fileNameLen;
+	int error = rn_recv_filename(conn, "fileName", &req, &fname, &fnamelen);
+	if (error != 0) {
+		/* Error already logged. */
 		return;
 	}
 
-	/* Now we can receive the rest of the payload. */
-	if (! conn_recv(conn, ctx->request.file_open.fileName,
-			ctx->request.file_open.fileNameLen + 3)) {
+	/* Receive the rest of the request (3 bytes). */
+	if (! conn_recv(conn, req, 3)) {
 		log_error("[%s] Failed to receive request.",
 		    conn_name(conn));
 		return;
 	}
 
-	uint8_t *cp = &ctx->request.file_open.fileName[
-	    ctx->request.file_open.fileNameLen];
-
 	/* Extract the flags and requested slot. */
-	flags = nabu_get_uint16(cp);
-	reqslot = cp[2];
+	uint16_t flags = nabu_get_uint16(req);
+	uint8_t reqslot = req[2];
+
+	/* Have all the args -- we can safely NUL-terminate the name. */
+	fname[fnamelen] = '\0';
 
 	/* XXX consume flags */
 	(void)flags;
 
-	/* Now NUL-terminate the name. */
-	*cp = '\0';
-
-	error = stext_file_open(&ctx->stext,
-	    (const char *)ctx->request.file_open.fileName,
-	    reqslot, &attrs, &f);
+	error = stext_file_open(&ctx->stext, fname, reqslot, &attrs, &f);
 	if (error == EBUSY) {
 		/*
 		 * The RetroNet API says to treat a busy requested
 		 * slot as "ok, then just allocate one.".  &shrug;
 		 */
-		error = stext_file_open(&ctx->stext,
-		    (const char *)ctx->request.file_open.fileName,
-		    0xff, &attrs, &f);
+		error = stext_file_open(&ctx->stext, fname, 0xff, &attrs, &f);
 	}
 
 	/*
@@ -626,40 +642,29 @@ static void
 rn_req_file_delete(struct retronet_context *ctx)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
+	char *fname;
+	uint8_t fnamelen;
 
-	/* First we have to get the file name length. */
-	if (! conn_recv_byte(conn, &ctx->request.file_delete.fileNameLen)) {
-		log_error("[%s] Failed to receive fileNameLen.",
-		    conn_name(conn));
+	uint8_t *req = &ctx->request.file_delete.fileNameLen;
+	int error = rn_recv_filename(conn, "fileName", &req, &fname, &fnamelen);
+	if (error != 0) {
+		/* Error already logged. */
 		return;
 	}
 
-	/* Now we can receive the rest of the payload. */
-	if (! conn_recv(conn, ctx->request.file_delete.fileName,
-			ctx->request.file_size.fileNameLen)) {
-		log_error("[%s] Failed to receive request.",
-		    conn_name(conn));
-		return;
-	}
-
-	/* NUL-terminate the name. */
-	ctx->request.file_delete.fileName[
-	    ctx->request.file_delete.fileNameLen] = '\0';
+	/* Have all the args -- we can safely NUL-terminate the name. */
+	fname[fnamelen] = '\0';
 
 	char *path =
-	    fileio_resolve_path((char *)ctx->request.file_delete.fileName,
-				conn->file_root, FILEIO_O_LOCAL_ROOT);
+	    fileio_resolve_path(fname, conn->file_root, FILEIO_O_LOCAL_ROOT);
 	if (path != NULL) {
-		if (unlink((char *)ctx->request.file_delete.fileName) < 0) {
+		if (unlink(path) < 0) {
 			log_info("[%s] unlink(%s) failed: %s",
-			    conn_name(conn),
-			    (char *)ctx->request.file_delete.fileName,
-			    strerror(errno));
+			    conn_name(conn), path, strerror(errno));
 		}
 	} else {
 		log_debug("[%s] Unable to resolve path: %s",
-		    conn_name(conn),
-		    (char *)ctx->request.file_delete.fileName);
+		    conn_name(conn), fname);
 	}
 }
 
@@ -670,59 +675,34 @@ rn_file_copy_mode_getargs(struct retronet_context *ctx,
 	struct nabu_connection *conn = ctx->stext.conn;
 	char *src_fname = NULL, *dst_fname = NULL;
 	uint8_t src_fname_len, dst_fname_len, flags;
-	uint8_t *cp;
+	int error;
 
 	/*
 	 * This request "structure" is a friggin' mess.  We just have
 	 * to treat it like a free-form blob because it contains variable-
 	 * length fields in the middle.
 	 */
-	cp = ctx->request.file_copy.ugh;
-
-	/* Source name length. */
-	if (! conn_recv_byte(conn, cp)) {
-		log_error("[%s] Failed to receive srcFileNameLen.",
-		    conn_name(conn));
+	uint8_t *req = ctx->request.file_copy.ugh;
+	error = rn_recv_filename(conn, "srcFileName", &req,
+	    &src_fname, &src_fname_len);
+	if (error != 0) {
+		/* Error already logged. */
 		return false;
 	}
-	src_fname_len = *cp;
-	cp++;
-
-	/* Source name. */
-	if (! conn_recv(conn, cp, src_fname_len)) {
-		log_error("[%s] Failed to receive srcFileName.",
-		    conn_name(conn));
+	error = rn_recv_filename(conn, "dstFileName", &req,
+	    &dst_fname, &dst_fname_len);
+	if (error != 0) {
+		/* Error already logged. */
 		return false;
 	}
-	src_fname = (char *)cp;
-	cp += src_fname_len;
-
-	/* Destination name length. */
-	if (! conn_recv_byte(conn, cp)) {
-		log_error("[%s] Failed to receive dstFileNameLen.",
-		    conn_name(conn));
-		return false;
-	}
-	dst_fname_len = *cp;
-	cp++;
-
-	/* Destination name. */
-	if (! conn_recv(conn, cp, dst_fname_len)) {
-		log_error("[%s] Failed to receive dstFileName.",
-		    conn_name(conn));
-		return false;
-	}
-	dst_fname = (char *)cp;
-	cp += dst_fname_len;
 
 	/* ...and the flags. */
-	if (! conn_recv_byte(conn, cp)) {
+	if (! conn_recv_byte(conn, req)) {
 		log_error("[%s] Failed to receive copyFlags.",
 		    conn_name(conn));
 		return false;
 	}
-	flags = *cp;
-	cp++;
+	flags = *req;
 
 	/*
 	 * All of the other info after the file names has now been
