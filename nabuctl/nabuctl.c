@@ -99,6 +99,12 @@ parse_number(const char *arg, const char *what,
 	return true;
 }
 
+static const char *
+enabledstr(bool val)
+{
+	return val ? "enabled" : "disabled";
+}
+
 /*****************************************************************************
  * SERVER COMMUNICATION STUFF
  *****************************************************************************/
@@ -219,6 +225,7 @@ struct channel_desc {
 	char		*source;
 	struct listing	*listing;
 	unsigned int	number;
+	bool		retronet_enabled;
 };
 static TAILQ_HEAD(, channel_desc) channel_list =
     TAILQ_HEAD_INITIALIZER(channel_list);
@@ -375,6 +382,12 @@ channel_deserialize(struct atom_list *reply_list, struct atom *atom)
 		case NABUCTL_CHAN_SOURCE:
 			chan->source = atom_consume(atom);
 			log_debug("Got NABUCTL_CHAN_SOURCE=%s", chan->source);
+			break;
+
+		case NABUCTL_CHAN_RETRONET_EXTENSIONS:
+			chan->retronet_enabled = atom_bool_value(atom);
+			log_debug("Got NABUCTL_CHAN_RETRONET_EXTENSIONS=%d",
+			    chan->retronet_enabled);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
@@ -1037,6 +1050,7 @@ command_show_channel(int argc, char *argv[])
 	if (chan->list_url != NULL) {
 		printf(" Listing URL: %s\n", chan->list_url);
 	}
+	printf("    RetroNet: %s\n", enabledstr(chan->retronet_enabled));
 
 	return false;
 }

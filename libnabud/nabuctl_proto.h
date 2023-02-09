@@ -90,6 +90,8 @@ struct nabuctl_atom_header {
 		(NABUCTL_TYPE_STRING | NABUCTL_OBJ_CHANNEL | (6U << 8))
 #define	NABUCTL_CHAN_SOURCE		\
 		(NABUCTL_TYPE_STRING | NABUCTL_OBJ_CHANNEL | (7U << 8))
+#define	NABUCTL_CHAN_RETRONET_EXTENSIONS \
+		(NABUCTL_TYPE_BOOL   | NABUCTL_OBJ_CHANNEL | (8U << 8))
 /*
  * Fields within a connection object.
  */

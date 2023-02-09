@@ -96,6 +96,9 @@ control_serialize_channel(struct image_channel *chan, void *ctx)
 	rv = rv && atom_list_append_string(list, NABUCTL_CHAN_SOURCE,
 	    chan->source->name);
 
+	rv = rv && atom_list_append_bool(list, NABUCTL_CHAN_RETRONET_EXTENSIONS,
+	    chan->retronet_enabled);
+
 	rv = rv && atom_list_append_done(list);
 
 	return rv;
