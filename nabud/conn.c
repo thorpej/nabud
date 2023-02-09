@@ -147,7 +147,7 @@ conn_thread(void *arg)
  *	Common connection-creation duties.
  */
 static void
-conn_create_common(char *name, int fd, unsigned int channel, char *file_root,
+conn_create_common(char *name, int fd, const struct conn_add_args *args,
     conn_type type, void *(*func)(void *))
 {
 	struct nabu_connection *conn;
@@ -161,7 +161,7 @@ conn_create_common(char *name, int fd, unsigned int channel, char *file_root,
 	}
 
 	conn->type = type;
-	conn->file_root = file_root;
+	conn->file_root = args->file_root;
 	pthread_mutex_init(&conn->mutex, NULL);
 
 	if (! conn_io_init(&conn->io, name, fd)) {
@@ -177,8 +177,8 @@ conn_create_common(char *name, int fd, unsigned int channel, char *file_root,
 	/*
 	 * If a channel was specified, set it now.
 	 */
-	if (channel != 0) {
-		image_channel_select(conn, (int16_t)channel);
+	if (args->channel != 0) {
+		image_channel_select(conn, (int16_t)args->channel);
 	}
 
 	if (! conn_io_start(&conn->io, func, conn)) {
@@ -202,21 +202,21 @@ conn_create_common(char *name, int fd, unsigned int channel, char *file_root,
  *	Add a serial connection.
  */
 void
-conn_add_serial(char *path, unsigned int channel, char *file_root)
+conn_add_serial(const struct conn_add_args *args)
 {
 	struct termios t;
 	int fd;
 
-	log_info("Creating Serial connection on %s.", path);
+	log_info("Creating Serial connection on %s.", args->port);
 
-	fd = open(path, O_RDWR | O_NONBLOCK | O_NOCTTY);
+	fd = open(args->port, O_RDWR | O_NONBLOCK | O_NOCTTY);
 	if (fd < 0) {
-		log_error("Unable to open %s: %s", path, strerror(errno));
+		log_error("Unable to open %s: %s", args->port, strerror(errno));
 		return;
 	}
 
 	if (tcgetattr(fd, &t) < 0) {
-		log_error("tcgetattr() failed on %s: %s", path,
+		log_error("tcgetattr() failed on %s: %s", args->port,
 		    strerror(errno));
 		goto bad;
 	}
@@ -232,7 +232,7 @@ conn_add_serial(char *path, unsigned int channel, char *file_root)
 	t.c_cflag |= CLOCAL | CS8 | CSTOPB;
 	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
 		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
-		    path);
+		    args->port);
 		goto fallback;
 	}
 
@@ -245,21 +245,21 @@ conn_add_serial(char *path, unsigned int channel, char *file_root)
 		 * re-synchronizing with the next start bit.
 		 */
 		log_info("Failed to 8N2-%d on %s; falling back to 8N2-%d.",
-		    NABU_NATIVE_BPS, path, NABU_FALLBACK_BPS);
+		    NABU_NATIVE_BPS, args->port, NABU_FALLBACK_BPS);
  fallback:
 		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
 			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
-			    path);
+			    args->port);
 			goto bad;
 		}
 		if (tcsetattr(fd, TCSANOW, &t) < 0) {
 			log_error("Failed to set 8N2-%d on %s.",
-			    NABU_FALLBACK_BPS, path);
+			    NABU_FALLBACK_BPS, args->port);
 			goto bad;
 		}
 	}
 
-	conn_create_common(path, fd, channel, file_root, CONN_TYPE_SERIAL,
+	conn_create_common(args->port, fd, args, CONN_TYPE_SERIAL,
 	    conn_thread);
  	return;
  bad:
@@ -279,6 +279,7 @@ conn_tcp_thread(void *arg)
 	char host[NI_MAXHOST];
 	struct sockaddr_storage peerss;
 	socklen_t peersslen;
+	struct conn_add_args args;
 	int sock, v;
 
 	for (;;) {
@@ -311,9 +312,13 @@ conn_tcp_thread(void *arg)
 		chan = conn->l_channel;
 		pthread_mutex_unlock(&conn->mutex);
 
-		conn_create_common(strdup(host), sock,
-		    chan != NULL ? chan->number : 0,
-		    conn->file_root != NULL ? strdup(conn->file_root) : NULL,
+		memset(&args, 0, sizeof(args));
+
+		args.channel = chan != NULL ? chan->number : 0;
+		args.file_root = conn->file_root != NULL ?
+		    strdup(conn->file_root) : NULL;
+
+		conn_create_common(strdup(host), sock, &args,
 		    CONN_TYPE_TCP, conn_thread);
 	}
 
@@ -330,17 +335,17 @@ conn_tcp_thread(void *arg)
  *	creates new connections to service them.
  */
 void
-conn_add_tcp(char *portstr, unsigned int channel, char *file_root)
+conn_add_tcp(const struct conn_add_args *args)
 {
 	int sock;
 	long port;
 	char name[sizeof("IPv4-65536")];
 
-	log_info("Creating TCP listener on port %s.", portstr);
+	log_info("Creating TCP listener on port %s.", args->port);
 
-	port = strtol(portstr, NULL, 10);
+	port = strtol(args->port, NULL, 10);
 	if (port < 1 || port > UINT16_MAX) {
-		log_error("Invalid TCP port number: %s", portstr);
+		log_error("Invalid TCP port number: %s", args->port);
 		return;
 	}
 
@@ -352,7 +357,7 @@ conn_add_tcp(char *portstr, unsigned int channel, char *file_root)
 	struct addrinfo *ai0, *ai;
 	int error;
 
-	error = getaddrinfo(NULL, portstr, &hints, &ai0);
+	error = getaddrinfo(NULL, args->port, &hints, &ai0);
 	if (error) {
 		log_error("getaddrinfo() failed: %s", gai_strerror(error));
 		return;
@@ -369,8 +374,7 @@ conn_add_tcp(char *portstr, unsigned int channel, char *file_root)
 			if (bind(sock, ai->ai_addr, ai->ai_addrlen) == 0) {
 				if (listen(sock, 8) == 0) {
 					conn_create_common(strdup(name), sock,
-					    channel, file_root,
-					    CONN_TYPE_LISTENER,
+					    args, CONN_TYPE_LISTENER,
 					    conn_tcp_thread);
 					sock = -1;
 				} else {

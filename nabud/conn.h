@@ -96,10 +96,16 @@ struct nabu_connection {
 	char *l_selected_file;
 };
 
+struct conn_add_args {
+	char		*port;
+	char		*file_root;
+	unsigned int	channel;
+};
+
 extern unsigned int conn_count;
 
-void	conn_add_serial(char *, unsigned int, char *);
-void	conn_add_tcp(char *, unsigned int, char *);
+void	conn_add_serial(const struct conn_add_args *);
+void	conn_add_tcp(const struct conn_add_args *);
 void	conn_destroy(struct nabu_connection *);
 
 bool	conn_enumerate(bool (*)(struct nabu_connection *, void *), void *);
