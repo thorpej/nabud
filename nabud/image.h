@@ -57,6 +57,7 @@ struct image_channel {
 	void		*listing;
 	size_t		listing_size;
 	unsigned int	number;
+	bool		retronet_enabled;
 	LIST_HEAD(, nabu_image) image_cache;
 };
 
