@@ -54,6 +54,7 @@
 #include "adaptor.h"
 #include "conn.h"
 #include "image.h"
+#include "retronet.h"
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t conn_list_enum_cv = PTHREAD_COND_INITIALIZER;
@@ -401,6 +402,7 @@ conn_destroy(struct nabu_connection *conn)
 	conn_remove(conn);
 
 	image_release(conn_set_last_image(conn, NULL));
+	retronet_conn_fini(conn);
 
 	pthread_mutex_destroy(&conn->mutex);
 
