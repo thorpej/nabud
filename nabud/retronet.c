@@ -28,6 +28,7 @@
  * Support for the NabuRetroNet protocol extensions.
  */
 
+#include <sys/stat.h>
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -686,6 +687,7 @@ rn_req_file_delete(struct retronet_context *ctx)
 			log_info("[%s] unlink(%s) failed: %s",
 			    conn_name(conn), path, strerror(errno));
 		}
+		free(path);
 	} else {
 		log_debug("[%s] Unable to resolve path: %s",
 		    conn_name(conn), fname);
@@ -781,7 +783,50 @@ rn_req_file_move(struct retronet_context *ctx)
 		return;
 	}
 
-	/* XXX implement FILE-MOVE */
+	char *src_path = fileio_resolve_path(src_fname, conn->file_root,
+	    FILEIO_O_LOCAL_ROOT);
+	char *dst_path = fileio_resolve_path(dst_fname, conn->file_root,
+	    FILEIO_O_LOCAL_ROOT);
+	bool replace = (flags & RN_FILE_COPY_MOVE_REPLACE) != 0;
+
+	if (src_path == NULL) {
+		log_debug("[%s] Unable to resolve src path: %s",
+		    conn_name(conn), src_fname);
+		goto out;
+	}
+	if (dst_path == NULL) {
+		log_debug("[%s] Unable to resolve dst path: %s",
+		    conn_name(conn), dst_fname);
+		goto out;
+	}
+
+	/*
+	 * If we haven't been given the REPLACE flag, then ensure
+	 * nothing is at the destination path.
+	 */
+	if (! replace) {
+		struct stat sb;
+
+		if (stat(dst_path, &sb) == 0 || errno != ENOENT) {
+			log_info("[%s] Not replacing file at '%s'.",
+			    conn_name(conn), dst_path);
+			goto out;
+		}
+	}
+
+	if (rename(src_path, dst_path) < 0) {
+		/* XXX Who wants to handle EXDEV?  Because I sure don't... */
+		log_info("[%s] rename(%s, %s) failed: %s",
+		    conn_name(conn), src_path, dst_path, strerror(errno));
+	}
+
+ out:
+	if (src_path != NULL) {
+		free(src_path);
+	}
+	if (dst_path != NULL) {
+		free(dst_path);
+	}
 }
 
 /*
