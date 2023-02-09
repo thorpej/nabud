@@ -164,6 +164,9 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	}
 	rv = rv && atom_list_append_string(list, NABUCTL_CONN_STATE, cp);
 
+	rv = rv && atom_list_append_bool(list, NABUCTL_CONN_RETRONET_EXTENSIONS,
+	    conn->retronet_enabled);
+
 	rv = rv && atom_list_append_done(list);
 
 	return rv;

@@ -602,6 +602,7 @@ struct connection_desc {
 	char		*selected_file;
 	unsigned int	channel;
 	unsigned int	number;
+	bool		retronet_enabled;
 };
 static TAILQ_HEAD(, connection_desc) connection_list =
     TAILQ_HEAD_INITIALIZER(connection_list);
@@ -724,6 +725,12 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 			conn->selected_file = atom_consume(atom);
 			log_debug("Got NABUCTL_CONN_SELECTED_FILE=%s",
 			    conn->selected_file);
+			break;
+
+		case NABUCTL_CONN_RETRONET_EXTENSIONS:
+			conn->retronet_enabled = atom_bool_value(atom);
+			log_debug("Got NABUCTL_CONN_RETRONET_EXTENSIONS=%d",
+			    conn->retronet_enabled);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
@@ -1082,6 +1089,7 @@ command_show_connection(int argc, char *argv[])
 	if (conn->selected_file != NULL) {
 		printf("Selected file: %s\n", conn->selected_file);
 	}
+	printf("     RetroNet: %s\n", enabledstr(conn->retronet_enabled));
 
 	return false;
 }
