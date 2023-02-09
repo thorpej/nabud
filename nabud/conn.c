@@ -502,6 +502,7 @@ conn_set_channel(struct nabu_connection *conn, struct image_channel *chan)
 
 	pthread_mutex_lock(&conn->mutex);
 	conn->l_channel = chan;
+	conn->retronet_enabled = chan->retronet_enabled;
 	selected_file = conn->l_selected_file;
 	conn->l_selected_file = NULL;
 	pthread_mutex_unlock(&conn->mutex);
