@@ -65,6 +65,7 @@ struct nabuctl_atom_header {
 #define	NABUCTL_TYPE_STRING	(1U << 24) /* length includes nul */
 #define	NABUCTL_TYPE_NUMBER	(2U << 24) /* encoded as a string */
 #define	NABUCTL_TYPE_BLOB	(3U << 24)
+#define	NABUCTL_TYPE_BOOL	(4U << 24) /* length must be one */
 
 #define	NABUCTL_OBJ(x)		((x) & (0xffU << 16))
 #define	NABUCTL_OBJ_CHANNEL	(1U << 16) /* channel fields follow */

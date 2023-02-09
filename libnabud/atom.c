@@ -45,15 +45,18 @@
  *	Allocate an atom.
  */
 static struct atom *
-atom_alloc(size_t len)
+atom_alloc(const struct nabuctl_atom_header *hdr)
 {
 	struct atom *atom = calloc(1, sizeof(struct atom));
-	if (atom != NULL && len != 0) {
-		atom->data = calloc(1, len);
-		if (atom->data == NULL) {
-			free(atom);
-			return NULL;
+	if (atom != NULL) {
+		if (hdr->length != 0 && !ATOM_DATA_INLINE_P(hdr->tag)) {
+			atom->external_data = calloc(1, hdr->length);
+			if (atom->external_data == NULL) {
+				free(atom);
+				return NULL;
+			}
 		}
+		atom->hdr = *hdr;
 	}
 	return atom;
 }
@@ -65,8 +68,9 @@ atom_alloc(size_t len)
 static void
 atom_free(struct atom *atom)
 {
-	if (atom->data != NULL) {
-		free(atom->data);
+	if (!ATOM_DATA_INLINE_P(atom->hdr.tag) &&
+	    atom->external_data != NULL) {
+		free(atom->external_data);
 	}
 	free(atom);
 }
@@ -139,8 +143,9 @@ atom_length(struct atom *atom)
 void *
 atom_consume(struct atom *atom)
 {
-	void *rv = atom->data;
-	atom->data = NULL;
+	assert(!ATOM_DATA_INLINE_P(atom->hdr.tag));
+	void *rv = atom->external_data;
+	atom->external_data = NULL;
 	return rv;
 }
 
@@ -152,7 +157,7 @@ atom_consume(struct atom *atom)
 void *
 atom_dataref(struct atom *atom)
 {
-	return atom->data;
+	return ATOM_DATA(atom);
 }
 
 /*
@@ -166,8 +171,19 @@ atom_number_value(struct atom *atom)
 
 	assert(NABUCTL_TYPE(atom->hdr.tag) == NABUCTL_TYPE_NUMBER);
 
-	val = strtoll(atom->data, NULL, 0);
+	val = strtoll(ATOM_DATA(atom), NULL, 0);
 	return (uint64_t)val;
+}
+
+/*
+ * atom_bool_value --
+ *	Return the value for a boolean atom.
+ */
+bool
+atom_bool_value(struct atom *atom)
+{
+	assert(NABUCTL_TYPE(atom->hdr.tag) == NABUCTL_TYPE_BOOL);
+	return atom->inline_data[0] != 0;
 }
 
 /*
@@ -206,8 +222,7 @@ atom_send(struct conn_io *conn, const struct atom *atom)
 {
 	atom_send_hdr(conn, &atom->hdr);
 	if (atom->hdr.length != 0) {
-		assert(atom->data != NULL);
-		conn_io_send(conn, atom->data, atom->hdr.length);
+		conn_io_send(conn, ATOM_DATA(atom), atom->hdr.length);
 	}
 }
 
@@ -277,6 +292,16 @@ atom_recv(struct conn_io *conn)
 		}
 		break;
 
+	case NABUCTL_TYPE_BOOL:
+		/* Boolean atoms must have a length of 1. */
+		if (hdr.length != 1) {
+			log_error("[%s] %s atom has length %u.",
+			    conn_io_name(conn), atom_typedesc(hdr.tag),
+			    hdr.length);
+			return NULL;
+		}
+		break;
+
 	default:
 		log_error("[%s] Unknown atom type 0x%08x length %u.",
 		    conn_io_name(conn), NABUCTL_TYPE(hdr.tag),
@@ -284,15 +309,14 @@ atom_recv(struct conn_io *conn)
 		return NULL;
 	}
 
-	struct atom *atom = atom_alloc(hdr.length);
+	struct atom *atom = atom_alloc(&hdr);
 	if (atom == NULL) {
 		log_error("[%s] Unable to allocate %u byte atom.",
 		    conn_io_name(conn), hdr.length);
 		return NULL;
 	}
-	atom->hdr = hdr;
 	if (atom->hdr.length != 0) {
-		if (! conn_io_recv(conn, atom->data, atom->hdr.length)) {
+		if (! conn_io_recv(conn, ATOM_DATA(atom), atom->hdr.length)) {
 			log_error("[%s] Failed to receive %u byte atom "
 			    "data.", conn_io_name(conn), atom->hdr.length);
 			atom_free(atom);
@@ -303,7 +327,7 @@ atom_recv(struct conn_io *conn)
 		 */
 		if (NABUCTL_TYPE(hdr.tag) == NABUCTL_TYPE_STRING ||
 		    NABUCTL_TYPE(hdr.tag) == NABUCTL_TYPE_NUMBER) {
-			const uint8_t *cp = atom->data;
+			const uint8_t *cp = ATOM_DATA(atom);
 			if (cp[hdr.length - 1] != '\0') {
 				log_error("[%s] %s atom is not nul-terminated.",
 				    conn_io_name(conn), atom_typedesc(hdr.tag));
@@ -355,12 +379,21 @@ atom_list_append(struct atom_list *list, uint32_t tag, const void *vbuf,
 	assert(NABUCTL_TYPE(tag) == NABUCTL_TYPE_VOID || len != 0);
 	assert(NABUCTL_TYPE(tag) != NABUCTL_TYPE_VOID || len == 0);
 
-	struct atom *atom = atom_alloc(len);
+	const struct nabuctl_atom_header hdr = {
+		.tag = tag,
+		.length = (uint32_t)len,
+	};
+
+	struct atom *atom = atom_alloc(&hdr);
 	if (atom != NULL) {
-		atom->hdr.tag = tag;
-		atom->hdr.length = (uint32_t)len;
 		if (vbuf != NULL) {
-			memcpy(atom->data, vbuf, len);
+			uint8_t *data = ATOM_DATA(atom);
+			if (NABUCTL_TYPE(tag) == NABUCTL_TYPE_BOOL) {
+				const bool *bp = vbuf;
+				data[0] = !!(*bp);
+			} else {
+				memcpy(data, vbuf, len);
+			}
 		}
 		TAILQ_INSERT_TAIL(&list->list, atom, link);
 		list->count++;
