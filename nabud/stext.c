@@ -535,7 +535,8 @@ static const struct stext_fileops stext_fileops_shadow = {
  */
 int
 stext_file_open(struct stext_context *ctx, const char *filename,
-    uint8_t reqslot, struct fileio_attrs *attrs, struct stext_file **outfp)
+    uint8_t reqslot, struct fileio_attrs *attrs, int oflags,
+    struct stext_file **outfp)
 {
 	struct stext_file *f = NULL;
 	struct fileio *fileio = NULL;
@@ -553,16 +554,15 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 	}
 
 	log_debug("[%s] Opening '%s'", conn_name(ctx->conn), filename);
-	fileio = fileio_open(filename,
-	    FILEIO_O_CREAT | FILEIO_O_LOCAL_ROOT | FILEIO_O_RDWR,
+	fileio = fileio_open(filename, FILEIO_O_LOCAL_ROOT | oflags,
 	    ctx->conn->file_root, attrs);
 	if (fileio == NULL) {
 		/*
 		 * Try opening read-only.  If that succeeds, then we just
 		 * allocate a shadow file.
 		 */
-		fileio = fileio_open(filename,
-		    FILEIO_O_LOCAL_ROOT | FILEIO_O_RDONLY,
+		oflags = (oflags & ~FILEIO_O_RDWR) | FILEIO_O_RDONLY;
+		fileio = fileio_open(filename, FILEIO_O_LOCAL_ROOT | oflags,
 		    ctx->conn->file_root, attrs);
 		if (fileio != NULL) {
 			log_debug("[%s] Need R/W shadow buffer for '%s'",

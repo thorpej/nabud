@@ -180,7 +180,8 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 
 	error = stext_file_open(&ctx->stext,
 	    (const char *)ctx->request.storage_open.url_string,
-	    ctx->request.storage_open.req_slot, &attrs, &f);
+	    ctx->request.storage_open.req_slot, &attrs,
+	    FILEIO_O_CREAT | FILEIO_O_RDWR, &f);
 
 	if (error != 0) {
 		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));

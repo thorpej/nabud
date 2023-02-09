@@ -41,7 +41,7 @@ void	stext_context_fini(struct stext_context *);
 struct stext_file *stext_file_find(struct stext_context *, uint8_t);
 
 int	stext_file_open(struct stext_context *, const char *, uint8_t,
-	    struct fileio_attrs *, struct stext_file **);
+	    struct fileio_attrs *, int, struct stext_file **);
 uint8_t	stext_file_slot(struct stext_file *);
 void	stext_file_close(struct stext_file *);
 int	stext_file_read(struct stext_file *, void *, uint16_t *);

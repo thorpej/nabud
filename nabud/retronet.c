@@ -293,16 +293,18 @@ rn_req_file_open(struct retronet_context *ctx)
 	/* Have all the args -- we can safely NUL-terminate the name. */
 	fname[fnamelen] = '\0';
 
-	/* XXX consume flags */
-	(void)flags;
+	int fileio_flags = (flags & RN_FILE_OPEN_RW) ?
+	    FILEIO_O_RDWR : FILEIO_O_RDONLY;
 
-	error = stext_file_open(&ctx->stext, fname, reqslot, &attrs, &f);
+	error = stext_file_open(&ctx->stext, fname, reqslot, &attrs,
+	    FILEIO_O_CREAT | fileio_flags, &f);
 	if (error == EBUSY) {
 		/*
 		 * The RetroNet API says to treat a busy requested
 		 * slot as "ok, then just allocate one.".  &shrug;
 		 */
-		error = stext_file_open(&ctx->stext, fname, 0xff, &attrs, &f);
+		error = stext_file_open(&ctx->stext, fname, 0xff, &attrs,
+		    FILEIO_O_CREAT | fileio_flags, &f);
 	}
 
 	/*
