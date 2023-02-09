@@ -269,6 +269,9 @@ struct rn_file_list_req {
 	uint8_t		ugh[1 + 255 + 1 + 255 + 1];
 };
 
+#define	RN_FILE_LIST_FILES	0x01
+#define	RN_FILE_LIST_DIRS	0x02
+
 struct rn_file_list_repl {
 	uint8_t		matchCount[2];
 };
