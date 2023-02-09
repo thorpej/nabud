@@ -29,6 +29,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -105,8 +106,6 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
     uint8_t **cursorp, char **fnamep, uint8_t *fnamelenp)
 {
 	uint8_t *bp = *cursorp;
-	char *cp /* , *endcp */;
-	uint8_t len;
 
 	/* First we have to get the file name length. */
 	if (! conn_recv_byte(conn, bp)) {
@@ -114,7 +113,7 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 		    conn_name(conn), which);
 		return ETIMEDOUT;
 	}
-	len = *bp++;
+	uint8_t len = *bp++;
 
 	/* Now we can receive the file name itself. */
 	if (! conn_recv(conn, bp, len)) {
@@ -122,13 +121,32 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 		    conn_name(conn), which);
 		return ETIMEDOUT;
 	}
-	cp = (char *)bp;
-	/* endcp = cp + len; */
-	bp += len;
-
-	*cursorp = bp;
-	*fnamep = cp;
+	*fnamep = (char *)bp;
 	*fnamelenp = len;
+	*cursorp = bp + len;
+
+	/*
+	 * Normalize the pathname according to the RetroNet rules (ugh):
+	 *
+	 *	- All file names are mapped to upper-case.  While
+	 *	  not explicitly stated, we assume this also means
+	 *	  all path components (sans the configured file-root).
+	 *
+	 *	- Local path delimeters are \ BECAUSE OF COURSE THEY ARE,
+	 *	  so we have to map those to /.
+	 *
+	 * Note that there is no provision for creating directories in
+	 * the RetroNet protocol, and nabud restricts file access to a
+	 * specific file-root, so the likelihood of actually encountering
+	 * anything other than a plan old file name is pretty low.
+	 */
+	for (char *cp = (char *)bp; cp < (char *)bp + len; cp++) {
+		if (*cp == '\\') {
+			*cp = '/';
+		} else if (islower((unsigned char)*cp)) {
+			*cp = toupper((unsigned char)*cp);
+		}
+	}
 
 	return 0;
 }
