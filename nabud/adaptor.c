@@ -82,6 +82,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "conn.h"
 #include "image.h"
 #include "nhacp.h"
+#include "retronet.h"
 
 static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;
 static const uint8_t nabu_msg_finished[] = NABU_MSGSEQ_FINISHED;
@@ -368,6 +369,11 @@ adaptor_send_time(struct nabu_connection *conn)
 static void
 adaptor_msg_reset(struct nabu_connection *conn)
 {
+	if (conn->retronet != NULL) {
+		log_info("[%s] Clearing previous RetroNet state.",
+		    conn_name(conn));
+		retronet_conn_fini(conn);
+	}
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
 	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
