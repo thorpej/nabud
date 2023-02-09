@@ -1075,6 +1075,11 @@ retronet_request(struct nabu_connection *conn, uint8_t msg)
 	struct retronet_context *ctx;
 	uint8_t idx = HANDLER_INDEX(msg);
 
+	if (! NABU_MSG_IS_RETRONET(msg)) {
+		/* Not a RetroNet message. */
+		return false;
+	}
+
 	if (! conn->retronet_enabled) {
 		log_debug("[%s] RetroNet is not enabled.",
 		    conn_name(conn));
@@ -1085,7 +1090,7 @@ retronet_request(struct nabu_connection *conn, uint8_t msg)
 	    retronet_request_types[idx].handler == NULL) {
 		log_error("[%s] Unknown RetroNet request type 0x%02x.",
 		    conn_name(conn), msg);
-		return true;
+		return false;
 	}
 
 	if ((ctx = conn->retronet) == NULL) {

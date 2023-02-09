@@ -574,6 +574,53 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	conn_send_byte(conn, NABU_STATE_CONFIRMED);
 }
 
+#define	HANDLER_INDEX(v)	((v) - NABU_MSG_CLASSIC_FIRST)
+#define	HANDLER_ENTRY(v, n)						\
+	[HANDLER_INDEX(v)] = {						\
+		.handler    = adaptor_msg_ ## n ,			\
+		.debug_desc = #v ,					\
+	}
+
+static const struct {
+	void		(*handler)(struct nabu_connection *);
+	const char	*debug_desc;
+} adaptor_msg_types[] = {
+	HANDLER_ENTRY(NABU_MSG_RESET,          reset),
+	HANDLER_ENTRY(NABU_MSG_MYSTERY,        mystery),
+	HANDLER_ENTRY(NABU_MSG_GET_STATUS,     get_status),
+	HANDLER_ENTRY(NABU_MSG_START_UP,       start_up),
+	HANDLER_ENTRY(NABU_MSG_PACKET_REQUEST, packet_request),
+	HANDLER_ENTRY(NABU_MSG_CHANGE_CHANNEL, change_channel),
+};
+static const unsigned int adaptor_msg_type_count =
+    sizeof(adaptor_msg_types) / sizeof(adaptor_msg_types[0]);
+
+/*
+ * adaptor_msg_classic --
+ *	Check for and process a classic NABU message.
+ */
+static bool
+adaptor_msg_classic(struct nabu_connection *conn, uint8_t msg)
+{
+	if (! NABU_MSG_IS_CLASSIC(msg)) {
+		/* Not a classic NABU message. */
+		return false;
+	}
+
+	uint8_t idx = HANDLER_INDEX(msg);
+	if (idx > adaptor_msg_type_count ||
+	    adaptor_msg_types[idx].handler == NULL) {
+		log_error("[%s] Unknown classic message type 0x%02x.",
+		    conn_name(conn), msg);
+		return false;
+	}
+
+	log_debug("[%s] Got %s.", conn_name(conn),
+	    adaptor_msg_types[idx].debug_desc);
+	(*adaptor_msg_types[idx].handler)(conn);
+	return true;
+}
+
 /*
  * adaptor_event_loop --
  *	Main event loop for the Adaptor emulation.
@@ -617,58 +664,25 @@ adaptor_event_loop(struct nabu_connection *conn)
 		 */
 		conn_start_watchdog(conn, 10);
 
-		switch (msg) {
-		case 0:
-			log_debug("[%s] Got mystery message 0x%02x.",
-			    conn_name(conn), msg);
-			continue;
-
-		default:
-			log_error("[%s] Got unexpected message 0x%02x.",
-			    conn_name(conn), msg);
-			continue;
-
-		case NABU_MSG_RESET:
-			log_debug("[%s] Got NABU_MSG_RESET.",
-			    conn_name(conn));
-			adaptor_msg_reset(conn);
-			continue;
-
-		case NABU_MSG_MYSTERY:
-			log_debug("[%s] Got NABU_MSG_MYSTERY.",
-			    conn_name(conn));
-			adaptor_msg_mystery(conn);
-			continue;
-
-		case NABU_MSG_GET_STATUS:
-			log_debug("[%s] Got NABU_MSG_GET_STATUS.",
-			    conn_name(conn));
-			adaptor_msg_get_status(conn);
-			continue;
-
-		case NABU_MSG_START_UP:
-			log_debug("[%s] Got NABU_MSG_START_UP.",
-			    conn_name(conn));
-			adaptor_msg_start_up(conn);
-			continue;
-
-		case NABU_MSG_PACKET_REQUEST:
-			log_debug("[%s] Got NABU_MSG_PACKET_REQUEST.",
-			    conn_name(conn));
-			adaptor_msg_packet_request(conn);
-			continue;
-
-		case NABU_MSG_CHANGE_CHANNEL:
-			log_debug("[%s] Got NABU_MSG_CHANGE_CHANNEL.",
-			    conn_name(conn));
-			adaptor_msg_change_channel(conn);
-			continue;
-
-		case NABU_MSG_START_NHACP:
-			log_debug("[%s] Got NABU_MSG_START_NHACP.",
-			    conn_name(conn));
-			nhacp_start(conn);
+		/* First check for a classic message. */
+		if (adaptor_msg_classic(conn, msg)) {
+			/* Yup! */
 			continue;
 		}
+
+		/* Check for a RetroNet request. */
+		if (retronet_request(conn, msg)) {
+			/* Yup! */
+			continue;
+		}
+
+		/* Check for NHACP mode. */
+		if (nhacp_start(conn, msg)) {
+			/* Yup! */
+			continue;
+		}
+
+		log_error("[%s] Got unexpected message 0x%02x.",
+		    conn_name(conn), msg);
 	}
 }

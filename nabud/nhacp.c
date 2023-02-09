@@ -418,20 +418,27 @@ nhacp_request(struct nhacp_context *ctx)
  * nhacp_start --
  *	Enter NHACP mode on this connection.
  */
-void
-nhacp_start(struct nabu_connection *conn)
+bool
+nhacp_start(struct nabu_connection *conn, uint8_t msg)
 {
-	struct nhacp_context *ctx = nhacp_context_alloc(conn);
+	struct nhacp_context *ctx;
 	extern char nabud_version[];
 	uint16_t reqlen;
 	ssize_t minlen;
+
+	if (msg != NABU_MSG_START_NHACP) {
+		/* Not a NHACP start message. */
+		return false;
+	}
 
 	/*
 	 * If we failed to allocate a context, just don't send
 	 * a reply -- act as if this were an unrecognized message.
 	 */
-	if (ctx == NULL) {
-		return;
+	if ((ctx = nhacp_context_alloc(conn)) == NULL) {
+		log_error("[%s] Failed to allocate NHACP context.",
+		    conn_name(conn));
+		return true;
 	}
 
 	/*
@@ -553,4 +560,5 @@ nhacp_start(struct nabu_connection *conn)
 
 	log_info("[%s] Exiting NHACP mode.", conn_name(conn));
 	nhacp_context_free(ctx);
+	return true;
 }
