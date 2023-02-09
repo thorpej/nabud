@@ -77,11 +77,20 @@ struct image_add_source_args {
 	char		*root;
 };
 
+struct image_add_channel_args {
+	image_channel_type type;
+	char		*name;
+	char		*source;
+	const char	*relpath;
+	char		*list_url;
+	char		*default_file;
+	unsigned int	number;
+};
+
 struct nabu_connection;
 
 void	image_add_source(const struct image_add_source_args *);
-void	image_add_channel(image_channel_type, char *, char *, const char *,
-	    char *, char *, unsigned int);
+void	image_add_channel(const struct image_add_channel_args *);
 
 struct image_channel *image_channel_lookup(unsigned int);
 bool	image_channel_enumerate(bool (*)(struct image_channel *, void *),

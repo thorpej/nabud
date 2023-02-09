@@ -215,23 +215,22 @@ image_channel_enumerate(bool (*func)(struct image_channel *, void *), void *ctx)
  *	Add a channel.
  */
 void
-image_add_channel(image_channel_type type, char *name, char *source,
-    const char *relpath, char *list_url, char *default_file,
-    unsigned int number)
+image_add_channel(const struct image_add_channel_args *args)
 {
 	struct image_channel *chan = NULL;
 	size_t pathlen;
 	char *pathstr = NULL;
+	const char *relpath = args->relpath;
 
-	struct image_source *imgsrc = image_source_lookup(source);
+	struct image_source *imgsrc = image_source_lookup(args->source);
 	if (imgsrc == NULL) {
-		log_error("Unknown image source: %s", source);
+		log_error("Unknown image source: %s", args->source);
 		goto bad;
 	}
 
-	if ((chan = image_channel_lookup(number)) != NULL) {
+	if ((chan = image_channel_lookup(args->number)) != NULL) {
 		log_error("Channel %u already exists (%s on %s).",
-		    number, chan->name, chan->source->name);
+		    args->number, chan->name, chan->source->name);
 		goto bad;
 	}
 
@@ -245,25 +244,25 @@ image_add_channel(image_channel_type type, char *name, char *source,
 		}
 	}
 	if (relpath == NULL) {
-		relpath = name;
+		relpath = args->name;
 	}
 	pathlen = strlen(relpath) + strlen(imgsrc->root) + 2; /* / + NUL */
 	chan = calloc(1, sizeof(*chan));
 	pathstr = malloc(pathlen);
 	if (chan == NULL || pathstr == NULL) {
 		log_error("Unable to allocate descriptor for channel %u.",
-		    number);
+		    args->number);
 		goto bad;
 	}
 	snprintf(pathstr, pathlen, "%s/%s", imgsrc->root, relpath);
 
 	chan->source = imgsrc;
-	chan->type = type;
-	chan->name = name;
+	chan->type = args->type;
+	chan->name = args->name;
 	chan->path = pathstr;
-	chan->list_url = list_url;
-	chan->default_file = default_file;
-	chan->number = number;
+	chan->list_url = args->list_url;
+	chan->default_file = args->default_file;
+	chan->number = args->number;
 	TAILQ_INSERT_TAIL(&image_channels, chan, link);
 	image_channel_count++;
 	log_info("Adding %s channel %u (%s on %s) at %s",
@@ -285,8 +284,14 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	if (pathstr != NULL) {
 		free(pathstr);
 	}
-	free(name);
-	free(source);
+	free(args->name);
+	free(args->source);
+	if (args->list_url != NULL) {
+		free(args->list_url);
+	}
+	if (args->default_file) {
+		free(args->default_file);
+	}
 }
 
 /*

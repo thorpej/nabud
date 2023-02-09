@@ -79,9 +79,8 @@ config_load_channel(mj_t *atom)
 {
 	mj_t *name_atom, *number_atom, *type_atom, *source_atom, *path_atom,
 	    *list_url_atom, *default_file_atom;
-	char *name = NULL, *number = NULL, *type = NULL, *source = NULL,
-	    *path = NULL, *list_url = NULL, *default_file = NULL;
-	image_channel_type ictype;
+	char *type = NULL, *number = NULL, *path = NULL;
+	struct image_add_channel_args args = { };
 	long val;
 
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
@@ -95,7 +94,7 @@ config_load_channel(mj_t *atom)
 		    atom);
 		goto out;
 	}
-	mj_asprint(&name, name_atom, MJ_HUMAN);
+	mj_asprint(&args.name, name_atom, MJ_HUMAN);
 
 	number_atom = mj_get_atom(atom, "Number");
 	if (! VALID_ATOM(number_atom, MJ_NUMBER)) {
@@ -110,6 +109,7 @@ config_load_channel(mj_t *atom)
 		    atom);
 		goto out;
 	}
+	args.number = (unsigned int)val;
 
 	type_atom = mj_get_atom(atom, "Type");
 	if (! VALID_ATOM(type_atom, MJ_STRING)) {
@@ -119,9 +119,9 @@ config_load_channel(mj_t *atom)
 	}
 	mj_asprint(&type, type_atom, MJ_HUMAN);
 	if (strcasecmp(type, "pak") == 0) {
-		ictype = IMAGE_CHANNEL_PAK;
+		args.type = IMAGE_CHANNEL_PAK;
 	} else if (strcasecmp(type, "nabu") == 0) {
-		ictype = IMAGE_CHANNEL_NABU;
+		args.type = IMAGE_CHANNEL_NABU;
 	} else {
 		config_error("Channel Type must be pak or nabu", atom);
 		goto out;
@@ -132,7 +132,7 @@ config_load_channel(mj_t *atom)
 		config_error("Invalid or missing Source in Channel object",
 		    atom);
 	}
-	mj_asprint(&source, source_atom, MJ_HUMAN);
+	mj_asprint(&args.source, source_atom, MJ_HUMAN);
 
 	/*
 	 * Optional Path -- specifies a path relative to the
@@ -141,6 +141,7 @@ config_load_channel(mj_t *atom)
 	path_atom = mj_get_atom(atom, "Path");
 	if (VALID_ATOM(path_atom, MJ_STRING)) {
 		mj_asprint(&path, path_atom, MJ_HUMAN);
+		args.relpath = path;
 	}
 
 	/*
@@ -149,7 +150,7 @@ config_load_channel(mj_t *atom)
 	 */
 	list_url_atom = mj_get_atom(atom, "ListURL");
 	if (VALID_ATOM(list_url_atom, MJ_STRING)) {
-		mj_asprint(&list_url, list_url_atom, MJ_HUMAN);
+		mj_asprint(&args.list_url, list_url_atom, MJ_HUMAN);
 	}
 
 	/*
@@ -158,17 +159,16 @@ config_load_channel(mj_t *atom)
 	 */
 	default_file_atom = mj_get_atom(atom, "DefaultFile");
 	if (VALID_ATOM(default_file_atom, MJ_STRING)) {
-		mj_asprint(&default_file, default_file_atom, MJ_HUMAN);
+		mj_asprint(&args.default_file, default_file_atom, MJ_HUMAN);
 	}
 
-	image_add_channel(ictype, name, source, path, list_url, default_file,
-	    val);
+	image_add_channel(&args);
 	/* image_add_channel() owns these */
-	name = source = list_url = default_file = NULL;
+	args.name = args.source = args.list_url = args.default_file = NULL;
 
  out:
-	if (name != NULL) {
-		free(name);
+	if (args.name != NULL) {
+		free(args.name);
 	}
 	if (number != NULL) {
 		free(number);
@@ -176,14 +176,17 @@ config_load_channel(mj_t *atom)
 	if (type != NULL) {
 		free(type);
 	}
-	if (source != NULL) {
-		free(source);
+	if (args.source != NULL) {
+		free(args.source);
 	}
 	if (path != NULL) {
 		free(path);
 	}
-	if (list_url != NULL) {
-		free(list_url);
+	if (args.list_url != NULL) {
+		free(args.list_url);
+	}
+	if (args.default_file != NULL) {
+		free(args.default_file);
 	}
 }
 
