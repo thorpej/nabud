@@ -191,7 +191,7 @@ static void
 config_load_source(mj_t *atom)
 {
 	mj_t *name_atom, *loc_atom;
-	char *name = NULL, *loc = NULL;
+	struct image_add_source_args args = { };
 
 	if (! VALID_ATOM(atom, MJ_OBJECT)) {
 		config_error("Invalid Source object", atom);
@@ -204,7 +204,7 @@ config_load_source(mj_t *atom)
 		    atom);
 		goto out;
 	}
-	mj_asprint(&name, name_atom, MJ_HUMAN);
+	mj_asprint(&args.name, name_atom, MJ_HUMAN);
 
 	loc_atom = mj_get_atom(atom, "Location");
 	if (! VALID_ATOM(loc_atom, MJ_STRING)) {
@@ -212,18 +212,19 @@ config_load_source(mj_t *atom)
 		    atom);
 		goto out;
 	}
-	mj_asprint(&loc, loc_atom, MJ_HUMAN);
+	mj_asprint(&args.root, loc_atom, MJ_HUMAN);
 
-	image_add_source(name, loc);
+	image_add_source(&args);
 	/* image_add_source() owns these. */
-	name = loc = NULL;
+	args.name = NULL;
+	args.root = NULL;
 
  out:
-	if (name != NULL) {
-		free(name);
+	if (args.name != NULL) {
+		free(args.name);
 	}
-	if (loc != NULL) {
-		free(loc);
+	if (args.root != NULL) {
+		free(args.root);
 	}
 }
 

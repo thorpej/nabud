@@ -72,9 +72,14 @@ struct nabu_image {
 	bool		cached;
 };
 
+struct image_add_source_args {
+	char		*name;
+	char		*root;
+};
+
 struct nabu_connection;
 
-void	image_add_source(char *, char *);
+void	image_add_source(const struct image_add_source_args *);
 void	image_add_channel(image_channel_type, char *, char *, const char *,
 	    char *, char *, unsigned int);
 

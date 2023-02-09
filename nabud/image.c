@@ -150,30 +150,30 @@ image_source_lookup(const char *name)
  *	Add an image source.
  */
 void
-image_add_source(char *name, char *root)
+image_add_source(const struct image_add_source_args *args)
 {
-	if (image_source_lookup(name) != NULL) {
-		log_error("Image source %s alreadty exists.", name);
+	if (image_source_lookup(args->name) != NULL) {
+		log_error("Image source %s alreadty exists.", args->name);
 		goto bad;
 	}
 
 	struct image_source *imgsrc = calloc(1, sizeof(*imgsrc));
 	if (imgsrc != NULL) {
-		imgsrc->name = name;
-		imgsrc->root = root;
+		imgsrc->name = args->name;
+		imgsrc->root = args->root;
 		LIST_INSERT_HEAD(&image_sources, imgsrc, link);
 		image_source_count++;
 		log_info("Adding Source %s at %s",
 		    imgsrc->name, imgsrc->root);
 	} else {
 		log_error("Unable to allocate image source descriptor for %s",
-		    name);
+		    args->name);
 		goto bad;
 	}
 	return;
  bad:
-	free(name);
-	free(root);
+	free(args->name);
+	free(args->root);
 }
 
 /*
