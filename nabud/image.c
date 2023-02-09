@@ -263,6 +263,7 @@ image_add_channel(const struct image_add_channel_args *args)
 	chan->list_url = args->list_url;
 	chan->default_file = args->default_file;
 	chan->number = args->number;
+	chan->retronet_enabled = args->retronet_enabled;
 	TAILQ_INSERT_TAIL(&image_channels, chan, link);
 	image_channel_count++;
 	log_info("Adding %s channel %u (%s on %s) at %s",
@@ -275,6 +276,10 @@ image_add_channel(const struct image_add_channel_args *args)
 	if (chan->default_file != NULL) {
 		log_info("Channel %u will default to '%s' for image 000001.",
 		    chan->number, chan->default_file);
+	}
+	if (chan->retronet_enabled) {
+		log_info("Channel %u has RetroNet enabled.",
+		    chan->number);
 	}
 	return;
  bad:

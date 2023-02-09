@@ -78,7 +78,7 @@ static void
 config_load_channel(mj_t *atom)
 {
 	mj_t *name_atom, *number_atom, *type_atom, *source_atom, *path_atom,
-	    *list_url_atom, *default_file_atom;
+	    *list_url_atom, *default_file_atom, *rn_enabled_atom;
 	char *type = NULL, *number = NULL, *path = NULL;
 	struct image_add_channel_args args = { };
 	long val;
@@ -160,6 +160,15 @@ config_load_channel(mj_t *atom)
 	default_file_atom = mj_get_atom(atom, "DefaultFile");
 	if (VALID_ATOM(default_file_atom, MJ_STRING)) {
 		mj_asprint(&args.default_file, default_file_atom, MJ_HUMAN);
+	}
+
+	/*
+	 * Optional RetroNetExtensions -- specifies whether or not
+	 * RetroNet extensions are enabled for this channel.
+	 */
+	rn_enabled_atom = mj_get_atom(atom, "RetroNetExtensions");
+	if (VALID_ATOM(rn_enabled_atom, MJ_TRUE)) {
+		args.retronet_enabled = true;
 	}
 
 	image_add_channel(&args);

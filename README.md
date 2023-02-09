@@ -483,6 +483,7 @@ And you can select a file to loaded wnen the NABU boots and requests image
   development a bit easier as there is no need to manually clear the cache
   each time a new image is dropped into a local channel being used for
   that purpose.
+* Added support for NabuRetroNet protocol extensions version _v2023.02.03.00_.
 
 ### nabud-1.0
 * Added support for the NABU HCCA Application Communication Protocol.  This

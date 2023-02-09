@@ -86,6 +86,7 @@ struct image_add_channel_args {
 	char		*list_url;
 	char		*default_file;
 	unsigned int	number;
+	bool		retronet_enabled;
 };
 
 struct nabu_connection;
