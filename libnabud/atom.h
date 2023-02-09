@@ -72,8 +72,8 @@ bool		atom_list_append(struct atom_list *, uint32_t,
 		    const void *, size_t);
 bool		atom_list_append_string(struct atom_list *, uint32_t,
 		    const char *);
-bool		atom_list_append_number(struct atom_list *, uint32_t,
-		    uint64_t);
+bool		atom_list_append_number(struct atom_list *, uint32_t, uint64_t);
+bool		atom_list_append_bool(struct atom_list *, uint32_t, bool);
 bool		atom_list_append_void(struct atom_list *, uint32_t);
 bool		atom_list_append_done(struct atom_list *);
 bool		atom_list_append_error(struct atom_list *);

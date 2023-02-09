@@ -429,6 +429,17 @@ atom_list_append_number(struct atom_list *list, uint32_t tag, uint64_t val)
 }
 
 /*
+ * atom_list_append_bool --
+ *	Convenience wrapper around atom_list_append().
+ */
+bool
+atom_list_append_bool(struct atom_list *list, uint32_t tag, bool val)
+{
+	assert(NABUCTL_TYPE(tag) == NABUCTL_TYPE_BOOL);
+	return atom_list_append(list, tag, &val, 1);
+}
+
+/*
  * atom_list_append_void --
  *	Convenience wrapper around atom_list_append().
  */
