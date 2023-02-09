@@ -140,6 +140,8 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 	 * specific file-root, so the likelihood of actually encountering
 	 * anything other than a plan old file name is pretty low.
 	 */
+	log_debug("[%s] %s before normalization: '%*s'",
+	    conn_name(conn), which, (int)len, *fnamep);
 	for (char *cp = (char *)bp; cp < (char *)bp + len; cp++) {
 		if (*cp == '\\') {
 			*cp = '/';
@@ -147,6 +149,8 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 			*cp = toupper((unsigned char)*cp);
 		}
 	}
+	log_debug("[%s] %s after normalization: '%*s'",
+	    conn_name(conn), which, (int)len, *fnamep);
 
 	return 0;
 }
