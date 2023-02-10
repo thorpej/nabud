@@ -79,6 +79,7 @@ struct fileio {
 	union {
 		struct {
 			int fd;
+			bool is_directory;
 		} local;
 		struct {
 			fetchIO *fio;
@@ -343,14 +344,30 @@ fileio_local_io_open(struct fileio *f, const char *location,
 		return false;
 	}
 
-	/* Allow only regular files. */
+	/*
+	 * Only regular files, unless the caller says they're OK
+	 * opening a directory (probably for a getattr call later).
+	 */
 	struct stat sb;
-	if (fstat(f->local.fd, &sb) < 0 || !S_ISREG(sb.st_mode)) {
-		close(f->local.fd);
-		return false;
+	if (fstat(f->local.fd, &sb) < 0) {
+		goto bad;
+	}
+	if (S_ISDIR(sb.st_mode)) {
+		if (f->flags & FILEIO_O_DIROK) {
+			f->local.is_directory = true;
+		} else {
+			errno = EISDIR;
+			goto bad;
+		}
+	} else if (!S_ISREG(sb.st_mode)) {
+		errno = EPERM;
+		goto bad;
 	}
 
 	return true;
+ bad:
+	close(f->local.fd);
+	return false;
 }
 
 static bool
@@ -374,7 +391,7 @@ fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 	attrs->size = sb.st_size;
 	attrs->mtime = sb.st_mtime;
 	attrs->btime = 0;		/* XXX HAVE_STAT_ST_BIRTHTIME */
-	attrs->is_directory = !!S_ISDIR(sb.st_mode);
+	attrs->is_directory = f->local.is_directory;
 	attrs->is_writable = access(f->location, R_OK | W_OK) == 0;
 	attrs->is_seekable = true;
 	attrs->is_local = true;
@@ -393,30 +410,51 @@ fileio_local_io_close(struct fileio *f)
 static off_t
 fileio_local_io_seek(struct fileio *f, off_t offset, int whence)
 {
+	if (f->local.is_directory) {
+		/* XXX rewinddir()? */
+		errno = EISDIR;
+		return -1;
+	}
 	return lseek(f->local.fd, offset, whence);
 }
 
 static bool
 fileio_local_io_truncate(struct fileio *f, off_t size)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return false;
+	}
 	return ftruncate(f->local.fd, size) == 0;
 }
 
 static ssize_t
 fileio_local_io_read(struct fileio *f, void *buf, size_t len)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return read(f->local.fd, buf, len);
 }
 
 static ssize_t
 fileio_local_io_write(struct fileio *f, const void *buf, size_t len)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return write(f->local.fd, buf, len);
 }
 
 static ssize_t
 fileio_local_io_pread(struct fileio *f, void *buf, size_t len, off_t offset)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return pread(f->local.fd, buf, len, offset);
 }
 
@@ -424,6 +462,10 @@ static ssize_t
 fileio_local_io_pwrite(struct fileio *f, const void *buf, size_t len,
     off_t offset)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return pwrite(f->local.fd, buf, len, offset);
 }
 
