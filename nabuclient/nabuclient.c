@@ -645,14 +645,12 @@ rn_set_uint32(uint32_t val)
 	rn_cursor += 4;
 }
 
-#if 0
 static void
 rn_set_blob(void *blob, uint16_t bloblen)
 {
 	memcpy(rn_cursor, blob, bloblen);
 	rn_cursor += bloblen;
 }
-#endif
 
 static void
 rn_set_filename(const char *name)
@@ -799,6 +797,82 @@ command_rn_fh_close(int argc, char *argv[])
 
 	printf("Sending: NABU_MSG_RN_FH_CLOSE.\n");
 	rn_send(NABU_MSG_RN_FH_CLOSE);
+
+	return false;
+}
+
+static bool
+command_rn_file_size(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+
+	printf("Sending: NABU_MSG_RN_FILE_SIZE.\n");
+	rn_send(NABU_MSG_RN_FILE_SIZE);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_size));
+
+	printf("--> Size %d <--\n",
+	    (int32_t)nabu_get_uint32(rn_buf.reply.file_size.fileSize));
+
+	return false;
+}
+
+static bool
+command_rn_fh_append(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint16_t length = (uint16_t)strlen(argv[2]);
+
+	rn_set_uint8(slot);
+	rn_set_uint16(length);
+	rn_set_blob(argv[2], length);
+
+	printf("Sending: NABU_MSG_RN_FH_APPEND.\n");
+	rn_send(NABU_MSG_RN_FH_APPEND);
+
+	return false;
+}
+
+/* XXX FH-INSERT */
+
+/* XXX FH-DELETE-RANGE */
+
+static bool
+command_rn_fh_replace(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
+	uint16_t length = (uint16_t)strlen(argv[3]);
+
+	rn_set_uint8(slot);
+	rn_set_uint32(offset);
+	rn_set_uint16(length);
+	rn_set_blob(argv[3], length);
+
+	printf("Sending: NABU_MSG_RN_FH_REPLACE.\n");
+	rn_send(NABU_MSG_RN_FH_REPLACE);
 
 	return false;
 }
@@ -1093,6 +1167,9 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-fh-size",		.func = command_rn_fh_size },
 	{ .name = "rn-fh-read",		.func = command_rn_fh_read },
 	{ .name = "rn-fh-close",	.func = command_rn_fh_close },
+	{ .name = "rn-file-size",	.func = command_rn_file_size },
+	{ .name = "rn-fh-append",	.func = command_rn_fh_append },
+	{ .name = "rn-fh-replace",	.func = command_rn_fh_replace },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
