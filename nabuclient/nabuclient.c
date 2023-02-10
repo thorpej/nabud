@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -573,6 +573,39 @@ command_change_channel(int argc, char *argv[])
 	return false;
 }
 
+static uint8_t
+stext_parse_slot(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 255) {
+		printf("'%s' invalid; must be between 0 - 255\n", cp);
+		cli_throw();
+	}
+	return (uint8_t)val;
+}
+
+static uint32_t
+stext_parse_offset(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 0xffffffff) {
+		printf("'%s' invalid offset\n", cp);
+		cli_throw();
+	}
+	return (uint32_t)val;
+}
+
+static uint16_t
+stext_parse_length(const char *cp, size_t maxlen)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 0x7fff) {
+		printf("'%s' invalid length\n", cp);
+		cli_throw();
+	}
+	return (uint16_t)val;
+}
+
 static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
@@ -714,37 +747,10 @@ nhacp_decode_reply(void)
 	}
 }
 
-static uint8_t
-nhacp_parse_slot(const char *cp)
-{
-	long val = strtol(cp, NULL, 0);
-	if (val < 0 || val > 255) {
-		printf("'%s' invalid; must be between 0 - 255\n", cp);
-		cli_throw();
-	}
-	return (uint8_t)val;
-}
-
-static uint32_t
-nhacp_parse_offset(const char *cp)
-{
-	long val = strtol(cp, NULL, 0);
-	if (val < 0 || val > 0xffffffff) {
-		printf("'%s' invalid offset\n", cp);
-		cli_throw();
-	}
-	return (uint32_t)val;
-}
-
 static uint16_t
 nhacp_parse_length(const char *cp)
 {
-	long val = strtol(cp, NULL, 0);
-	if (val < 0 || val > 0x7fff) {
-		printf("'%s' invalid length\n", cp);
-		cli_throw();
-	}
-	return (uint16_t)val;
+	return stext_parse_length(cp, 0x7fff);
 }
 
 static bool
@@ -775,7 +781,7 @@ command_nhacp_storage_open(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t req_slot = nhacp_parse_slot(argv[1]);
+	uint8_t req_slot = stext_parse_slot(argv[1]);
 
 	nhacp_buf.request.storage_open.req_slot = req_slot;
 	nabu_set_uint16(nhacp_buf.request.storage_open.flags, 0);
@@ -798,8 +804,8 @@ command_nhacp_storage_get(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t slot = nhacp_parse_slot(argv[1]);
-	uint32_t offset = nhacp_parse_offset(argv[2]);
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
 	uint16_t length = nhacp_parse_length(argv[3]);
 
 	nhacp_buf.request.storage_get.slot = slot;
@@ -822,8 +828,8 @@ command_nhacp_storage_put(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t slot = nhacp_parse_slot(argv[1]);
-	uint32_t offset = nhacp_parse_offset(argv[2]);
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
 	uint16_t length = strlen(argv[3]);
 
 	nhacp_buf.request.storage_put.slot = slot;
@@ -847,7 +853,7 @@ command_nhacp_storage_close(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t slot = nhacp_parse_slot(argv[1]);
+	uint8_t slot = stext_parse_slot(argv[1]);
 
 	nhacp_buf.request.storage_close.slot = slot;
 
@@ -876,6 +882,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "quit",		.func = command_exit },
 
 	{ .name = "help",		.func = command_help },
+	{ .name = "?",			.func = command_help },
 
 	{ .name = "reset",		.func = command_reset },
 	{ .name = "start-up",		.func = command_start_up },
