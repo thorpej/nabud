@@ -87,6 +87,7 @@ atom_typedesc(uint32_t tag)
 	case NABUCTL_TYPE_STRING:	return "STRING";
 	case NABUCTL_TYPE_NUMBER:	return "NUMBER";
 	case NABUCTL_TYPE_BLOB:		return "BLOB";
+	case NABUCTL_TYPE_BOOL:		return "BOOL";
 	default:			return "???";
 	}
 }
