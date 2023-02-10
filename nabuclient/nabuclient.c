@@ -973,6 +973,31 @@ command_rn_file_details(int argc, char *argv[])
 	return false;
 }
 
+static bool
+command_rn_fh_details(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	rn_set_uint8(slot);
+
+	printf("Sending: NABU_MSG_RN_FH_DETAILS.\n");
+	rn_send(NABU_MSG_RN_FH_DETAILS);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_details));
+
+	print_rn_file_details(&rn_buf.reply.fh_details);
+
+	return false;
+}
+
 static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
@@ -1269,6 +1294,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-file-delete",	.func = command_rn_file_delete },
 	{ .name = "rn-file-move",	.func = command_rn_file_move },
 	{ .name = "rn-file-details",	.func = command_rn_file_details },
+	{ .name = "rn-fh-details",	.func = command_rn_fh_details },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
