@@ -877,6 +877,52 @@ command_rn_fh_replace(int argc, char *argv[])
 	return false;
 }
 
+static bool
+command_rn_file_delete(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+
+	printf("Sending: NABU_MSG_RN_FILE_DELETE.\n");
+	rn_send(NABU_MSG_RN_FILE_DELETE);
+
+	return false;
+}
+
+/* XXX RN-FILE-COPY */
+
+static bool
+command_rn_file_move(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t flags = 0;
+
+	if (argc > 3 && strcmp(argv[3], "replace") == 0) {
+		flags |= RN_FILE_COPY_MOVE_REPLACE;
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+	rn_set_filename(argv[2]);
+	rn_set_uint8(flags);
+
+	printf("Sending: NABU_MSG_RN_FILE_MOVE.\n");
+	rn_send(NABU_MSG_RN_FILE_MOVE);
+
+	return false;
+}
+
 static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
@@ -1170,6 +1216,8 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-file-size",	.func = command_rn_file_size },
 	{ .name = "rn-fh-append",	.func = command_rn_fh_append },
 	{ .name = "rn-fh-replace",	.func = command_rn_fh_replace },
+	{ .name = "rn-file-delete",	.func = command_rn_file_delete },
+	{ .name = "rn-file-move",	.func = command_rn_file_move },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
