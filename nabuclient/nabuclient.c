@@ -42,6 +42,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <err.h>	/* XXX HAVE_ERR_H-ize, please */
+#include <limits.h>
 #include <netdb.h>
 #include <setjmp.h>
 #include <stdbool.h>
@@ -589,11 +590,22 @@ static uint32_t
 stext_parse_offset(const char *cp)
 {
 	long val = strtol(cp, NULL, 0);
-	if (val < 0 || val > 0xffffffff) {
+	if (val < 0 || val > UINT32_MAX) {
 		printf("'%s' invalid offset\n", cp);
 		cli_throw();
 	}
 	return (uint32_t)val;
+}
+
+static int32_t
+stext_parse_signed_offset(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < INT32_MIN || val > INT32_MAX) {
+		printf("'%s' invalid signed offset\n", cp);
+		cli_throw();
+	}
+	return (int32_t)val;
 }
 
 static uint16_t
@@ -1031,6 +1043,47 @@ command_rn_fh_readseq(int argc, char *argv[])
 	return false;
 }
 
+static bool
+command_rn_fh_seek(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	int32_t offset = stext_parse_signed_offset(argv[2]);
+	uint8_t whence;
+
+	if (strcmp(argv[3], "set") == 0) {
+		whence = RN_SEEK_SET;
+	} else if (strcmp(argv[3], "cur") == 0) {
+		whence = RN_SEEK_CUR;
+	} else if (strcmp(argv[3], "end") == 0) {
+		whence = RN_SEEK_END;
+	} else {
+		printf("lol, wut?\n");
+		cli_throw();
+	}
+
+	rn_set_uint8(slot);
+	rn_set_uint32((uint32_t)offset);
+	rn_set_uint8(whence);
+
+	printf("Sending: NABU_MSG_RN_FH_SEEK.\n");
+	rn_send(NABU_MSG_RN_FH_SEEK);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_seek));
+
+	printf("--> New offset: %u <--\n",
+	    nabu_get_uint32(rn_buf.reply.fh_seek.offset));
+
+	return false;
+}
+
 static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
@@ -1329,6 +1382,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-file-details",	.func = command_rn_file_details },
 	{ .name = "rn-fh-details",	.func = command_rn_fh_details },
 	{ .name = "rn-fh-readseq",	.func = command_rn_fh_readseq },
+	{ .name = "rn-fh-seek",		.func = command_rn_fh_seek },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
