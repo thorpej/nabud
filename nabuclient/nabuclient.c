@@ -998,6 +998,39 @@ command_rn_fh_details(int argc, char *argv[])
 	return false;
 }
 
+static bool
+command_rn_fh_readseq(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint16_t length = rn_parse_length(argv[2]);
+
+	rn_set_uint8(slot);
+	rn_set_uint16(length);
+
+	printf("Sending: NABU_MSG_RN_FH_READSEQ.\n");
+	rn_send(NABU_MSG_RN_FH_READSEQ);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_readseq.returnLength));
+
+	uint16_t retlen = nabu_get_uint16(rn_buf.reply.fh_readseq.returnLength);
+	printf("--> Return length %u <--\n", retlen);
+
+	if (retlen != 0) {
+		rn_recv(retlen);
+		printf("%*s\n", (int)retlen, rn_buf.reply.fh_readseq.data);
+	}
+
+	return false;
+}
+
 static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
@@ -1295,6 +1328,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-file-move",	.func = command_rn_file_move },
 	{ .name = "rn-file-details",	.func = command_rn_file_details },
 	{ .name = "rn-fh-details",	.func = command_rn_fh_details },
+	{ .name = "rn-fh-readseq",	.func = command_rn_fh_readseq },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
