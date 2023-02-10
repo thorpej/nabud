@@ -212,11 +212,15 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 	 * Open the file so we can get the size.  Yes, open.
 	 * This is necessary for remote files on the other
 	 * end of an HTTP connection, for example.
+	 *
+	 * It's OK to open a directory here, because we want to be able
+	 * to convey that information.
 	 */
-	f = fileio_open(fname, FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT,
+	f = fileio_open(fname,
+	    FILEIO_O_RDONLY | FILEIO_O_DIROK | FILEIO_O_LOCAL_ROOT,
 	    conn->file_root, attrs);
 	if (f == NULL) {
-		return ENOENT;
+		return errno;
 	}
 
 	/* Now have the attrs; close the file. */
