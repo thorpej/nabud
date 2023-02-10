@@ -923,6 +923,56 @@ command_rn_file_move(int argc, char *argv[])
 	return false;
 }
 
+static void
+print_rn_file_details(const struct rn_file_details *d)
+{
+	int namelen = d->name_length;
+	uint32_t size;
+
+	size = nabu_get_uint32(d->file_size);
+
+	printf("--> Name length: %u <--\n", d->name_length);
+	if (namelen > sizeof(d->name)) {
+		namelen = sizeof(d->name);
+	}
+	printf("--> '%*s' <--\n", namelen, d->name);
+	if (size == NR_ISDIR) {
+		printf("--> DIRECTORY!\n");
+	} else if (size == NR_NOENT) {
+		printf("--> ENOENT!\n");
+		return;
+	}
+	printf(" Created: %d-%d-%d %02d:%02d:%02d\n",
+	    nabu_get_uint16(d->c_year), d->c_month, d->c_day,
+	    d->c_hour, d->c_minute, d->c_second);
+	printf("Modified: %d-%d-%d %02d:%02d:%02d\n",
+	    nabu_get_uint16(d->m_year), d->m_month, d->m_day,
+	    d->m_hour, d->m_minute, d->m_second);
+}
+
+static bool
+command_rn_file_details(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+
+	printf("Sending: NABU_MSG_RN_FILE_DETAILS.\n");
+	rn_send(NABU_MSG_RN_FILE_DETAILS);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_details));
+
+	print_rn_file_details(&rn_buf.reply.file_details);
+
+	return false;
+}
+
 static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
@@ -1218,6 +1268,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-fh-replace",	.func = command_rn_fh_replace },
 	{ .name = "rn-file-delete",	.func = command_rn_file_delete },
 	{ .name = "rn-file-move",	.func = command_rn_file_move },
+	{ .name = "rn-file-details",	.func = command_rn_file_details },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
