@@ -176,6 +176,8 @@ rn_fileio_attrs_to_file_details(const char *location,
 	const char *fname = strrchr(location, '/');
 	if (fname == NULL) {
 		fname = location;
+	} else {
+		fname++;
 	}
 	size_t fnamelen = strlen(fname);
 	if (fnamelen > sizeof(d->name)) {
