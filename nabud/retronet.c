@@ -54,41 +54,6 @@
 #include "retronet.h"
 #include "stext.h"
 
-union retronet_request {
-	struct rn_file_open_req		file_open;
-	struct rn_fh_size_req		fh_size;
-	struct rn_fh_read_req		fh_read;
-	struct rn_fh_close_req		fh_close;
-	struct rn_file_size_req		file_size;
-	struct rn_fh_append_req		fh_append;
-	struct rn_fh_insert_req		fh_insert;
-	struct rn_fh_delete_range_req	fh_delete_range;
-	struct rn_fh_replace_req	fh_replace;
-	struct rn_fh_file_delete_req	file_delete;
-	struct rn_file_copy_req		file_copy;
-	struct rn_file_move_req		file_move;
-	struct rn_fh_truncate_req	fh_truncate;
-	struct rn_file_list_req		file_list;
-	struct rn_file_list_item_req	file_list_item;
-	struct rn_file_details_req	file_details;
-	struct rn_fh_details_req	fh_details;
-	struct rn_fh_readseq_req	fh_readseq;
-	struct rn_fh_seek_req		fh_seek;
-};
-
-union retronet_reply {
-	struct rn_file_open_repl	file_open;
-	struct rn_fh_size_repl		fh_size;
-	struct rn_fh_read_repl		fh_read;
-	struct rn_file_size_repl	file_size;
-	struct rn_file_list_repl	file_list;
-	struct rn_file_details		file_list_item;
-	struct rn_file_details		file_details;
-	struct rn_file_details		fh_details;
-	struct rn_fh_readseq_repl	fh_readseq;
-	struct rn_fh_seek_repl		fh_seek;
-};
-
 struct retronet_context {
 	struct stext_context stext;
 
