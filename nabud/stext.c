@@ -56,6 +56,7 @@ struct stext_file {
 	const struct stext_fileops *ops;
 	uint8_t		slot;
 	bool		linked;
+	bool		writable;
 
 	union {
 		struct {
@@ -541,6 +542,7 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 	struct stext_file *f = NULL;
 	struct fileio *fileio = NULL;
 	bool need_shadow = false;
+	bool want_write = (oflags & FILEIO_O_RDWR) == FILEIO_O_RDWR;
 	int error = 0;
 
 	*outfp = NULL;
@@ -624,6 +626,7 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		fileio = NULL;		/* file owns it now */
 		f->ops = &stext_fileops_fileio;
 	}
+	f->writable = want_write;
 
 	error = stext_file_insert(ctx, f, reqslot);
 	if (error != 0) {
@@ -690,6 +693,9 @@ stext_file_read(struct stext_file *f, void *vbuf, uint16_t *lengthp)
 int
 stext_file_write(struct stext_file *f, const void *vbuf, uint16_t length)
 {
+	if (! f->writable) {
+		return EBADF;
+	}
 	return (*f->ops->file_write)(f, vbuf, length);
 }
 
@@ -712,10 +718,12 @@ int
 stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
     uint16_t length)
 {
+	if (! f->writable) {
+		return EBADF;
+	}
 	if (length > f->ops->max_length - offset) {
 		return EFBIG;
 	}
-
 	return (*f->ops->file_pwrite)(f, vbuf, offset, length);
 }
 
