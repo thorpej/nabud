@@ -61,6 +61,7 @@
 #include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
 #include "libnabud/nhacp_proto.h"
+#include "libnabud/retronet_proto.h"
 
 static int	client_sock;
 
@@ -607,6 +608,202 @@ stext_parse_length(const char *cp, size_t maxlen)
 }
 
 static union {
+	union retronet_request request;
+	union retronet_reply reply;
+} rn_buf;
+static uint8_t *rn_cursor;
+
+static void
+rn_reset_cursor(void)
+{
+	rn_cursor = (uint8_t *)&rn_buf.request;
+}
+
+static size_t
+rn_length(void)
+{
+	return (size_t)(rn_cursor - (uint8_t *)&rn_buf.request);
+}
+
+static void
+rn_set_uint8(uint8_t val)
+{
+	*rn_cursor++ = val;
+}
+
+static void
+rn_set_uint16(uint16_t val)
+{
+	nabu_set_uint16(rn_cursor, val);
+	rn_cursor += 2;
+}
+
+static void
+rn_set_uint32(uint32_t val)
+{
+	nabu_set_uint32(rn_cursor, val);
+	rn_cursor += 4;
+}
+
+#if 0
+static void
+rn_set_blob(void *blob, uint16_t bloblen)
+{
+	memcpy(rn_cursor, blob, bloblen);
+	rn_cursor += bloblen;
+}
+#endif
+
+static void
+rn_set_filename(const char *name)
+{
+	size_t namelen = strlen(name);
+	assert(namelen <= 255);
+	rn_set_uint8((uint8_t)namelen);
+	memcpy(rn_cursor, name, namelen);
+	rn_cursor += namelen;
+}
+
+static void
+rn_send(uint8_t op)
+{
+	nabu_send_byte(op);
+	nabu_send(&rn_buf.request, rn_length());
+}
+
+static void
+rn_recv(size_t bytes)
+{
+	nabu_recv(rn_cursor, bytes);
+	rn_cursor += bytes;
+}
+
+static uint16_t
+rn_parse_length(const char *cp)
+{
+	return stext_parse_length(cp, 0xffff);
+}
+
+static bool
+command_rn_file_open(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t req_slot = stext_parse_slot(argv[1]);
+	uint16_t flags = 0;
+
+	if (strcmp(argv[2], "ro") == 0) {
+		/* No bit to set. */
+	} else if (strcmp(argv[2], "rw") == 0) {
+		flags |= RN_FILE_OPEN_RW;
+	} else {
+		printf("What is '%s'?\n", argv[2]);
+		cli_throw();
+	}
+
+	rn_set_filename(argv[3]);
+	rn_set_uint16(flags);
+	rn_set_uint8(req_slot);
+
+	printf("Sending: NABU_MSG_RN_FILE_OPEN.\n");
+	rn_send(NABU_MSG_RN_FILE_OPEN);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_open));
+
+	printf("--> Slot %u <--\n",
+	    rn_buf.reply.file_open.fileHandle);
+
+	return false;
+}
+
+static bool
+command_rn_fh_size(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	rn_set_uint8(slot);
+
+	printf("Sending: NABU_MSG_RN_FH_SIZE.\n");
+	rn_send(NABU_MSG_RN_FH_SIZE);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_size));
+
+	printf("--> Size %d <--\n",
+	    (int32_t)nabu_get_uint32(rn_buf.reply.fh_size.fileSize));
+
+	return false;
+}
+
+static bool
+command_rn_fh_read(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
+	uint16_t length = rn_parse_length(argv[3]);
+
+	rn_set_uint8(slot);
+	rn_set_uint32(offset);
+	rn_set_uint16(length);
+
+	printf("Sending: NABU_MSG_RN_FH_READ.\n");
+	rn_send(NABU_MSG_RN_FH_READ);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_read.returnLength));
+
+	uint16_t retlen = nabu_get_uint16(rn_buf.reply.fh_read.returnLength);
+	printf("--> Return length %u <--\n", retlen);
+
+	if (retlen != 0) {
+		rn_recv(retlen);
+		printf("%*s\n", (int)retlen, rn_buf.reply.fh_read.data);
+	}
+
+	return false;
+}
+
+static bool
+command_rn_fh_close(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	rn_set_uint8(slot);
+
+	printf("Sending: NABU_MSG_RN_FH_CLOSE.\n");
+	rn_send(NABU_MSG_RN_FH_CLOSE);
+
+	return false;
+}
+
+static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
 } nhacp_buf;
@@ -891,6 +1088,11 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "get-transmit-status",.func = command_get_transmit_status },
 	{ .name = "get-time",		.func = command_get_time },
 	{ .name = "get-image",		.func = command_get_image },
+
+	{ .name = "rn-file-open",	.func = command_rn_file_open },
+	{ .name = "rn-fh-size",		.func = command_rn_fh_size },
+	{ .name = "rn-fh-read",		.func = command_rn_fh_read },
+	{ .name = "rn-fh-close",	.func = command_rn_fh_close },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
