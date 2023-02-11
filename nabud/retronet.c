@@ -1172,8 +1172,8 @@ rn_req_file_list(struct retronet_context *ctx)
 		    globret);
 		goto out;
 	}
-	log_debug("[%s] glob() returned %d matches.", conn_name(conn),
-	    g.gl_matchc);
+	log_debug("[%s] glob() returned %zd matches.", conn_name(conn),
+	    (size_t)g.gl_matchc);
 
 	for (int i = 0; i < g.gl_matchc; i++) {
 		struct fileio_attrs attrs;
