@@ -338,6 +338,9 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	if (f->flags & FILEIO_O_CREAT) {
 		open_flags |= O_CREAT;
 	}
+	if (f->flags & FILEIO_O_EXCL) {
+		open_flags |= O_EXCL;
+	}
 
 	f->local.fd = open(f->location, open_flags, 0666);
 	if (f->local.fd < 0) {
