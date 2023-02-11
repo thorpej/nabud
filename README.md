@@ -387,7 +387,7 @@ Upon start-up, nabuctl does a handshake with the server to ensure they're
 the same version:
 
     % nabuctl
-    Server version: 0.8
+    Server version: 1.1
     nabuctl> 
 
 There is some basic help available:
@@ -409,9 +409,11 @@ You can list the channels available, as well as any current connections:
     nabuctl> list channels
     1  - NABU Network 1984 Cycle v1 (NabuRetroNet)
     2  - NABU Network 1984 Cycle v2 (NabuRetroNet)
-    3  - HomeBrew                   (NabuRetroNet)
-    11 - cycle1                     (Local)
-    12 - homebrew                   (Local)
+    3  - DJs Playground Cycle       (NabuRetroNet)
+    9  - HomeBrew                   (NabuRetroNet)
+    11 - NABU Network 1984 Cycle v1 (Local)
+    12 - NABU Network 1984 Cycle v2 (Local)
+    19 - homebrew                   (Local)
     nabuctl> list connections
     1  - Serial   [1]  /dev/tty-uftdi-A10MHWD6-0
     2  - Listener [1]  IPv6-5001
@@ -420,33 +422,40 @@ You can list the channels available, as well as any current connections:
     5  - Listener [2]  IPv4-5002
     6  - Listener [3]  IPv6-5003
     7  - Listener [3]  IPv4-5003
-    8  - Listener [11] IPv6-5011
-    9  - Listener [11] IPv4-5011
-    10 - Listener [12] IPv6-5012
-    11 - Listener [12] IPv4-5012
+    8  - Listener [9]  IPv6-5009
+    9  - Listener [9]  IPv4-5009
+    10 - Listener [11] IPv6-5011
+    11 - Listener [11] IPv4-5011
+    12 - Listener [12] IPv6-5012
+    13 - Listener [12] IPv4-5012
+    14 - Listener [19] IPv6-5019
+    15 - Listener [19] IPv4-5019
+    nabuctl> 
+
+You can change channels:
+
+    nabuctl> connection 1 channel 9
+    /dev/tty-uftdi-A10MHWD6-0: Selecting channel 'HomeBrew' on NabuRetroNet.
     nabuctl> 
 
 Additional details for channels and connections can also be viewed:
 
-    nabuctl> show channel 3
-    Channel 3:
+    nabuctl> show channel 9
+    Channel 9:
             Name: HomeBrew
           Source: NabuRetroNet
             Path: https://cloud.nabu.ca/HomeBrew/titles
             Type: NABU
-     Listing URL: https://cloud.nabu.ca/HomeBrew/titles/files.txt
+     Listing URL: https://cloud.nabu.ca/HomeBrew/titles/filesv2.txt
+        RetroNet: enabled
     nabuctl> show connection 1
     Connection 1:
              Name: /dev/tty-uftdi-A10MHWD6-0
              Type: Serial
             State: OK
-          Channel: 1
-    nabuctl> 
-
-You can change channels:
-
-    nabuctl> connection 1 channel 3
-    /dev/tty-uftdi-A10MHWD6-0: Selecting channel 'HomeBrew' on NabuRetroNet.
+          Channel: 9
+     Storage area: /home/nabu/storage/living-room-nabu
+         RetroNet: enabled
     nabuctl> 
 
 You can see the list of files available on a connections's channel, if
@@ -454,40 +463,49 @@ that channel provides a listing:
 
     nabuctl> connection 1 listing
     =====> RetroNET
-    1  - RetronetChat.nabu             Chat (v2.4b)
-    2  - Telnet Client.nabu            vt100 Telnet Client (0.8b)
+    1  - CPM22.nabu                Cloud CP/M 2.2 (BIOS v3.5b)
+    2  - RetronetChat.nabu         Chat (v2.8b)
+    3  - Telnet Client.nabu        vt100 Telnet Client (1.0b)
+    4  - Slidesho.nabu             Slide Show Gallery
     =====> Demos
-    3  - Demo - Christmas.nabu         Merry Christmas
-    4  - Demo - Bad Apple.nabu         Bad Apple!
-    5  - plasma.nabu                   Plasma
-    6  - HelloNABUBounce.nabu          Hello NABU Bounce
-    7  - Mandelbrot.nabu               Mandelbrot
+    5  - Demo - Christmas.nabu     Merry Christmas
+    6  - Demo - Bad Apple.nabu     Bad Apple!
+    7  - plasma.nabu               Plasma
+    8  - HelloNABUBounce.nabu      Hello NABU Bounce
+    9  - Mandelbrot.nabu           Mandelbrot
     =====> Games
-    8  - Nabutris.nabu                 Nabutris
-    9  - doom.nabu                     DOOM!
-    =====> Pictures
-    10 - pic - Leo.nabu                Leo The Great
-    11 - pic - DJ.nabu                 DJ
-    12 - pic - rambo.nabu              Rambo
-    13 - pic - alien.nabu              Alien
-    14 - pic - amazon woman.nabu       Amazon Woman
-    15 - pic - angry goblin.nabu       Angry Goblin
-    16 - pic - aquitic adventure.nabu  Aquatic Adventure
-    17 - pic - car babe.nabu           Car Babe
-    18 - pic - death.nabu              Death
-    19 - pic - Metropolis Android.nabu Metropolis Android
-    20 - pic - spider man.nabu         Spider Man
-    21 - pic - aleste game.nabu        Aleste Game Ad
-    22 - pic - dragon party.nabu       Dragon Party
-    23 - LarsPicture1.nabu             Lars Picture 1 (NSFW)
+    10 - brickbattle.nabu          Brick Battle (0.1b)
+    11 - gamemanyeah.nabu          Game Man Yeah! (0.8b)
+    12 - gamemanyeahprototype.nabu Game Man Yeah Prototype
+    13 - Nabutris.nabu             Nabutris
+    14 - doom.nabu                 DOOM!
+    15 - AQUATTACK.nabu            Aqua Attack
+    16 - FLIP_AND_FLOP.nabu        Flip and Flop
+    17 - GALAXIAN.nabu             Galaxian
+    18 - HEAVYWEIGHT_BOXING.nabu   Heavy Weight Boxing
+    19 - LASER_ATTACK.nabu         Laser Attack
+    20 - MANIA.nabu                Mania
+    21 - MINER2049ER.nabu          Miner 2049er
+    22 - MOONSWEEPER.nabu          Moon Sweeper
+    23 - MOTORCYCLE.nabu           Motorcycle
+    24 - MUMMYS_TOMB.nabu          Mummy's Tomb
+    25 - pac-man.nabu              Pac-Man
+    26 - Q-BERT.nabu               Q-Bert
+    27 - QUEST_FOR_TIRES.nabu      Quest For Tires
+    28 - TIME_PILOT.nabu           Time Pilot
+    29 - TRACK_FIELD_1.nabu        Track & Field 1
+    30 - UFOS.nabu                 UFOs
+    31 - WINGWAR.nabu              Wing War
     =====> Utilities
-    24 - ScanCodeViewer.nabu           Scan Code Viewer
+    32 - Remote FS Test.nabu       Remote File System Test
+    33 - ScanCodeViewer.nabu       Scan Code Viewer
+    34 - ScrollTest.nabu           Scroll Test
     nabuctl> 
 
 And you can select a file to loaded wnen the NABU boots and requests image
 000001:
 
-    nabuctl> connection 1 file 8
+    nabuctl> connection 1 file 13
     /dev/tty-uftdi-A10MHWD6-0: Selecting file 'Nabutris.nabu'
     nabuctl> 
 
@@ -501,6 +519,7 @@ And you can select a file to loaded wnen the NABU boots and requests image
   each time a new image is dropped into a local channel being used for
   that purpose.
 * Added support for NabuRetroNet protocol extensions version _v2023.02.03.00_.
+  This enables running the NabuRetroNet Cloud CP/M.
 * Updated the example _nabud.conf_ file to show storage and RetroNet
   options.
 
