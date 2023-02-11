@@ -907,7 +907,31 @@ command_rn_file_delete(int argc, char *argv[])
 	return false;
 }
 
-/* XXX RN-FILE-COPY */
+static bool
+command_rn_file_copy(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t flags = 0;
+
+	if (argc > 3 && strcmp(argv[3], "replace") == 0) {
+		flags |= RN_FILE_COPY_MOVE_REPLACE;
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+	rn_set_filename(argv[2]);
+	rn_set_uint8(flags);
+
+	printf("Sending: NABU_MSG_RN_FILE_COPY.\n");
+	rn_send(NABU_MSG_RN_FILE_COPY);
+
+	return false;
+}
 
 static bool
 command_rn_file_move(int argc, char *argv[])
@@ -1429,6 +1453,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-fh-append",	.func = command_rn_fh_append },
 	{ .name = "rn-fh-replace",	.func = command_rn_fh_replace },
 	{ .name = "rn-file-delete",	.func = command_rn_file_delete },
+	{ .name = "rn-file-copy",	.func = command_rn_file_copy },
 	{ .name = "rn-file-move",	.func = command_rn_file_move },
 	{ .name = "rn-file-list",	.func = command_rn_file_list },
 	{ .name = "rn-file-details",	.func = command_rn_file_details },

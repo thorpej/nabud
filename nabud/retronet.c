@@ -73,6 +73,10 @@ struct retronet_context {
 	};
 };
 
+		/* note reference to local variable */
+#define	COPY_BUFSIZE	sizeof(ctx->reply.fh_read.data)
+#define	COPY_BUF	ctx->reply.fh_read.data
+
 /*****************************************************************************
  * Request handling
  *****************************************************************************/
@@ -101,6 +105,11 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 	*fnamep = (char *)bp;
 	*fnamelenp = len;
 	*cursorp = bp + len;
+
+	if (! fileio_location_is_local((char *)bp, len)) {
+		/* Remote locations don't get "normalized". Blech. */
+		return 0;
+	}
 
 	/*
 	 * Normalize the pathname according to the RetroNet rules (ugh):
@@ -744,7 +753,77 @@ rn_req_file_copy(struct retronet_context *ctx)
 		return;
 	}
 
-	/* XXX implement FILE-COPY */
+	/*
+	 * We allow the source to be anywhere (local or remote), but
+	 * the destination must be local.
+	 */
+	int dst_oflags = 0;
+	if ((flags & RN_FILE_COPY_MOVE_REPLACE) == 0) {
+		dst_oflags |= FILEIO_O_EXCL;
+	}
+	char *dst_path = fileio_resolve_path(dst_fname, conn->file_root,
+	    FILEIO_O_LOCAL_ROOT);
+	if (dst_path == NULL) {
+		log_debug("[%s] Unable to resolve dst path: %s",
+		    conn_name(conn), dst_fname);
+		return;
+	}
+
+	struct fileio *src_f = NULL, *dst_f = NULL;
+
+	src_f = fileio_open(src_fname,
+	    FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT,
+	    conn->file_root, NULL);
+	if (src_f == NULL) {
+		log_debug("[%s] Unable to open src '%s': %s",
+		    conn_name(conn), src_fname, strerror(errno));
+		goto out;
+	}
+
+	/*
+	 * No need to specify LOCAL_ROOT for the destination -- we've
+	 * already resolved the path.
+	 */
+	dst_f = fileio_open(dst_path,
+	    FILEIO_O_RDWR | FILEIO_O_CREAT | dst_oflags, NULL, NULL);
+	if (dst_f == NULL) {
+		log_debug("[%s] Unable to open dst '%s': %s",
+		    conn_name(conn), dst_path, strerror(errno));
+		goto out;
+	}
+
+	ssize_t actual;
+	for (;;) {
+		actual = fileio_read(src_f, COPY_BUF, COPY_BUFSIZE);
+		if (actual < 0) {
+			log_error("[%s] fileio_read() failed: %s",
+			    conn_name(conn), strerror(errno));
+			goto bad;
+		}
+		if (actual == 0) {
+			/* EOF! */
+			log_debug("[%s] Copy complete.", conn_name(conn));
+			break;
+		}
+		actual = fileio_write(dst_f, COPY_BUF, actual);
+		if (actual < 0) {
+			log_error("[%s] fileio_write() failed: %s",
+			    conn_name(conn), strerror(errno));
+			goto bad;
+		}
+	}
+
+ out:
+	if (src_f != NULL) {
+		fileio_close(src_f);
+	}
+	if (dst_f != NULL) {
+		fileio_close(dst_f);
+	}
+ 	return;
+ bad:
+	unlink(dst_path);
+	goto out;
 }
 
 /*
