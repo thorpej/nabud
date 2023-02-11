@@ -53,12 +53,15 @@ ssize_t		fileio_write(struct fileio *, const void *, size_t);
 ssize_t		fileio_pread(struct fileio *, void *, size_t, off_t);
 ssize_t		fileio_pwrite(struct fileio *, const void *, size_t, off_t);
 bool		fileio_getattr(struct fileio *, struct fileio_attrs *);
+bool		fileio_getattr_path(const char *, struct fileio_attrs *);
 bool		fileio_truncate(struct fileio *, off_t);
 const char *	fileio_location(struct fileio *);
 
 #define	FILEIO_O_RDONLY		0x0000
 #define	FILEIO_O_RDWR		0x0001
 #define	FILEIO_O_CREAT		0x0010
+#define	FILEIO_O_EXCL		0x0020
+#define	FILEIO_O_DIROK		0x0040
 #define	FILEIO_O_LOCAL_ROOT	0x0100	/* require a local root */
 
 void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
@@ -66,5 +69,8 @@ void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 
 void	*fileio_load_file_from_location(const char *, size_t, size_t,
 					struct fileio_attrs *, size_t *);
+
+char	*fileio_resolve_path(const char *, const char *, int);
+bool	fileio_location_is_local(const char *, size_t);
 
 #endif /* fileio_h_included */

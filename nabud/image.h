@@ -57,6 +57,7 @@ struct image_channel {
 	void		*listing;
 	size_t		listing_size;
 	unsigned int	number;
+	bool		retronet_enabled;
 	LIST_HEAD(, nabu_image) image_cache;
 };
 
@@ -68,13 +69,30 @@ struct nabu_image {
 	size_t		length;
 	uint32_t	number;
 	uint32_t	refcnt;
+	bool		is_local;
+	bool		cached;
+};
+
+struct image_add_source_args {
+	char		*name;
+	char		*root;
+};
+
+struct image_add_channel_args {
+	image_channel_type type;
+	char		*name;
+	char		*source;
+	const char	*relpath;
+	char		*list_url;
+	char		*default_file;
+	unsigned int	number;
+	bool		retronet_enabled;
 };
 
 struct nabu_connection;
 
-void	image_add_source(char *, char *);
-void	image_add_channel(image_channel_type, char *, char *, const char *,
-	    char *, char *, unsigned int);
+void	image_add_source(const struct image_add_source_args *);
+void	image_add_channel(const struct image_add_channel_args *);
 
 struct image_channel *image_channel_lookup(unsigned int);
 bool	image_channel_enumerate(bool (*)(struct image_channel *, void *),
@@ -84,6 +102,7 @@ char *	image_channel_copy_listing(struct image_channel *, size_t *);
 
 void	image_channel_select(struct nabu_connection *, int16_t);
 struct nabu_image *image_load(struct nabu_connection *, uint32_t);
+void	image_unload(struct nabu_connection *, struct nabu_image *, bool);
 void	image_release(struct nabu_image *);
 
 #endif /* image_h_included */

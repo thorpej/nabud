@@ -333,7 +333,7 @@ conn_io_polltimo(struct conn_io *conn, const struct timespec *deadline,
 	} else if (millis == 0) {
 		millis = 1;
 	}
-	log_debug("[%s] next %s timeout: %d ms", which, conn->name,
+	log_debug("[%s] next %s timeout: %d ms", conn->name, which,
 	    (int)millis);
 	return (int)millis;
 }

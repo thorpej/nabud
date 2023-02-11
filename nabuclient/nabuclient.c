@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,6 +42,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <err.h>	/* XXX HAVE_ERR_H-ize, please */
+#include <limits.h>
 #include <netdb.h>
 #include <setjmp.h>
 #include <stdbool.h>
@@ -61,6 +62,7 @@
 #include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
 #include "libnabud/nhacp_proto.h"
+#include "libnabud/retronet_proto.h"
 
 static int	client_sock;
 
@@ -573,6 +575,635 @@ command_change_channel(int argc, char *argv[])
 	return false;
 }
 
+static uint8_t
+stext_parse_slot(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 255) {
+		printf("'%s' invalid; must be between 0 - 255\n", cp);
+		cli_throw();
+	}
+	return (uint8_t)val;
+}
+
+static uint32_t
+stext_parse_offset(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > UINT32_MAX) {
+		printf("'%s' invalid offset\n", cp);
+		cli_throw();
+	}
+	return (uint32_t)val;
+}
+
+static int32_t
+stext_parse_signed_offset(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < INT32_MIN || val > INT32_MAX) {
+		printf("'%s' invalid signed offset\n", cp);
+		cli_throw();
+	}
+	return (int32_t)val;
+}
+
+static uint16_t
+stext_parse_length(const char *cp, size_t maxlen)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > 0x7fff) {
+		printf("'%s' invalid length\n", cp);
+		cli_throw();
+	}
+	return (uint16_t)val;
+}
+
+static union {
+	union retronet_request request;
+	union retronet_reply reply;
+} rn_buf;
+static uint8_t *rn_cursor;
+
+static void
+rn_reset_cursor(void)
+{
+	rn_cursor = (uint8_t *)&rn_buf.request;
+}
+
+static size_t
+rn_length(void)
+{
+	return (size_t)(rn_cursor - (uint8_t *)&rn_buf.request);
+}
+
+static void
+rn_set_uint8(uint8_t val)
+{
+	*rn_cursor++ = val;
+}
+
+static void
+rn_set_uint16(uint16_t val)
+{
+	nabu_set_uint16(rn_cursor, val);
+	rn_cursor += 2;
+}
+
+static void
+rn_set_uint32(uint32_t val)
+{
+	nabu_set_uint32(rn_cursor, val);
+	rn_cursor += 4;
+}
+
+static void
+rn_set_blob(void *blob, uint16_t bloblen)
+{
+	memcpy(rn_cursor, blob, bloblen);
+	rn_cursor += bloblen;
+}
+
+static void
+rn_set_filename(const char *name)
+{
+	size_t namelen = strlen(name);
+	assert(namelen <= 255);
+	rn_set_uint8((uint8_t)namelen);
+	memcpy(rn_cursor, name, namelen);
+	rn_cursor += namelen;
+}
+
+static void
+rn_send(uint8_t op)
+{
+	nabu_send_byte(op);
+	nabu_send(&rn_buf.request, rn_length());
+}
+
+static void
+rn_recv(size_t bytes)
+{
+	nabu_recv(rn_cursor, bytes);
+	rn_cursor += bytes;
+}
+
+static uint16_t
+rn_parse_length(const char *cp)
+{
+	return stext_parse_length(cp, 0xffff);
+}
+
+static bool
+command_rn_file_open(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t req_slot = stext_parse_slot(argv[1]);
+	uint16_t flags = 0;
+
+	if (strcmp(argv[2], "ro") == 0) {
+		/* No bit to set. */
+	} else if (strcmp(argv[2], "rw") == 0) {
+		flags |= RN_FILE_OPEN_RW;
+	} else {
+		printf("What is '%s'?\n", argv[2]);
+		cli_throw();
+	}
+
+	rn_set_filename(argv[3]);
+	rn_set_uint16(flags);
+	rn_set_uint8(req_slot);
+
+	printf("Sending: NABU_MSG_RN_FILE_OPEN.\n");
+	rn_send(NABU_MSG_RN_FILE_OPEN);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_open));
+
+	printf("--> Slot %u <--\n",
+	    rn_buf.reply.file_open.fileHandle);
+
+	return false;
+}
+
+static bool
+command_rn_fh_size(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	rn_set_uint8(slot);
+
+	printf("Sending: NABU_MSG_RN_FH_SIZE.\n");
+	rn_send(NABU_MSG_RN_FH_SIZE);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_size));
+
+	printf("--> Size %d <--\n",
+	    (int32_t)nabu_get_uint32(rn_buf.reply.fh_size.fileSize));
+
+	return false;
+}
+
+static bool
+command_rn_fh_read(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
+	uint16_t length = rn_parse_length(argv[3]);
+
+	rn_set_uint8(slot);
+	rn_set_uint32(offset);
+	rn_set_uint16(length);
+
+	printf("Sending: NABU_MSG_RN_FH_READ.\n");
+	rn_send(NABU_MSG_RN_FH_READ);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_read.returnLength));
+
+	uint16_t retlen = nabu_get_uint16(rn_buf.reply.fh_read.returnLength);
+	printf("--> Return length %u <--\n", retlen);
+
+	if (retlen != 0) {
+		rn_recv(retlen);
+		printf("%*s\n", (int)retlen, rn_buf.reply.fh_read.data);
+	}
+
+	return false;
+}
+
+static bool
+command_rn_fh_close(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	rn_set_uint8(slot);
+
+	printf("Sending: NABU_MSG_RN_FH_CLOSE.\n");
+	rn_send(NABU_MSG_RN_FH_CLOSE);
+
+	return false;
+}
+
+static bool
+command_rn_file_size(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+
+	printf("Sending: NABU_MSG_RN_FILE_SIZE.\n");
+	rn_send(NABU_MSG_RN_FILE_SIZE);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_size));
+
+	printf("--> Size %d <--\n",
+	    (int32_t)nabu_get_uint32(rn_buf.reply.file_size.fileSize));
+
+	return false;
+}
+
+static bool
+command_rn_fh_append(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint16_t length = (uint16_t)strlen(argv[2]);
+
+	rn_set_uint8(slot);
+	rn_set_uint16(length);
+	rn_set_blob(argv[2], length);
+
+	printf("Sending: NABU_MSG_RN_FH_APPEND.\n");
+	rn_send(NABU_MSG_RN_FH_APPEND);
+
+	return false;
+}
+
+static bool
+command_rn_fh_insert(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
+	uint16_t length = (uint16_t)strlen(argv[3]);
+
+	rn_set_uint8(slot);
+	rn_set_uint32(offset);
+	rn_set_uint16(length);
+	rn_set_blob(argv[3], length);
+
+	printf("Sending: NABU_MSG_RN_FH_INSERT.\n");
+	rn_send(NABU_MSG_RN_FH_INSERT);
+
+	return false;
+}
+
+static bool
+command_rn_fh_delete_range(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n"); 
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
+	uint16_t length = rn_parse_length(argv[3]);
+
+	rn_set_uint8(slot);
+	rn_set_uint32(offset);
+	rn_set_uint16(length);
+
+	printf("Sending: NABU_MSG_RN_FH_DELETE_RANGE.\n");
+	rn_send(NABU_MSG_RN_FH_DELETE_RANGE);
+
+	return false;
+}
+
+static bool
+command_rn_fh_replace(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
+	uint16_t length = (uint16_t)strlen(argv[3]);
+
+	rn_set_uint8(slot);
+	rn_set_uint32(offset);
+	rn_set_uint16(length);
+	rn_set_blob(argv[3], length);
+
+	printf("Sending: NABU_MSG_RN_FH_REPLACE.\n");
+	rn_send(NABU_MSG_RN_FH_REPLACE);
+
+	return false;
+}
+
+static bool
+command_rn_file_delete(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+
+	printf("Sending: NABU_MSG_RN_FILE_DELETE.\n");
+	rn_send(NABU_MSG_RN_FILE_DELETE);
+
+	return false;
+}
+
+static bool
+command_rn_file_copy(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t flags = 0;
+
+	if (argc > 3 && strcmp(argv[3], "replace") == 0) {
+		flags |= RN_FILE_COPY_MOVE_REPLACE;
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+	rn_set_filename(argv[2]);
+	rn_set_uint8(flags);
+
+	printf("Sending: NABU_MSG_RN_FILE_COPY.\n");
+	rn_send(NABU_MSG_RN_FILE_COPY);
+
+	return false;
+}
+
+static bool
+command_rn_file_move(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t flags = 0;
+
+	if (argc > 3 && strcmp(argv[3], "replace") == 0) {
+		flags |= RN_FILE_COPY_MOVE_REPLACE;
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+	rn_set_filename(argv[2]);
+	rn_set_uint8(flags);
+
+	printf("Sending: NABU_MSG_RN_FILE_MOVE.\n");
+	rn_send(NABU_MSG_RN_FILE_MOVE);
+
+	return false;
+}
+
+static void
+print_rn_file_details(const struct rn_file_details *d)
+{
+	int namelen = d->name_length;
+	uint32_t size;
+
+	size = nabu_get_uint32(d->file_size);
+
+	printf("--> Name length: %u <--\n", d->name_length);
+	if (namelen > sizeof(d->name)) {
+		namelen = sizeof(d->name);
+	}
+	printf("--> '%*s' <--\n", namelen, d->name);
+	if (size == RN_ISDIR) {
+		printf("--> DIRECTORY!\n");
+	} else if (size == RN_NOENT) {
+		printf("--> ENOENT!\n");
+		return;
+	}
+	printf(" Created: %d-%d-%d %02d:%02d:%02d\n",
+	    nabu_get_uint16(d->c_year), d->c_month, d->c_day,
+	    d->c_hour, d->c_minute, d->c_second);
+	printf("Modified: %d-%d-%d %02d:%02d:%02d\n",
+	    nabu_get_uint16(d->m_year), d->m_month, d->m_day,
+	    d->m_hour, d->m_minute, d->m_second);
+}
+
+static bool
+command_rn_file_list(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t flags = RN_FILE_LIST_FILES | RN_FILE_LIST_DIRS;
+
+	if (argc > 3) {
+		if (strcmp(argv[3], "files") == 0) {
+			flags = RN_FILE_LIST_FILES;
+		} else if (strcmp(argv[3], "dirs") == 0) {
+			flags = RN_FILE_LIST_DIRS;
+		}
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+	rn_set_filename(argv[2]);
+	rn_set_uint8(flags);
+
+	printf("Sending: NABU_MSG_RN_FILE_LIST.\n");
+	rn_send(NABU_MSG_RN_FILE_LIST);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_list));
+
+	unsigned int matches =
+	    nabu_get_uint16(rn_buf.reply.file_list.matchCount);
+
+	printf("--> %u matches <--\n", matches);
+
+	if (matches == 0) {
+		return false;
+	}
+
+	for (unsigned int i = 0; i < matches; i++) {
+		rn_reset_cursor();
+		rn_set_uint16((uint16_t)i);
+		rn_send(NABU_MSG_RN_FILE_LIST_ITEM);
+		rn_reset_cursor();
+		rn_recv(sizeof(rn_buf.reply.file_list_item));
+		print_rn_file_details(&rn_buf.reply.file_list_item);
+	}
+
+	return false;
+}
+
+static bool
+command_rn_file_details(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+
+	printf("Sending: NABU_MSG_RN_FILE_DETAILS.\n");
+	rn_send(NABU_MSG_RN_FILE_DETAILS);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_details));
+
+	print_rn_file_details(&rn_buf.reply.file_details);
+
+	return false;
+}
+
+static bool
+command_rn_fh_details(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	rn_set_uint8(slot);
+
+	printf("Sending: NABU_MSG_RN_FH_DETAILS.\n");
+	rn_send(NABU_MSG_RN_FH_DETAILS);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_details));
+
+	print_rn_file_details(&rn_buf.reply.fh_details);
+
+	return false;
+}
+
+static bool
+command_rn_fh_readseq(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint16_t length = rn_parse_length(argv[2]);
+
+	rn_set_uint8(slot);
+	rn_set_uint16(length);
+
+	printf("Sending: NABU_MSG_RN_FH_READSEQ.\n");
+	rn_send(NABU_MSG_RN_FH_READSEQ);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_readseq.returnLength));
+
+	uint16_t retlen = nabu_get_uint16(rn_buf.reply.fh_readseq.returnLength);
+	printf("--> Return length %u <--\n", retlen);
+
+	if (retlen != 0) {
+		rn_recv(retlen);
+		printf("%*s\n", (int)retlen, rn_buf.reply.fh_readseq.data);
+	}
+
+	return false;
+}
+
+static bool
+command_rn_fh_seek(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	int32_t offset = stext_parse_signed_offset(argv[2]);
+	uint8_t whence;
+
+	if (strcmp(argv[3], "set") == 0) {
+		whence = RN_SEEK_SET;
+	} else if (strcmp(argv[3], "cur") == 0) {
+		whence = RN_SEEK_CUR;
+	} else if (strcmp(argv[3], "end") == 0) {
+		whence = RN_SEEK_END;
+	} else {
+		printf("lol, wut?\n");
+		cli_throw();
+	}
+
+	rn_set_uint8(slot);
+	rn_set_uint32((uint32_t)offset);
+	rn_set_uint8(whence);
+
+	printf("Sending: NABU_MSG_RN_FH_SEEK.\n");
+	rn_send(NABU_MSG_RN_FH_SEEK);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_seek));
+
+	printf("--> New offset: %u <--\n",
+	    nabu_get_uint32(rn_buf.reply.fh_seek.offset));
+
+	return false;
+}
+
 static union {
 	struct nhacp_request request;
 	struct nhacp_response reply;
@@ -714,37 +1345,10 @@ nhacp_decode_reply(void)
 	}
 }
 
-static uint8_t
-nhacp_parse_slot(const char *cp)
-{
-	long val = strtol(cp, NULL, 0);
-	if (val < 0 || val > 255) {
-		printf("'%s' invalid; must be between 0 - 255\n", cp);
-		cli_throw();
-	}
-	return (uint8_t)val;
-}
-
-static uint32_t
-nhacp_parse_offset(const char *cp)
-{
-	long val = strtol(cp, NULL, 0);
-	if (val < 0 || val > 0xffffffff) {
-		printf("'%s' invalid offset\n", cp);
-		cli_throw();
-	}
-	return (uint32_t)val;
-}
-
 static uint16_t
 nhacp_parse_length(const char *cp)
 {
-	long val = strtol(cp, NULL, 0);
-	if (val < 0 || val > 0x7fff) {
-		printf("'%s' invalid length\n", cp);
-		cli_throw();
-	}
-	return (uint16_t)val;
+	return stext_parse_length(cp, 0x7fff);
 }
 
 static bool
@@ -775,7 +1379,7 @@ command_nhacp_storage_open(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t req_slot = nhacp_parse_slot(argv[1]);
+	uint8_t req_slot = stext_parse_slot(argv[1]);
 
 	nhacp_buf.request.storage_open.req_slot = req_slot;
 	nabu_set_uint16(nhacp_buf.request.storage_open.flags, 0);
@@ -798,8 +1402,8 @@ command_nhacp_storage_get(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t slot = nhacp_parse_slot(argv[1]);
-	uint32_t offset = nhacp_parse_offset(argv[2]);
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
 	uint16_t length = nhacp_parse_length(argv[3]);
 
 	nhacp_buf.request.storage_get.slot = slot;
@@ -822,8 +1426,8 @@ command_nhacp_storage_put(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t slot = nhacp_parse_slot(argv[1]);
-	uint32_t offset = nhacp_parse_offset(argv[2]);
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
 	uint16_t length = strlen(argv[3]);
 
 	nhacp_buf.request.storage_put.slot = slot;
@@ -847,7 +1451,7 @@ command_nhacp_storage_close(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t slot = nhacp_parse_slot(argv[1]);
+	uint8_t slot = stext_parse_slot(argv[1]);
 
 	nhacp_buf.request.storage_close.slot = slot;
 
@@ -876,6 +1480,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "quit",		.func = command_exit },
 
 	{ .name = "help",		.func = command_help },
+	{ .name = "?",			.func = command_help },
 
 	{ .name = "reset",		.func = command_reset },
 	{ .name = "start-up",		.func = command_start_up },
@@ -884,6 +1489,24 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "get-transmit-status",.func = command_get_transmit_status },
 	{ .name = "get-time",		.func = command_get_time },
 	{ .name = "get-image",		.func = command_get_image },
+
+	{ .name = "rn-file-open",	.func = command_rn_file_open },
+	{ .name = "rn-fh-size",		.func = command_rn_fh_size },
+	{ .name = "rn-fh-read",		.func = command_rn_fh_read },
+	{ .name = "rn-fh-close",	.func = command_rn_fh_close },
+	{ .name = "rn-file-size",	.func = command_rn_file_size },
+	{ .name = "rn-fh-append",	.func = command_rn_fh_append },
+	{ .name = "rn-fh-insert",	.func = command_rn_fh_insert },
+	{ .name = "rn-fh-delete-range",	.func = command_rn_fh_delete_range },
+	{ .name = "rn-fh-replace",	.func = command_rn_fh_replace },
+	{ .name = "rn-file-delete",	.func = command_rn_file_delete },
+	{ .name = "rn-file-copy",	.func = command_rn_file_copy },
+	{ .name = "rn-file-move",	.func = command_rn_file_move },
+	{ .name = "rn-file-list",	.func = command_rn_file_list },
+	{ .name = "rn-file-details",	.func = command_rn_file_details },
+	{ .name = "rn-fh-details",	.func = command_rn_fh_details },
+	{ .name = "rn-fh-readseq",	.func = command_rn_fh_readseq },
+	{ .name = "rn-fh-seek",		.func = command_rn_fh_seek },
 
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },

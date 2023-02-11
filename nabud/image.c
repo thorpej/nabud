@@ -105,7 +105,10 @@ static void
 image_free(struct nabu_image *img)
 {
 	if (img != NULL) {
+		log_debug("[Channel %u] Freeing image %s.",
+		    img->channel->number, img->name);
 		assert(img->refcnt == 0);
+		assert(img->cached == false);
 		free(img->name);
 		free(img->data);
 		free(img);
@@ -147,30 +150,30 @@ image_source_lookup(const char *name)
  *	Add an image source.
  */
 void
-image_add_source(char *name, char *root)
+image_add_source(const struct image_add_source_args *args)
 {
-	if (image_source_lookup(name) != NULL) {
-		log_error("Image source %s alreadty exists.", name);
+	if (image_source_lookup(args->name) != NULL) {
+		log_error("Image source %s alreadty exists.", args->name);
 		goto bad;
 	}
 
 	struct image_source *imgsrc = calloc(1, sizeof(*imgsrc));
 	if (imgsrc != NULL) {
-		imgsrc->name = name;
-		imgsrc->root = root;
+		imgsrc->name = args->name;
+		imgsrc->root = args->root;
 		LIST_INSERT_HEAD(&image_sources, imgsrc, link);
 		image_source_count++;
 		log_info("Adding Source %s at %s",
 		    imgsrc->name, imgsrc->root);
 	} else {
 		log_error("Unable to allocate image source descriptor for %s",
-		    name);
+		    args->name);
 		goto bad;
 	}
 	return;
  bad:
-	free(name);
-	free(root);
+	free(args->name);
+	free(args->root);
 }
 
 /*
@@ -212,23 +215,22 @@ image_channel_enumerate(bool (*func)(struct image_channel *, void *), void *ctx)
  *	Add a channel.
  */
 void
-image_add_channel(image_channel_type type, char *name, char *source,
-    const char *relpath, char *list_url, char *default_file,
-    unsigned int number)
+image_add_channel(const struct image_add_channel_args *args)
 {
 	struct image_channel *chan = NULL;
 	size_t pathlen;
 	char *pathstr = NULL;
+	const char *relpath = args->relpath;
 
-	struct image_source *imgsrc = image_source_lookup(source);
+	struct image_source *imgsrc = image_source_lookup(args->source);
 	if (imgsrc == NULL) {
-		log_error("Unknown image source: %s", source);
+		log_error("Unknown image source: %s", args->source);
 		goto bad;
 	}
 
-	if ((chan = image_channel_lookup(number)) != NULL) {
+	if ((chan = image_channel_lookup(args->number)) != NULL) {
 		log_error("Channel %u already exists (%s on %s).",
-		    number, chan->name, chan->source->name);
+		    args->number, chan->name, chan->source->name);
 		goto bad;
 	}
 
@@ -242,25 +244,26 @@ image_add_channel(image_channel_type type, char *name, char *source,
 		}
 	}
 	if (relpath == NULL) {
-		relpath = name;
+		relpath = args->name;
 	}
 	pathlen = strlen(relpath) + strlen(imgsrc->root) + 2; /* / + NUL */
 	chan = calloc(1, sizeof(*chan));
 	pathstr = malloc(pathlen);
 	if (chan == NULL || pathstr == NULL) {
 		log_error("Unable to allocate descriptor for channel %u.",
-		    number);
+		    args->number);
 		goto bad;
 	}
 	snprintf(pathstr, pathlen, "%s/%s", imgsrc->root, relpath);
 
 	chan->source = imgsrc;
-	chan->type = type;
-	chan->name = name;
+	chan->type = args->type;
+	chan->name = args->name;
 	chan->path = pathstr;
-	chan->list_url = list_url;
-	chan->default_file = default_file;
-	chan->number = number;
+	chan->list_url = args->list_url;
+	chan->default_file = args->default_file;
+	chan->number = args->number;
+	chan->retronet_enabled = args->retronet_enabled;
 	TAILQ_INSERT_TAIL(&image_channels, chan, link);
 	image_channel_count++;
 	log_info("Adding %s channel %u (%s on %s) at %s",
@@ -274,6 +277,10 @@ image_add_channel(image_channel_type type, char *name, char *source,
 		log_info("Channel %u will default to '%s' for image 000001.",
 		    chan->number, chan->default_file);
 	}
+	if (chan->retronet_enabled) {
+		log_info("Channel %u has RetroNet enabled.",
+		    chan->number);
+	}
 	return;
  bad:
 	if (chan != NULL) {
@@ -282,8 +289,14 @@ image_add_channel(image_channel_type type, char *name, char *source,
 	if (pathstr != NULL) {
 		free(pathstr);
 	}
-	free(name);
-	free(source);
+	free(args->name);
+	free(args->source);
+	if (args->list_url != NULL) {
+		free(args->list_url);
+	}
+	if (args->default_file) {
+		free(args->default_file);
+	}
 }
 
 /*
@@ -351,6 +364,8 @@ image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 {
 	struct nabu_image *img;
 
+	assert(newimg->cached == false);
+
 	if (newimg->number == IMAGE_NUMBER_NAMED) {
 		img = image_cache_lookup_named_locked(chan, newimg->name);
 	} else {
@@ -360,13 +375,36 @@ image_cache_insert_locked(struct image_channel *chan, struct nabu_image *newimg)
 		image_retain_locked(newimg);
 		LIST_INSERT_HEAD(&chan->image_cache, newimg, link);
 		image_cache_size += newimg->length;
+		newimg->cached = true;
 
 		log_info("Cached %s on Channel %u; "
 		    "total cache size: %zu", newimg->name, chan->number,
 		        image_cache_size);
 		img = newimg;
+	} else {
+		assert(img->cached == true);
 	}
 	return img;
+}
+
+/*
+ * image_cache_remove_locked --
+ *	Remove an image from its channel's image cache.  Caller is
+ *	responsible for dropping the retain if non-NULL is returned.
+ */
+static struct nabu_image *
+image_cache_remove_locked(struct nabu_image *img)
+{
+	if (img->cached) {
+		image_cache_size -= img->length;
+		log_debug("[Channel %u] Removing image %s from cache; "
+		    "total cache size: %zu",
+		    img->channel->number, img->name, image_cache_size);
+		LIST_REMOVE(img, link);
+		img->cached = false;
+		return img;
+	}
+	return NULL;
 }
 
 /*
@@ -383,8 +421,8 @@ image_cache_clear(struct image_channel *chan)
 	LIST_INIT(&old_cache);
 	pthread_mutex_lock(&image_cache_lock);
 	while ((img = LIST_FIRST(&chan->image_cache)) != NULL) {
-		image_cache_size -= img->length;
-		LIST_REMOVE(img, link);
+		assert(img->cached == true);
+		image_cache_remove_locked(img);
 		LIST_INSERT_HEAD(&old_cache, img, link);
 	}
 	listing = chan->listing;
@@ -721,9 +759,10 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 	struct nabu_image *img;
 	uint8_t *filebuf;
 	size_t filesize;
+	struct fileio_attrs attrs;
 
 	filebuf = fileio_load_file_from_location(url, 0, NABU_MAXSEGMENTSIZE,
-	    NULL, &filesize);
+	    &attrs, &filesize);
 	if (filebuf == NULL) {
 		/* Error already logged. */
 		return NULL;
@@ -736,6 +775,9 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 		img = image_from_nabu(chan, image, image_name, filebuf,
 		    filesize);
 	}
+
+	/* For cache management decisions later. */
+	img->is_local = attrs.is_local;
 
 	return img;
 }
@@ -919,4 +961,47 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		free(selected_name);
 	}
 	return img;
+}
+
+/*
+ * image_unload --
+ *	The reverse of image_load().  We release our references, and
+ *	maybe free the image completely.
+ */
+void
+image_unload(struct nabu_connection *conn, struct nabu_image *img,
+    bool lastuse)
+{
+	struct nabu_image *oimg;
+
+	pthread_mutex_lock(&image_cache_lock);
+
+	/*
+	 * If this is the last-use of an image by the connection, then
+	 * get rid of caching retains before dropping the primary retain.
+	 */
+	if (lastuse) {
+		log_debug("[%s] dropping last-image retain of %s.",
+		    conn_name(conn), img->name);
+		oimg = conn_set_last_image(conn, NULL);
+		assert(oimg == img);
+		image_release_locked(oimg);
+
+		if (img->is_local) {
+			log_debug("[%s] Removing %s from channel cache.",
+			    conn_name(conn), img->name);
+			oimg = image_cache_remove_locked(img);
+			if (oimg != NULL) {
+				log_debug("[%s] Dropping cache retain for %s.",
+				    conn_name(conn), img->name);
+				image_release_locked(oimg);
+			}
+		}
+	}
+
+	img = image_release_locked(img);
+
+	pthread_mutex_unlock(&image_cache_lock);
+
+	image_free(img);
 }

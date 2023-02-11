@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2023 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,11 +24,34 @@
  * SUCH DAMAGE.
  */
 
-#ifndef nhacp_h_included
-#define	nhacp_h_included
+#ifndef stext_h_included
+#define	stext_h_included
 
+struct fileio_attrs;
 struct nabu_connection;
 
-bool	nhacp_start(struct nabu_connection *, uint8_t);
+struct stext_context {
+	struct nabu_connection *conn;
+	LIST_HEAD(, stext_file) files;
+};
 
-#endif /* nhacp_h_included */
+void	stext_context_init(struct stext_context *, struct nabu_connection *);
+void	stext_context_fini(struct stext_context *);
+
+struct stext_file *stext_file_find(struct stext_context *, uint8_t);
+
+int	stext_file_open(struct stext_context *, const char *, uint8_t,
+	    struct fileio_attrs *, int, struct stext_file **);
+uint8_t	stext_file_slot(struct stext_file *);
+void	stext_file_close(struct stext_file *);
+int	stext_file_read(struct stext_file *, void *, uint16_t *);
+int	stext_file_write(struct stext_file *, const void *, uint16_t);
+int	stext_file_pread(struct stext_file *, void *, uint32_t, uint16_t *);
+int	stext_file_pwrite(struct stext_file *, const void *, uint32_t,
+	    uint16_t);
+int	stext_file_seek(struct stext_file *, int32_t *, int);
+int	stext_file_truncate(struct stext_file *, uint32_t);
+int	stext_file_getattr(struct stext_file *, struct fileio_attrs *);
+const char *stext_file_location(struct stext_file *);
+
+#endif /* stext_h_included */

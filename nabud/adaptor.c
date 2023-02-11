@@ -82,6 +82,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "conn.h"
 #include "image.h"
 #include "nhacp.h"
+#include "retronet.h"
 
 static const uint8_t nabu_msg_ack[] = NABU_MSGSEQ_ACK;
 static const uint8_t nabu_msg_finished[] = NABU_MSGSEQ_FINISHED;
@@ -154,6 +155,26 @@ adaptor_expect_ack(struct nabu_connection *conn)
 {
 	return adaptor_expect_sequence(conn, nabu_msg_ack,
 	    sizeof(nabu_msg_ack));
+}
+
+/*
+ * adaptor_send_ack --
+ *	Send an ACK message to the NABU.
+ */
+static void
+adaptor_send_ack(struct nabu_connection *conn)
+{
+	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
+}
+
+/*
+ * adaptor_send_confirmed --
+ *	Send a CONFIRMED message to the NABU.
+ */
+static void
+adaptor_send_confirmed(struct nabu_connection *conn)
+{
+	conn_send_byte(conn, NABU_STATE_CONFIRMED);
 }
 
 /*
@@ -368,10 +389,15 @@ adaptor_send_time(struct nabu_connection *conn)
 static void
 adaptor_msg_reset(struct nabu_connection *conn)
 {
+	if (conn->retronet != NULL) {
+		log_info("[%s] Clearing previous RetroNet state.",
+		    conn_name(conn));
+		retronet_conn_fini(conn);
+	}
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
-	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
-	conn_send_byte(conn, NABU_STATE_CONFIRMED);
+	adaptor_send_ack(conn);
+	adaptor_send_confirmed(conn);
 }
 
 /*
@@ -384,7 +410,7 @@ adaptor_msg_mystery(struct nabu_connection *conn)
 	uint8_t msg[2];
 
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn_name(conn));
-	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
+	adaptor_send_ack(conn);
 
 	log_debug("[%s] Expecting the NABU to send 2 bytes.", conn_name(conn));
 	if (! conn_recv(conn, msg, sizeof(msg))) {
@@ -395,7 +421,7 @@ adaptor_msg_mystery(struct nabu_connection *conn)
 		    conn_name(conn), msg[0], msg[1]);
 	}
 	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
-	conn_send_byte(conn, NABU_STATE_CONFIRMED);
+	adaptor_send_confirmed(conn);
 }
 
 /*
@@ -443,7 +469,8 @@ adaptor_msg_get_status(struct nabu_connection *conn)
 	uint8_t msg;
 
 	log_debug("[%s] Sending MABU_MSGSEQ_ACK.", conn_name(conn));
-	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
+	adaptor_send_ack(conn);
+
 	log_debug("[%s] Expecting the NABU to send status type.",
 	    conn_name(conn));
 	if (! conn_recv_byte(conn, &msg)) {
@@ -479,8 +506,8 @@ adaptor_msg_start_up(struct nabu_connection *conn)
 {
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
-	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
-	conn_send_byte(conn, NABU_STATE_CONFIRMED);
+	adaptor_send_ack(conn);
+	adaptor_send_confirmed(conn);
 }
 
 /*
@@ -493,7 +520,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 	uint8_t msg[4];
 
 	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn_name(conn));
-	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
+	adaptor_send_ack(conn);
 
 	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send segment/image message.",
@@ -508,7 +535,7 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 	    conn_name(conn), segment, image);
 
 	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
-	conn_send_byte(conn, NABU_STATE_CONFIRMED);
+	adaptor_send_confirmed(conn);
 
 	if (image == NABU_IMAGE_TIME) {
 		if (segment == 0) {
@@ -533,8 +560,8 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 
 	log_debug("[%s] Sending segment %u of image %06X.",
 	    conn_name(conn), segment, image);
-	adaptor_send_image(conn, image, segment, img);
-	image_release(img);
+	image_unload(conn, img,
+	    adaptor_send_image(conn, image, segment, img));
 }
 
 /*
@@ -547,7 +574,7 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	uint8_t msg[2];
 
 	log_debug("[%s] Sending MABU_MSGSEQ_ACK.", conn_name(conn));
-	conn_send(conn, nabu_msg_ack, sizeof(nabu_msg_ack));
+	adaptor_send_ack(conn);
 
 	log_debug("[%s] Wating for NABU to send channel code.",
 	    conn_name(conn));
@@ -565,7 +592,54 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 	image_channel_select(conn, channel);
 
 	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
-	conn_send_byte(conn, NABU_STATE_CONFIRMED);
+	adaptor_send_confirmed(conn);
+}
+
+#define	HANDLER_INDEX(v)	((v) - NABU_MSG_CLASSIC_FIRST)
+#define	HANDLER_ENTRY(v, n)						\
+	[HANDLER_INDEX(v)] = {						\
+		.handler    = adaptor_msg_ ## n ,			\
+		.debug_desc = #v ,					\
+	}
+
+static const struct {
+	void		(*handler)(struct nabu_connection *);
+	const char	*debug_desc;
+} adaptor_msg_types[] = {
+	HANDLER_ENTRY(NABU_MSG_RESET,          reset),
+	HANDLER_ENTRY(NABU_MSG_MYSTERY,        mystery),
+	HANDLER_ENTRY(NABU_MSG_GET_STATUS,     get_status),
+	HANDLER_ENTRY(NABU_MSG_START_UP,       start_up),
+	HANDLER_ENTRY(NABU_MSG_PACKET_REQUEST, packet_request),
+	HANDLER_ENTRY(NABU_MSG_CHANGE_CHANNEL, change_channel),
+};
+static const unsigned int adaptor_msg_type_count =
+    sizeof(adaptor_msg_types) / sizeof(adaptor_msg_types[0]);
+
+/*
+ * adaptor_msg_classic --
+ *	Check for and process a classic NABU message.
+ */
+static bool
+adaptor_msg_classic(struct nabu_connection *conn, uint8_t msg)
+{
+	if (! NABU_MSG_IS_CLASSIC(msg)) {
+		/* Not a classic NABU message. */
+		return false;
+	}
+
+	uint8_t idx = HANDLER_INDEX(msg);
+	if (idx > adaptor_msg_type_count ||
+	    adaptor_msg_types[idx].handler == NULL) {
+		log_error("[%s] Unknown classic message type 0x%02x.",
+		    conn_name(conn), msg);
+		return false;
+	}
+
+	log_debug("[%s] Got %s.", conn_name(conn),
+	    adaptor_msg_types[idx].debug_desc);
+	(*adaptor_msg_types[idx].handler)(conn);
+	return true;
 }
 
 /*
@@ -611,58 +685,25 @@ adaptor_event_loop(struct nabu_connection *conn)
 		 */
 		conn_start_watchdog(conn, 10);
 
-		switch (msg) {
-		case 0:
-			log_debug("[%s] Got mystery message 0x%02x.",
-			    conn_name(conn), msg);
-			continue;
-
-		default:
-			log_error("[%s] Got unexpected message 0x%02x.",
-			    conn_name(conn), msg);
-			continue;
-
-		case NABU_MSG_RESET:
-			log_debug("[%s] Got NABU_MSG_RESET.",
-			    conn_name(conn));
-			adaptor_msg_reset(conn);
-			continue;
-
-		case NABU_MSG_MYSTERY:
-			log_debug("[%s] Got NABU_MSG_MYSTERY.",
-			    conn_name(conn));
-			adaptor_msg_mystery(conn);
-			continue;
-
-		case NABU_MSG_GET_STATUS:
-			log_debug("[%s] Got NABU_MSG_GET_STATUS.",
-			    conn_name(conn));
-			adaptor_msg_get_status(conn);
-			continue;
-
-		case NABU_MSG_START_UP:
-			log_debug("[%s] Got NABU_MSG_START_UP.",
-			    conn_name(conn));
-			adaptor_msg_start_up(conn);
-			continue;
-
-		case NABU_MSG_PACKET_REQUEST:
-			log_debug("[%s] Got NABU_MSG_PACKET_REQUEST.",
-			    conn_name(conn));
-			adaptor_msg_packet_request(conn);
-			continue;
-
-		case NABU_MSG_CHANGE_CHANNEL:
-			log_debug("[%s] Got NABU_MSG_CHANGE_CHANNEL.",
-			    conn_name(conn));
-			adaptor_msg_change_channel(conn);
-			continue;
-
-		case NABU_MSG_START_NHACP:
-			log_debug("[%s] Got NABU_MSG_START_NHACP.",
-			    conn_name(conn));
-			nhacp_start(conn);
+		/* First check for a classic message. */
+		if (adaptor_msg_classic(conn, msg)) {
+			/* Yup! */
 			continue;
 		}
+
+		/* Check for a RetroNet request. */
+		if (retronet_request(conn, msg)) {
+			/* Yup! */
+			continue;
+		}
+
+		/* Check for NHACP mode. */
+		if (nhacp_start(conn, msg)) {
+			/* Yup! */
+			continue;
+		}
+
+		log_error("[%s] Got unexpected message 0x%02x.",
+		    conn_name(conn), msg);
 	}
 }

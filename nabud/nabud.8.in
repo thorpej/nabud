@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 4, 2023
+.Dd February 9, 2023
 .Dt NABUD 8
 .Sh NAME
 .Nm nabud
@@ -107,6 +107,13 @@ Support for the NABU HCCA Application Communication Protocol.
 NHACP is a new protocol extension under active development that
 allows programs running on the NABU to access remote storage.
 .It
+Support for the NabuRetroNet protocol extensions.
+These protocol extensions provide support for accessing remote
+storage and other features.
+.Nm
+supports NabuRetroNet protocol extension version
+.Em v2023.02.03.00 .
+.It
 Minimal privilege requirements.
 .Nm
 requires the ability to open serial ports for reading and writing in
@@ -184,7 +191,8 @@ is not started as the super-user.
 .\" extras-darwin .Fl u .
 .It Fl U Ar umask
 Specifes the file creation mask to use when creating files.
-File creation on the server is suppored by the NHACP protocol.
+File creation on the server is suppored by the NHACP protocol
+and the NabuRetroNet protocol extensions.
 .\" extras-darwin Note that if
 .\" extras-darwin .Nm
 .\" extras-darwin is started via
@@ -234,7 +242,7 @@ The
 .Dq Channels
 stanza is an array of channel objects.
 Each channel object has the following properties:
-.Bl -tag -width "DefaultFile"
+.Bl -tag -width "RetroNetExtensions"
 .It Name
 A string that specifies the name of the channel.
 In addition to being the name displayed to the user, this is
@@ -264,6 +272,19 @@ connections.
 An optional string that specifes a default file to be loaded when
 the NABU ROM requests image 000001.
 Indiviual connections can override this by selecting a different file.
+.It RetroNetExtensions
+An optional boolean value
+.Po
+.Dq true
+or
+.Dq false
+.Pc
+that specifies if the NabuRetroNet protocol extensions are enabled
+for connections using this channel.
+NabuRetroNet protocol extensions are disabled by default due to
+collisions with NHACP;
+if the NabuRetroNet protocol extensions are enabled, then NHACP
+will not be available for connections using this channel.
 .El
 .Ss Connections
 The
@@ -339,7 +360,7 @@ as well as provide suggestions for file system permissions and group
 management.
 .Pp
 First and foremost, you should create a dedicated group for all users
-on the system that will have permission to do make hanges to files
+on the system that will have permission to do make changes to files
 accessed by
 .Nm
 and interact with
@@ -422,7 +443,7 @@ should use the
 .Fl u Ar user
 and
 .Fl U Ar umask
-when running
+options when running
 .Nm :
 .Bd -literal -offset indent
 XXXsbindirXXX/nabud -u nabu -U 002

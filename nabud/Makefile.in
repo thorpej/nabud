@@ -108,7 +108,8 @@ am__installdirs = "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(man8dir)"
 PROGRAMS = $(sbin_PROGRAMS)
 am_nabud_OBJECTS = nabud-adaptor.$(OBJEXT) nabud-conn.$(OBJEXT) \
 	nabud-control.$(OBJEXT) nabud-image.$(OBJEXT) \
-	nabud-main.$(OBJEXT) nabud-nhacp.$(OBJEXT)
+	nabud-main.$(OBJEXT) nabud-nhacp.$(OBJEXT) \
+	nabud-retronet.$(OBJEXT) nabud-stext.$(OBJEXT)
 nabud_OBJECTS = $(am_nabud_OBJECTS)
 am__DEPENDENCIES_1 =
 nabud_DEPENDENCIES = ../libnabud/libnabud.la ../libfetch/libfetch.la \
@@ -137,7 +138,8 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/nabud-adaptor.Po \
 	./$(DEPDIR)/nabud-conn.Po ./$(DEPDIR)/nabud-control.Po \
 	./$(DEPDIR)/nabud-image.Po ./$(DEPDIR)/nabud-main.Po \
-	./$(DEPDIR)/nabud-nhacp.Po
+	./$(DEPDIR)/nabud-nhacp.Po ./$(DEPDIR)/nabud-retronet.Po \
+	./$(DEPDIR)/nabud-stext.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -358,7 +360,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = $(PTHREAD_CFLAGS) $(WARNCFLAGS)
-nabud_SOURCES = adaptor.c conn.c control.c image.c main.c nhacp.c
+nabud_SOURCES = adaptor.c conn.c control.c image.c main.c nhacp.c \
+			  retronet.c stext.c
+
 nabud_CPPFLAGS = -DINSTALL_PREFIX=\"$(prefix)\" \
 			  $(SSL_INCLUDES) $(PAK_INCLUDES)
 
@@ -470,6 +474,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-image.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-main.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-nhacp.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-retronet.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nabud-stext.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -581,6 +587,34 @@ nabud-nhacp.obj: nhacp.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='nhacp.c' object='nabud-nhacp.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-nhacp.obj `if test -f 'nhacp.c'; then $(CYGPATH_W) 'nhacp.c'; else $(CYGPATH_W) '$(srcdir)/nhacp.c'; fi`
+
+nabud-retronet.o: retronet.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-retronet.o -MD -MP -MF $(DEPDIR)/nabud-retronet.Tpo -c -o nabud-retronet.o `test -f 'retronet.c' || echo '$(srcdir)/'`retronet.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-retronet.Tpo $(DEPDIR)/nabud-retronet.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='retronet.c' object='nabud-retronet.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-retronet.o `test -f 'retronet.c' || echo '$(srcdir)/'`retronet.c
+
+nabud-retronet.obj: retronet.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-retronet.obj -MD -MP -MF $(DEPDIR)/nabud-retronet.Tpo -c -o nabud-retronet.obj `if test -f 'retronet.c'; then $(CYGPATH_W) 'retronet.c'; else $(CYGPATH_W) '$(srcdir)/retronet.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-retronet.Tpo $(DEPDIR)/nabud-retronet.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='retronet.c' object='nabud-retronet.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-retronet.obj `if test -f 'retronet.c'; then $(CYGPATH_W) 'retronet.c'; else $(CYGPATH_W) '$(srcdir)/retronet.c'; fi`
+
+nabud-stext.o: stext.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-stext.o -MD -MP -MF $(DEPDIR)/nabud-stext.Tpo -c -o nabud-stext.o `test -f 'stext.c' || echo '$(srcdir)/'`stext.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-stext.Tpo $(DEPDIR)/nabud-stext.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='stext.c' object='nabud-stext.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-stext.o `test -f 'stext.c' || echo '$(srcdir)/'`stext.c
+
+nabud-stext.obj: stext.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT nabud-stext.obj -MD -MP -MF $(DEPDIR)/nabud-stext.Tpo -c -o nabud-stext.obj `if test -f 'stext.c'; then $(CYGPATH_W) 'stext.c'; else $(CYGPATH_W) '$(srcdir)/stext.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/nabud-stext.Tpo $(DEPDIR)/nabud-stext.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='stext.c' object='nabud-stext.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(nabud_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o nabud-stext.obj `if test -f 'stext.c'; then $(CYGPATH_W) 'stext.c'; else $(CYGPATH_W) '$(srcdir)/stext.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -763,6 +797,8 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/nabud-image.Po
 	-rm -f ./$(DEPDIR)/nabud-main.Po
 	-rm -f ./$(DEPDIR)/nabud-nhacp.Po
+	-rm -f ./$(DEPDIR)/nabud-retronet.Po
+	-rm -f ./$(DEPDIR)/nabud-stext.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -814,6 +850,8 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/nabud-image.Po
 	-rm -f ./$(DEPDIR)/nabud-main.Po
 	-rm -f ./$(DEPDIR)/nabud-nhacp.Po
+	-rm -f ./$(DEPDIR)/nabud-retronet.Po
+	-rm -f ./$(DEPDIR)/nabud-stext.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

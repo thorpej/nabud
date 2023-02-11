@@ -79,6 +79,7 @@ struct fileio {
 	union {
 		struct {
 			int fd;
+			bool is_directory;
 		} local;
 		struct {
 			fetchIO *fio;
@@ -258,13 +259,14 @@ check_local_root_escape(const char *location)
 	return depth < 0;
 }
 
-static bool
-fileio_local_io_open(struct fileio *f, const char *location,
-    const char *local_root)
+static int
+fileio_local_resolve_path(const char *location, const char *local_root,
+    int flags, char **fnamep)
 {
-	if ((f->flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
-		errno = EINVAL;
-		return false;
+	char *fname;
+
+	if ((flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
+		return EINVAL;
 	}
 
 	/*
@@ -286,42 +288,58 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	}
 
 	if (strlen(location) == 0) {
-		errno = EINVAL;
-		return false;
+		return EINVAL;
 	}
 
 	if (local_root != NULL) {
 		/* The local root must be an absolute path. */
 		if (*local_root != '/') {
-			errno = EINVAL;
-			return false;
+			return EINVAL;
 		}
 		if (check_local_root_escape(location)) {
-			errno = EPERM;
-			return false;
+			return EPERM;
 		}
 		/* local_root/location\0 */
-		f->location = malloc(strlen(local_root) + 1 +
+		fname = malloc(strlen(local_root) + 1 +
 		    strlen(location) + 1);
-		if (f->location != NULL) {
-			sprintf(f->location, "%s/%s", local_root, location);
+		if (fname != NULL) {
+			sprintf(fname, "%s/%s", local_root, location);
 		}
 	} else {
-		if (f->flags & FILEIO_O_LOCAL_ROOT) {
-			errno = EPERM;
-			return false;
+		if (flags & FILEIO_O_LOCAL_ROOT) {
+			return EPERM;
 		}
-		f->location = strdup(location);
+		fname = strdup(location);
 	}
-	if (f->location == NULL) {
-		errno = ENOMEM;
+	if (fname == NULL) {
+		return ENOMEM;
+	}
+
+	*fnamep = fname;
+	return 0;
+}
+
+static bool
+fileio_local_io_open(struct fileio *f, const char *location,
+    const char *local_root)
+{
+	int error;
+
+	error = fileio_local_resolve_path(location, local_root, f->flags,
+	    &f->location);
+	if (error != 0) {
+		errno = error;
 		return false;
 	}
+
 	/* If open fails, caller will free f->location. */
 
 	int open_flags = (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY;
 	if (f->flags & FILEIO_O_CREAT) {
 		open_flags |= O_CREAT;
+	}
+	if (f->flags & FILEIO_O_EXCL) {
+		open_flags |= O_EXCL;
 	}
 
 	f->local.fd = open(f->location, open_flags, 0666);
@@ -329,14 +347,30 @@ fileio_local_io_open(struct fileio *f, const char *location,
 		return false;
 	}
 
-	/* Allow only regular files. */
+	/*
+	 * Only regular files, unless the caller says they're OK
+	 * opening a directory (probably for a getattr call later).
+	 */
 	struct stat sb;
-	if (fstat(f->local.fd, &sb) < 0 || !S_ISREG(sb.st_mode)) {
-		close(f->local.fd);
-		return false;
+	if (fstat(f->local.fd, &sb) < 0) {
+		goto bad;
+	}
+	if (S_ISDIR(sb.st_mode)) {
+		if (f->flags & FILEIO_O_DIROK) {
+			f->local.is_directory = true;
+		} else {
+			errno = EISDIR;
+			goto bad;
+		}
+	} else if (!S_ISREG(sb.st_mode)) {
+		errno = EPERM;
+		goto bad;
 	}
 
 	return true;
+ bad:
+	close(f->local.fd);
+	return false;
 }
 
 static bool
@@ -349,6 +383,24 @@ fileio_local_io_ok(struct fileio *f, bool writing)
 	return fileio_io_ok(f, writing);
 }
 
+static void
+fileio_stat_to_attrs(const char *path, const struct stat *sb,
+    struct fileio_attrs *attrs)
+{
+	attrs->size = sb->st_size;
+	attrs->mtime = sb->st_mtime;
+#ifdef HAVE_STAT_ST_BIRTHTIME
+	/* check for -1 in case some quirky file system returns it */
+	attrs->btime = sb->st_birthtime != (time_t)-1 ? sb->st_birthtime : 0;
+#else
+	attrs->btime = 0;
+#endif /* HAVE_STAT_ST_BIRTHTIME */
+	attrs->is_directory = !!S_ISDIR(sb->st_mode);
+	attrs->is_writable = access(path, R_OK | W_OK) == 0;
+	attrs->is_seekable = true;
+	attrs->is_local = true;
+}
+
 static bool
 fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 {
@@ -357,14 +409,8 @@ fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 	if (fstat(f->local.fd, &sb) < 0) {
 		return false;
 	}
-	attrs->size = sb.st_size;
-	attrs->mtime = sb.st_mtime;
-	attrs->btime = 0;		/* XXX HAVE_STAT_ST_BIRTHTIME */
-	attrs->is_directory = !!S_ISDIR(sb.st_mode);
-	attrs->is_writable = access(f->location, R_OK | W_OK) == 0;
-	attrs->is_seekable = true;
-	attrs->is_local = true;
 
+	fileio_stat_to_attrs(f->location, &sb, attrs);
 	return true;
 }
 
@@ -379,30 +425,51 @@ fileio_local_io_close(struct fileio *f)
 static off_t
 fileio_local_io_seek(struct fileio *f, off_t offset, int whence)
 {
+	if (f->local.is_directory) {
+		/* XXX rewinddir()? */
+		errno = EISDIR;
+		return -1;
+	}
 	return lseek(f->local.fd, offset, whence);
 }
 
 static bool
 fileio_local_io_truncate(struct fileio *f, off_t size)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return false;
+	}
 	return ftruncate(f->local.fd, size) == 0;
 }
 
 static ssize_t
 fileio_local_io_read(struct fileio *f, void *buf, size_t len)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return read(f->local.fd, buf, len);
 }
 
 static ssize_t
 fileio_local_io_write(struct fileio *f, const void *buf, size_t len)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return write(f->local.fd, buf, len);
 }
 
 static ssize_t
 fileio_local_io_pread(struct fileio *f, void *buf, size_t len, off_t offset)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return pread(f->local.fd, buf, len, offset);
 }
 
@@ -410,6 +477,10 @@ static ssize_t
 fileio_local_io_pwrite(struct fileio *f, const void *buf, size_t len,
     off_t offset)
 {
+	if (f->local.is_directory) {
+		errno = EISDIR;
+		return -1;
+	}
 	return pwrite(f->local.fd, buf, len, offset);
 }
 
@@ -520,12 +591,17 @@ fileio_free(struct fileio *f)
 }
 
 static const struct fileio_scheme_ops *
-fileio_ops_for_location(const char *location)
+fileio_ops_for_location(const char *location, size_t loclen)
 {
 	const struct fileio_scheme_ops *fso;
+	size_t schemelen;
 
 	for (fso = fileio_scheme_ops; fso->scheme != NULL; fso++) {
-		if (strncmp(location, fso->scheme, strlen(fso->scheme)) == 0) {
+		schemelen = strlen(fso->scheme);
+		if (loclen < schemelen) {
+			continue;
+		}
+		if (strncmp(location, fso->scheme, schemelen) == 0) {
 			break;
 		}
 	}
@@ -543,7 +619,7 @@ fileio_open(const char *location, int flags, const char *local_root,
 	const struct fileio_scheme_ops *fso;
 	struct fileio *f;
 
-	fso = fileio_ops_for_location(location);
+	fso = fileio_ops_for_location(location, strlen(location));
 
 	if (fso->ops->io_write == NULL && (flags & FILEIO_O_RDWR) != 0) {
 		errno = ENOTSUP;
@@ -569,6 +645,44 @@ fileio_open(const char *location, int flags, const char *local_root,
 
 	fileio_free(f);
 	return NULL;
+}
+
+/*
+ * fileio_resolve_path --
+ *	Resolve a file location into a local path.  If the file's
+ *	location is not local, NULL will be returned.  Caller is
+ *	responsible for freeing the resulting path string.
+ */
+char *
+fileio_resolve_path(const char *location, const char *local_root, int oflags)
+{
+	char *path;
+	int error;
+
+	if (! fileio_location_is_local(location, strlen(location))) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	error = fileio_local_resolve_path(location, local_root, oflags, &path);
+	if (error != 0) {
+		errno = error;
+		return NULL;
+	}
+	return path;
+}
+
+/*
+ * fileio_location_is_local --
+ *	Returns true if the specified location is a local location.
+ */
+bool
+fileio_location_is_local(const char *location, size_t loclen)
+{
+	const struct fileio_scheme_ops *fso;
+
+	fso = fileio_ops_for_location(location, loclen);
+	return fso->ops == &fileio_local_ops;
 }
 
 /*
@@ -607,6 +721,23 @@ fileio_getattr(struct fileio *f, struct fileio_attrs *attrs)
 		rv = (*f->ops->io_getattr)(f, attrs);
 	}
 	return rv;
+}
+
+/*
+ * fileio_getattr_path --
+ *	Do a fileio_getattr(), but on a path instead of a fileio.
+ */
+bool
+fileio_getattr_path(const char *path, struct fileio_attrs *attrs)
+{
+	struct stat sb;
+
+	if (stat(path, &sb) < 0) {
+		return false;
+	}
+
+	fileio_stat_to_attrs(path, &sb, attrs);
+	return true;
 }
 
 /*

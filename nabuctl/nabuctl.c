@@ -99,6 +99,12 @@ parse_number(const char *arg, const char *what,
 	return true;
 }
 
+static const char *
+enabledstr(bool val)
+{
+	return val ? "enabled" : "disabled";
+}
+
 /*****************************************************************************
  * SERVER COMMUNICATION STUFF
  *****************************************************************************/
@@ -219,6 +225,7 @@ struct channel_desc {
 	char		*source;
 	struct listing	*listing;
 	unsigned int	number;
+	bool		retronet_enabled;
 };
 static TAILQ_HEAD(, channel_desc) channel_list =
     TAILQ_HEAD_INITIALIZER(channel_list);
@@ -375,6 +382,12 @@ channel_deserialize(struct atom_list *reply_list, struct atom *atom)
 		case NABUCTL_CHAN_SOURCE:
 			chan->source = atom_consume(atom);
 			log_debug("Got NABUCTL_CHAN_SOURCE=%s", chan->source);
+			break;
+
+		case NABUCTL_CHAN_RETRONET_EXTENSIONS:
+			chan->retronet_enabled = atom_bool_value(atom);
+			log_debug("Got NABUCTL_CHAN_RETRONET_EXTENSIONS=%d",
+			    chan->retronet_enabled);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
@@ -587,8 +600,10 @@ struct connection_desc {
 	char		*type;
 	char		*state;
 	char		*selected_file;
+	char		*file_root;
 	unsigned int	channel;
 	unsigned int	number;
+	bool		retronet_enabled;
 };
 static TAILQ_HEAD(, connection_desc) connection_list =
     TAILQ_HEAD_INITIALIZER(connection_list);
@@ -614,6 +629,7 @@ connection_desc_free(struct connection_desc *conn)
 	FREE(conn->type);
 	FREE(conn->state);
 	FREE(conn->selected_file);
+	FREE(conn->file_root);
 	free(conn);
 }
 
@@ -711,6 +727,18 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 			conn->selected_file = atom_consume(atom);
 			log_debug("Got NABUCTL_CONN_SELECTED_FILE=%s",
 			    conn->selected_file);
+			break;
+
+		case NABUCTL_CONN_RETRONET_EXTENSIONS:
+			conn->retronet_enabled = atom_bool_value(atom);
+			log_debug("Got NABUCTL_CONN_RETRONET_EXTENSIONS=%d",
+			    conn->retronet_enabled);
+			break;
+
+		case NABUCTL_CONN_FILE_ROOT:
+			conn->file_root = atom_consume(atom);
+			log_debug("Got NABUCTL_CONN_FILE_ROOT=%s",
+			    conn->file_root);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
@@ -1037,6 +1065,7 @@ command_show_channel(int argc, char *argv[])
 	if (chan->list_url != NULL) {
 		printf(" Listing URL: %s\n", chan->list_url);
 	}
+	printf("    RetroNet: %s\n", enabledstr(chan->retronet_enabled));
 
 	return false;
 }
@@ -1068,6 +1097,10 @@ command_show_connection(int argc, char *argv[])
 	if (conn->selected_file != NULL) {
 		printf("Selected file: %s\n", conn->selected_file);
 	}
+	if (conn->file_root != NULL) {
+		printf(" Storage area: %s\n", conn->file_root);
+	}
+	printf("     RetroNet: %s\n", enabledstr(conn->retronet_enabled));
 
 	return false;
 }

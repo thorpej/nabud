@@ -24,11 +24,12 @@
  * SUCH DAMAGE.
  */
 
-#ifndef nhacp_h_included
-#define	nhacp_h_included
+#ifndef retronet_h_included
+#define	retronet_h_included
 
 struct nabu_connection;
 
-bool	nhacp_start(struct nabu_connection *, uint8_t);
+bool	retronet_request(struct nabu_connection *, uint8_t);
+void	retronet_conn_fini(struct nabu_connection *);
 
-#endif /* nhacp_h_included */
+#endif /* retronet_h_included */

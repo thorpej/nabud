@@ -96,6 +96,9 @@ control_serialize_channel(struct image_channel *chan, void *ctx)
 	rv = rv && atom_list_append_string(list, NABUCTL_CHAN_SOURCE,
 	    chan->source->name);
 
+	rv = rv && atom_list_append_bool(list, NABUCTL_CHAN_RETRONET_EXTENSIONS,
+	    chan->retronet_enabled);
+
 	rv = rv && atom_list_append_done(list);
 
 	return rv;
@@ -160,6 +163,14 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	default:			cp = "???"; break;
 	}
 	rv = rv && atom_list_append_string(list, NABUCTL_CONN_STATE, cp);
+
+	rv = rv && atom_list_append_bool(list, NABUCTL_CONN_RETRONET_EXTENSIONS,
+	    conn->retronet_enabled);
+
+	if (conn->file_root != NULL) {
+		rv = rv && atom_list_append_string(list,
+		    NABUCTL_CONN_FILE_ROOT, conn->file_root);
+	}
 
 	rv = rv && atom_list_append_done(list);
 

@@ -126,6 +126,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	NABU_MSG_CHANGE_CHANNEL	0x85
 #define	NABU_MSG_BEGIN		0x8F	/* ?? */
 
+#define	NABU_MSG_CLASSIC_FIRST	NABU_MSG_RESET
+#define	NABU_MSG_CLASSIC_LAST	NABU_MSG_CHANGE_CHANNEL
+
+#define	NABU_MSG_IS_CLASSIC(x)	((x) >= NABU_MSG_CLASSIC_FIRST &&	\
+				 (x) <= NABU_MSG_CLASSIC_LAST)
+
 #define	NABU_SERVICE_UNAUTHORIZED 0x90
 #define	NABU_SERVICE_AUTHORIZED	0x91
 
@@ -174,32 +180,6 @@ struct nabu_time {
 	uint8_t		hour;
 	uint8_t		minute;
 	uint8_t		second;
-};
-
-/*
- * NabuRetroNet file details structure.
- */
-struct rn_file_details {
-	uint8_t		file_size[4];
-#define	NR_ISDIR	((uint32_t)-1)
-#define	NR_NOENT	((uint32_t)-2)
-
-	uint8_t		c_year[2];
-	uint8_t		c_month;
-	uint8_t		c_day;
-	uint8_t		c_hour;
-	uint8_t		c_minute;
-	uint8_t		c_second;
-
-	uint8_t		m_year[2];
-	uint8_t		m_month;
-	uint8_t		m_day;
-	uint8_t		m_hour;
-	uint8_t		m_minute;
-	uint8_t		m_second;
-
-	uint8_t		name_length;
-	uint8_t		name[64];
 };
 
 #ifdef NABU_PROTO_INLINES

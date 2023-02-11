@@ -37,8 +37,18 @@
 struct atom {
 	TAILQ_ENTRY(atom) link;
 	struct nabuctl_atom_header hdr;
-	void *data;
+	union {
+		void *external_data;
+		uint8_t inline_data[sizeof(void *)];
+	};
 };
+
+#define	ATOM_DATA(atom)							\
+	(ATOM_DATA_INLINE_P((atom)->hdr.tag) ? (atom)->inline_data	\
+					     : (atom)->external_data)
+
+#define	ATOM_DATA_INLINE_P(tag)						\
+	(NABUCTL_TYPE(tag) == NABUCTL_TYPE_BOOL)
 
 struct atom_list {
 	TAILQ_HEAD(, atom) list;
@@ -51,6 +61,7 @@ size_t		atom_length(struct atom *);
 void *		atom_consume(struct atom *);
 void *		atom_dataref(struct atom *);
 uint64_t	atom_number_value(struct atom *);
+bool		atom_bool_value(struct atom *);
 
 const char *	atom_typedesc(uint32_t);
 const char *	atom_objdesc(uint32_t);
@@ -61,8 +72,8 @@ bool		atom_list_append(struct atom_list *, uint32_t,
 		    const void *, size_t);
 bool		atom_list_append_string(struct atom_list *, uint32_t,
 		    const char *);
-bool		atom_list_append_number(struct atom_list *, uint32_t,
-		    uint64_t);
+bool		atom_list_append_number(struct atom_list *, uint32_t, uint64_t);
+bool		atom_list_append_bool(struct atom_list *, uint32_t, bool);
 bool		atom_list_append_void(struct atom_list *, uint32_t);
 bool		atom_list_append_done(struct atom_list *);
 bool		atom_list_append_error(struct atom_list *);
