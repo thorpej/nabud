@@ -597,9 +597,81 @@ rn_req_fh_delete_range(struct retronet_context *ctx)
 		return;
 	}
 
-	/* XXX implement FH-DELETE-RANGE */
-	(void)offset;
-	(void)length;
+	/* No work to do if the length to delete is zero. */
+	if (length == 0) {
+		log_debug("[%s] length is zero; no work to do.",
+		    conn_name(conn));
+		return;
+	}
+
+	/*
+	 * First, get the current state of the file and figure out
+	 * the boundaries of the deleted range.
+	 */
+	struct fileio_attrs attrs;
+	int error;
+
+	error = stext_file_getattr(f, &attrs);
+	if (error) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		return;
+	}
+
+	if (offset >= attrs.size) {
+		log_debug("[%s] Offset %u beyond end-of-file.",
+		    conn_name(conn), offset);
+		return;
+	}
+
+	if (attrs.size - offset <= length) {
+		log_debug("[%s] Deleted range at tail-of-file (%u).",
+		    conn_name(conn), offset);
+		/*
+		 * No need to move any data in this case; we can just
+		 * truncate the file to the offset.
+		 */
+		stext_file_truncate(f, offset);
+		return;
+	}
+
+	uint32_t newsize = (uint32_t)attrs.size - length;
+	uint32_t keepoff = offset + length;
+	assert(keepoff > offset);
+
+	/*
+	 * Now, we just copy the data after the deleted range
+	 * to the start of the deleted range, then truncate
+	 * the file to the new size.
+	 */
+	assert(COPY_BUFSIZE <= UINT16_MAX);
+	for (;;) {
+		uint16_t iolen = COPY_BUFSIZE;
+
+		error = stext_file_pread(f, COPY_BUF, keepoff, &iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pread() failed: %s",
+			    conn_name(conn), strerror(error));
+			break;
+		}
+		if (iolen == 0) {
+			/* EOF! */
+			break;
+		}
+		error = stext_file_pwrite(f, COPY_BUF, offset, iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pwrite() failed: %s",
+			    conn_name(conn), strerror(error));
+			break;
+		}
+		keepoff += iolen;
+		offset += iolen;
+	}
+	error = stext_file_truncate(f, newsize);
+	if (error != 0) {
+		log_error("[%s] stext_file_truncate() failed: %s",
+		    conn_name(conn), strerror(error));
+	}
 }
 
 /*
