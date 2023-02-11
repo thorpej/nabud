@@ -71,5 +71,6 @@ void	*fileio_load_file_from_location(const char *, size_t, size_t,
 					struct fileio_attrs *, size_t *);
 
 char	*fileio_resolve_path(const char *, const char *, int);
+bool	fileio_location_is_local(const char *, size_t);
 
 #endif /* fileio_h_included */

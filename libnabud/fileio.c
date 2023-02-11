@@ -586,12 +586,17 @@ fileio_free(struct fileio *f)
 }
 
 static const struct fileio_scheme_ops *
-fileio_ops_for_location(const char *location)
+fileio_ops_for_location(const char *location, size_t loclen)
 {
 	const struct fileio_scheme_ops *fso;
+	size_t schemelen;
 
 	for (fso = fileio_scheme_ops; fso->scheme != NULL; fso++) {
-		if (strncmp(location, fso->scheme, strlen(fso->scheme)) == 0) {
+		schemelen = strlen(fso->scheme);
+		if (loclen < schemelen) {
+			continue;
+		}
+		if (strncmp(location, fso->scheme, schemelen) == 0) {
 			break;
 		}
 	}
@@ -609,7 +614,7 @@ fileio_open(const char *location, int flags, const char *local_root,
 	const struct fileio_scheme_ops *fso;
 	struct fileio *f;
 
-	fso = fileio_ops_for_location(location);
+	fso = fileio_ops_for_location(location, strlen(location));
 
 	if (fso->ops->io_write == NULL && (flags & FILEIO_O_RDWR) != 0) {
 		errno = ENOTSUP;
@@ -646,12 +651,10 @@ fileio_open(const char *location, int flags, const char *local_root,
 char *
 fileio_resolve_path(const char *location, const char *local_root, int oflags)
 {
-	const struct fileio_scheme_ops *fso;
 	char *path;
 	int error;
 
-	fso = fileio_ops_for_location(location);
-	if (fso->ops != &fileio_local_ops) {
+	if (! fileio_location_is_local(location, strlen(location))) {
 		errno = EINVAL;
 		return NULL;
 	}
@@ -662,6 +665,19 @@ fileio_resolve_path(const char *location, const char *local_root, int oflags)
 		return NULL;
 	}
 	return path;
+}
+
+/*
+ * fileio_location_is_local --
+ *	Returns true if the specified location is a local location.
+ */
+bool
+fileio_location_is_local(const char *location, size_t loclen)
+{
+	const struct fileio_scheme_ops *fso;
+
+	fso = fileio_ops_for_location(location, loclen);
+	return fso->ops == &fileio_local_ops;
 }
 
 /*
