@@ -600,6 +600,7 @@ struct connection_desc {
 	char		*type;
 	char		*state;
 	char		*selected_file;
+	char		*file_root;
 	unsigned int	channel;
 	unsigned int	number;
 	bool		retronet_enabled;
@@ -628,6 +629,7 @@ connection_desc_free(struct connection_desc *conn)
 	FREE(conn->type);
 	FREE(conn->state);
 	FREE(conn->selected_file);
+	FREE(conn->file_root);
 	free(conn);
 }
 
@@ -731,6 +733,12 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 			conn->retronet_enabled = atom_bool_value(atom);
 			log_debug("Got NABUCTL_CONN_RETRONET_EXTENSIONS=%d",
 			    conn->retronet_enabled);
+			break;
+
+		case NABUCTL_CONN_FILE_ROOT:
+			conn->file_root = atom_consume(atom);
+			log_debug("Got NABUCTL_CONN_FILE_ROOT=%s",
+			    conn->file_root);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
@@ -1088,6 +1096,9 @@ command_show_connection(int argc, char *argv[])
 	}
 	if (conn->selected_file != NULL) {
 		printf("Selected file: %s\n", conn->selected_file);
+	}
+	if (conn->file_root != NULL) {
+		printf(" Storage area: %s\n", conn->file_root);
 	}
 	printf("     RetroNet: %s\n", enabledstr(conn->retronet_enabled));
 

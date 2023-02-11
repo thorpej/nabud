@@ -167,6 +167,11 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	rv = rv && atom_list_append_bool(list, NABUCTL_CONN_RETRONET_EXTENSIONS,
 	    conn->retronet_enabled);
 
+	if (conn->file_root != NULL) {
+		rv = rv && atom_list_append_string(list,
+		    NABUCTL_CONN_FILE_ROOT, conn->file_root);
+	}
+
 	rv = rv && atom_list_append_done(list);
 
 	return rv;
