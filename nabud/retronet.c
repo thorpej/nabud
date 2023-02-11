@@ -820,7 +820,7 @@ rn_req_file_copy(struct retronet_context *ctx)
 	if (dst_f != NULL) {
 		fileio_close(dst_f);
 	}
- 	return;
+	return;
  bad:
 	unlink(dst_path);
 	goto out;
