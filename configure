@@ -14293,6 +14293,44 @@ printf "%s\n" "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 
+# Check for struct stat::st_birthtime.  This extension is available
+# on macOS and some of the BSDs.
+#
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for st_birthtime member in struct stat" >&5
+printf %s "checking for st_birthtime member in struct stat... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+		#include <sys/types.h>
+		#include <sys/stat.h>
+
+int
+main (void)
+{
+
+		struct stat dummy;
+		dummy.st_birthtime = 0;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+
+
+printf "%s\n" "#define HAVE_STAT_ST_BIRTHTIME 1" >>confdefs.h
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else $as_nop
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+
 # Check for some useful BSD functions that, sadly, are not universal.
 #
 ac_fn_c_check_func "$LINENO" "getprogname" "ac_cv_func_getprogname"

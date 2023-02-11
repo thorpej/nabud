@@ -389,7 +389,12 @@ fileio_stat_to_attrs(const char *path, const struct stat *sb,
 {
 	attrs->size = sb->st_size;
 	attrs->mtime = sb->st_mtime;
-	attrs->btime = 0;		/* XXX HAVE_STAT_ST_BIRTHTIME */
+#ifdef HAVE_STAT_ST_BIRTHTIME
+	/* check for -1 in case some quirky file system returns it */
+	attrs->btime = sb->st_birthtime != (time_t)-1 ? sb->st_birthtime : 0;
+#else
+	attrs->btime = 0;
+#endif /* HAVE_STAT_ST_BIRTHTIME */
 	attrs->is_directory = !!S_ISDIR(sb->st_mode);
 	attrs->is_writable = access(path, R_OK | W_OK) == 0;
 	attrs->is_seekable = true;

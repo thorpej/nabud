@@ -201,6 +201,22 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for struct stat::st_birthtime.  This extension is available
+# on macOS and some of the BSDs.
+#
+AC_MSG_CHECKING(for st_birthtime member in struct stat)
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/stat.h>
+	]],[[
+		struct stat dummy;
+		dummy.st_birthtime = 0;
+	]])],[
+		AC_DEFINE(HAVE_STAT_ST_BIRTHTIME, 1, [Define if the struct stat has a member st_birthtime on your OS])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for some useful BSD functions that, sadly, are not universal.
 #
 AC_CHECK_FUNCS(getprogname)

@@ -27,6 +27,9 @@
 /* Define if the struct sockaddr_un has a member sun_len on your OS */
 #undef HAVE_SOCKADDR_UN_SUN_LEN
 
+/* Define if the struct stat has a member st_birthtime on your OS */
+#undef HAVE_STAT_ST_BIRTHTIME
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
