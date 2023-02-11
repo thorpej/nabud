@@ -972,9 +972,9 @@ print_rn_file_details(const struct rn_file_details *d)
 		namelen = sizeof(d->name);
 	}
 	printf("--> '%*s' <--\n", namelen, d->name);
-	if (size == NR_ISDIR) {
+	if (size == RN_ISDIR) {
 		printf("--> DIRECTORY!\n");
-	} else if (size == NR_NOENT) {
+	} else if (size == RN_NOENT) {
 		printf("--> ENOENT!\n");
 		return;
 	}

@@ -360,8 +360,8 @@ struct rn_fh_seek_repl {
  */
 struct rn_file_details {
 	uint8_t		file_size[4];
-#define	NR_ISDIR	((uint32_t)-1)
-#define	NR_NOENT	((uint32_t)-2)
+#define	RN_ISDIR	((uint32_t)-1)
+#define	RN_NOENT	((uint32_t)-2)
 
 	uint8_t		c_year[2];
 	uint8_t		c_month;

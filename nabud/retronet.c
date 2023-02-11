@@ -179,7 +179,7 @@ rn_fileio_attrs_to_file_details(const char *location,
 		d->m_second = tm->tm_sec;
 
 		if (a->is_directory) {
-			size = NR_ISDIR;
+			size = RN_ISDIR;
 		} else {
 			if (a->size > UINT32_MAX) {
 				size = UINT32_MAX;
@@ -189,7 +189,7 @@ rn_fileio_attrs_to_file_details(const char *location,
 		}
 	} else {
 		/* NULL attrs == file does not exist. */
-		size = NR_NOENT;
+		size = RN_NOENT;
 	}
 	nabu_set_uint32(d->file_size, size);
 
@@ -1095,7 +1095,7 @@ rn_req_file_list_item(struct retronet_context *ctx)
 		memset(&ctx->reply.file_list_item, 0,
 		    sizeof(ctx->reply.file_list_item));
 		nabu_set_uint32(ctx->reply.file_list_item.file_size,
-		    NR_NOENT);
+		    RN_NOENT);
 	}
 	conn_send(conn, &ctx->reply.file_list_item,
 	    sizeof(ctx->reply.file_list_item));
