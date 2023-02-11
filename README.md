@@ -97,7 +97,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
       "Sources": [
         {
           "Name": "Local",
-          "Location": "/home/nabu",
+          "Location": "/home/nabu/channels",
         },
         {
           "Name": "NabuRetroNet",
@@ -122,20 +122,29 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
         {
           "Name": "HomeBrew",
           "Path": "HomeBrew/titles",
-          "ListURL": "https://cloud.nabu.ca/HomeBrew/titles/files.txt",
+          "ListURL": "https://cloud.nabu.ca/HomeBrew/titles/filesv2.txt",
           "Number": 9,
           "Type": "nabu",
           "Source": "NabuRetroNet",
+          "RetroNetExtensions": true,
         },
         {
-          "Name": "cycle1",
+          "Name": "NABU Network 1984 Cycle v1",
+          "Path": "cycle1",
           "Number": 11,
           "Type": "pak",
           "Source": "Local",
         },
         {
-          "Name": "homebrew",
+          "Name": "NABU Network 1984 Cycle v2",
+          "Path": "cycle2",
           "Number": 12,
+          "Type": "pak",
+          "Source": "Local",
+        },
+        {
+          "Name": "homebrew",
+          "Number": 19,
           "Type": "nabu",
           "Source": "Local",
         }
@@ -145,6 +154,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "serial",
           "Port": "/dev/tty-uftdi-A10MHWD6-0",
           "Channel": 11,
+          "FileRoot": "/home/nabu/storage/living-room-nabu",
         },
         {
           "Type": "tcp",
@@ -160,6 +170,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "tcp",
           "Port": "5009",
           "Channel": 9,
+          "FileRoot": "/home/nabu/storage/mame-nabu",
         },
         {
           "Type": "tcp",
@@ -170,20 +181,26 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "tcp",
           "Port": "5012",
           "Channel": 12,
+        },
+        {
+          "Type": "tcp",
+          "Port": "5019",
+          "Channel": 19,
+          "FileRoot": "/home/nabu/storage/mame-nabu",
         }
       ]
     }
 
 And this is the file layout of my one Source location:
 
-    the-ripe-vessel:thorpej 256$ ls -l /home/nabu/                                 
+    the-ripe-vessel:thorpej 256$ ls -l /home/nabu/channels
     total 28
     24 drwxr-xr-x  2 thorpej  wheel  22528 Dec 28 14:49 cycle1/
      4 drwxr-xr-x  2 thorpej  wheel    512 Dec 28 14:36 homebrew/
-    the-ripe-vessel:thorpej 257$ ls -l /home/nabu/homebrew/                                                      <
+    the-ripe-vessel:thorpej 257$ ls -l /home/nabu/channels/homebrew
     total 8
     8 -rw-r--r--  1 thorpej  users  6732 Dec 28 09:09 000001.nabu
-    the-ripe-vessel:thorpej 258$ ls -l /home/nabu/cycle1    
+    the-ripe-vessel:thorpej 258$ ls -l /home/nabu/channels/cycle1    
     total 6764
      28 -rw-r--r--  1 thorpej  users   27712 Dec 28 11:14 00-DD-5C-C5-82-58-D9-BA-33-D9-80-2D-19-1D-FC-55.npak
       4 -rw-r--r--  1 thorpej  users    3160 Dec 28 11:14 01-43-6A-DF-BE-45-CB-E8-A1-D7-EB-8D-AB-63-06-E7.npak
