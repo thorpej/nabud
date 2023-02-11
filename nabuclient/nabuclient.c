@@ -860,7 +860,30 @@ command_rn_fh_append(int argc, char *argv[])
 	return false;
 }
 
-/* XXX FH-INSERT */
+static bool
+command_rn_fh_insert(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t offset = stext_parse_offset(argv[2]);
+	uint16_t length = (uint16_t)strlen(argv[3]);
+
+	rn_set_uint8(slot);
+	rn_set_uint32(offset);
+	rn_set_uint16(length);
+	rn_set_blob(argv[3], length);
+
+	printf("Sending: NABU_MSG_RN_FH_INSERT.\n");
+	rn_send(NABU_MSG_RN_FH_INSERT);
+
+	return false;
+}
 
 static bool
 command_rn_fh_delete_range(int argc, char *argv[])
@@ -1473,6 +1496,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-fh-close",	.func = command_rn_fh_close },
 	{ .name = "rn-file-size",	.func = command_rn_file_size },
 	{ .name = "rn-fh-append",	.func = command_rn_fh_append },
+	{ .name = "rn-fh-insert",	.func = command_rn_fh_insert },
 	{ .name = "rn-fh-delete-range",	.func = command_rn_fh_delete_range },
 	{ .name = "rn-fh-replace",	.func = command_rn_fh_replace },
 	{ .name = "rn-file-delete",	.func = command_rn_file_delete },

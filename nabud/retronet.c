@@ -532,6 +532,7 @@ rn_req_fh_insert(struct retronet_context *ctx)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
 	struct stext_file *f;
+	uint8_t *buf = NULL;
 
 	/*
 	 * Get the first few bytes of the request so we know how
@@ -562,8 +563,102 @@ rn_req_fh_insert(struct retronet_context *ctx)
 		return;
 	}
 
-	/* XXX implement FH-INSERT */
-	(void)offset;
+	/* No work to do if the length to insert is zero. */
+	if (length == 0) {
+		log_debug("[%s] length is zero; no work to do.",
+		    conn_name(conn));
+		return;
+	}
+
+	/*
+	 * First, get the current state of the file and figure out
+	 * the boundaries of the affected range.
+	 */
+	struct fileio_attrs attrs;
+	int error;
+
+	error = stext_file_getattr(f, &attrs);
+	if (error) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		return;
+	}
+
+	/*
+	 * If the insertion comes just at the end-of-file or beyond
+	 * it, then there is no need to make room for it.
+	 */
+	if (offset >= attrs.size) {
+		goto do_insert;
+	}
+
+	/*
+	 * Ok, we have to shuffle file data around to make room for
+	 * the insertion.  We're going to need a temporary buffer for
+	 * this, and we'll have to walk backwards from the end of the
+	 * file to the insertion point.
+	 */
+	buf = malloc(COPY_BUFSIZE);
+	if (buf == NULL) {
+		log_error("[%s] Unable to allocate temporary buffer.",
+		    conn_name(conn));
+		return;
+	}
+
+	off_t newsize = attrs.size + length; /* new size of the file */
+	off_t resid = attrs.size - offset;   /* amount of data to copy */
+
+	if (newsize <= attrs.size || newsize > UINT32_MAX) {
+		log_error("[%s] Resulting file is too large.", conn_name(conn));
+		return;
+	}
+
+	/*
+	 * Ok, we've confirmed the new file will fit within our numerical
+	 * constraints.
+	 */
+	uint32_t readoff = (uint32_t)attrs.size;
+	uint32_t writeoff = (uint32_t)newsize;
+	uint16_t iolen;
+
+	while (resid != 0) {
+		iolen = (resid < COPY_BUFSIZE) ? resid : COPY_BUFSIZE;
+		readoff -= iolen;
+		writeoff -= iolen;
+
+		error = stext_file_pread(f, buf, readoff, &iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pread() failed: %s",
+			    conn_name(conn), strerror(error));
+			goto out;
+		}
+		/* Should never encounter EOF here. */
+		if (iolen == 0) {
+			log_error("[%s] UNEXPECTED END-OF-FILE!!!",
+			    conn_name(conn));
+			goto out;
+		}
+		error = stext_file_pwrite(f, buf, writeoff, iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pwrite() failed: %s",
+			    conn_name(conn), strerror(error));
+			goto out;
+		}
+		resid -= iolen;
+	}
+
+ do_insert:
+	error = stext_file_pwrite(f, ctx->request.fh_insert.data,
+	    offset, length);
+	if (error != 0) {
+		log_error("[%s] stext_file_pwrite() failed: %s",
+		    conn_name(conn), strerror(error));
+	}
+
+ out:
+	if (buf != NULL) {
+		free(buf);
+	}
 }
 
 /*
