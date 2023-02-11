@@ -32,6 +32,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <glob.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -54,8 +55,17 @@
 #include "retronet.h"
 #include "stext.h"
 
+struct rn_file_list_entry {
+	STAILQ_ENTRY(rn_file_list_entry) link;
+	unsigned int idx;
+	struct rn_file_details details;
+};
+
 struct retronet_context {
 	struct stext_context stext;
+	STAILQ_HEAD(, rn_file_list_entry) file_list;
+	unsigned int file_list_count;
+	struct rn_file_list_entry *cached_entry;
 
 	union {
 		union retronet_request request;
@@ -80,6 +90,7 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 		return ETIMEDOUT;
 	}
 	uint8_t len = *bp++;
+	log_debug("[%s] name length: %u", conn_name(conn), len);
 
 	/* Now we can receive the file name itself. */
 	if (! conn_recv(conn, bp, len)) {
@@ -834,6 +845,19 @@ rn_req_fh_truncate(struct retronet_context *ctx)
 	}
 }
 
+static void
+rn_file_list_free(struct retronet_context *ctx)
+{
+	struct rn_file_list_entry *e;
+
+	while ((e = STAILQ_FIRST(&ctx->file_list)) != NULL) {
+		STAILQ_REMOVE_HEAD(&ctx->file_list, link);
+		free(e);
+	}
+	ctx->file_list_count = 0;
+	ctx->cached_entry = NULL;
+}
+
 /*
  * rn_req_file_list --
  *	Handle the FILE-LIST request.
@@ -841,6 +865,110 @@ rn_req_fh_truncate(struct retronet_context *ctx)
 static void
 rn_req_file_list(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	const char *where, *pattern;
+	char *path, *cp;
+	glob_t g;
+	uint8_t flags;
+
+	/* Clear out any previous file list. */
+	rn_file_list_free(ctx);
+
+	/*
+	 * While the fields aren't interpreted the same way, somewhat
+	 * conveniently the "where", "pattern", and "flags" arguments
+	 * to FILE-LIST line up exactly with "src", "dst", and "flags"
+	 * for FILE-MOVE and FILE-COPY.
+	 */
+	if (! rn_file_copy_mode_getargs(ctx, &where, &pattern, &flags)) {
+		log_error("[%s] Failed to get arguments.",
+		    conn_name(conn));
+		return;
+	}
+
+	memset(&g, 0, sizeof(g));
+
+	path = fileio_resolve_path(where, conn->file_root,
+	    FILEIO_O_LOCAL_ROOT);
+	if (path == NULL) {
+		log_debug("[%s] Unable to resolve path: %s",
+		    conn_name(conn), where);
+		goto out;
+	}
+	log_debug("[%s] Resolved path: %s", conn_name(conn), path);
+
+	/*
+	 * Get rid of any trailing /'s -- we'll ensure there is
+	 * exactly one below.
+	 */
+	cp = path + strlen(path) - 1;
+	while (cp > path && *cp == '/') {
+		*cp-- = '\0';
+	}
+
+	if (asprintf(&cp, "%s/%s", path, pattern) < 0) {
+		log_error("[%s] Unable to allocate memory for glob pattern.",
+		    conn_name(conn));
+		goto out;
+	}
+	free(path);
+	path = cp;
+
+	log_debug("[%s] Pattern for glob: %s", conn_name(conn), path);
+
+	/*
+	 * We've already converted \ to / in the string, so just
+	 * disable escapes.
+	 */
+	int globret = glob(path, GLOB_NOESCAPE, NULL, &g);
+	if (globret != 0) {
+		log_debug("[%s] glob() returned %d.", conn_name(conn),
+		    globret);
+		goto out;
+	}
+	log_debug("[%s] glob() returned %d matches.", conn_name(conn),
+	    g.gl_matchc);
+
+	for (int i = 0; i < g.gl_matchc; i++) {
+		struct fileio_attrs attrs;
+		struct rn_file_list_entry *e = calloc(1, sizeof(*e));
+		uint8_t check_flag;
+
+		if (e == NULL) {
+			log_error("[%s] Failed to allocate file list entry.",
+			    conn_name(conn));
+			goto out;
+		}
+		if (! fileio_getattr_path(g.gl_pathv[i], &attrs)) {
+			log_error("[%s] Unable to get attrs for '%s': %s",
+			    conn_name(conn), g.gl_pathv[i], strerror(errno));
+			free(e);
+			continue;
+		}
+		check_flag = attrs.is_directory ? RN_FILE_LIST_DIRS
+						: RN_FILE_LIST_FILES;
+		if ((flags & check_flag) == 0) {
+			log_debug("[%s] Skipping '%s' due to flags.",
+			    conn_name(conn), g.gl_pathv[i]);
+			free(e);
+			continue;
+		}
+		log_debug("[%s] Will return '%s'.", conn_name(conn),
+		     g.gl_pathv[i]);
+		rn_fileio_attrs_to_file_details(g.gl_pathv[i], &attrs,
+		    &e->details);
+		e->idx = ctx->file_list_count++;
+		STAILQ_INSERT_TAIL(&ctx->file_list, e, link);
+	}
+
+ out:
+	nabu_set_uint16(ctx->reply.file_list.matchCount,
+	    (uint16_t)ctx->file_list_count);
+	conn_send(conn, &ctx->reply.file_list, sizeof(ctx->reply.file_list));
+	if (path != NULL) {
+		free(path);
+	}
+	globfree(&g);
 }
 
 /*
@@ -850,6 +978,48 @@ rn_req_file_list(struct retronet_context *ctx)
 static void
 rn_req_file_list_item(struct retronet_context *ctx)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.file_list_item,
+			sizeof(ctx->request.file_list_item))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	struct rn_file_list_entry *e;
+	unsigned int idx =
+	    nabu_get_uint16(ctx->request.file_list_item.itemIndex);
+
+	/* Start searching from the item we last returned. */
+	for (e = ctx->cached_entry; e != NULL; e = STAILQ_NEXT(e, link)) {
+		if (e->idx == idx) {
+			goto gotit;
+		}
+	}
+
+	for (e = STAILQ_FIRST(&ctx->file_list); e != ctx->cached_entry;
+	     e = STAILQ_NEXT(e, link)) {
+		if (e->idx == idx) {
+			goto gotit;
+		}
+	}
+
+ gotit:
+	ctx->cached_entry = e;
+	if (e != NULL) {
+		memcpy(&ctx->reply.file_list_item,
+		    &e->details, sizeof(ctx->reply.file_list_item));
+	} else {
+		/* Again, NO ERRORS.  Sigh. */
+		memset(&ctx->reply.file_list_item, 0,
+		    sizeof(ctx->reply.file_list_item));
+		nabu_set_uint32(ctx->reply.file_list_item.file_size,
+		    NR_NOENT);
+	}
+	conn_send(conn, &ctx->reply.file_list_item,
+	    sizeof(ctx->reply.file_list_item));
 }
 
 /*
@@ -1063,6 +1233,7 @@ retronet_context_alloc(struct nabu_connection *conn)
 	struct retronet_context *ctx = calloc(1, sizeof(*ctx));
 	if (ctx != NULL) {
 		stext_context_init(&ctx->stext, conn);
+		STAILQ_INIT(&ctx->file_list);
 		conn->retronet = ctx;
 	}
 	return ctx;
@@ -1078,6 +1249,7 @@ retronet_context_free(struct retronet_context *ctx)
 	assert(ctx->stext.conn->retronet == ctx);
 	ctx->stext.conn->retronet = NULL;
 	stext_context_fini(&ctx->stext);
+	rn_file_list_free(ctx);
 	free(ctx);
 }
 

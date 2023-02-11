@@ -963,6 +963,57 @@ print_rn_file_details(const struct rn_file_details *d)
 }
 
 static bool
+command_rn_file_list(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t flags = RN_FILE_LIST_FILES | RN_FILE_LIST_DIRS;
+
+	if (argc > 3) {
+		if (strcmp(argv[3], "files") == 0) {
+			flags = RN_FILE_LIST_FILES;
+		} else if (strcmp(argv[3], "dirs") == 0) {
+			flags = RN_FILE_LIST_DIRS;
+		}
+	}
+
+	rn_reset_cursor();
+
+	rn_set_filename(argv[1]);
+	rn_set_filename(argv[2]);
+	rn_set_uint8(flags);
+
+	printf("Sending: NABU_MSG_RN_FILE_LIST.\n");
+	rn_send(NABU_MSG_RN_FILE_LIST);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.file_list));
+
+	unsigned int matches =
+	    nabu_get_uint16(rn_buf.reply.file_list.matchCount);
+
+	printf("--> %u matches <--\n", matches);
+
+	if (matches == 0) {
+		return false;
+	}
+
+	for (unsigned int i = 0; i < matches; i++) {
+		rn_reset_cursor();
+		rn_set_uint16((uint16_t)i);
+		rn_send(NABU_MSG_RN_FILE_LIST_ITEM);
+		rn_reset_cursor();
+		rn_recv(sizeof(rn_buf.reply.file_list_item));
+		print_rn_file_details(&rn_buf.reply.file_list_item);
+	}
+
+	return false;
+}
+
+static bool
 command_rn_file_details(int argc, char *argv[])
 {
 	if (argc < 2) {
@@ -1379,6 +1430,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-fh-replace",	.func = command_rn_fh_replace },
 	{ .name = "rn-file-delete",	.func = command_rn_file_delete },
 	{ .name = "rn-file-move",	.func = command_rn_file_move },
+	{ .name = "rn-file-list",	.func = command_rn_file_list },
 	{ .name = "rn-file-details",	.func = command_rn_file_details },
 	{ .name = "rn-fh-details",	.func = command_rn_fh_details },
 	{ .name = "rn-fh-readseq",	.func = command_rn_fh_readseq },

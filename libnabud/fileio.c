@@ -380,6 +380,19 @@ fileio_local_io_ok(struct fileio *f, bool writing)
 	return fileio_io_ok(f, writing);
 }
 
+static void
+fileio_stat_to_attrs(const char *path, const struct stat *sb,
+    struct fileio_attrs *attrs)
+{
+	attrs->size = sb->st_size;
+	attrs->mtime = sb->st_mtime;
+	attrs->btime = 0;		/* XXX HAVE_STAT_ST_BIRTHTIME */
+	attrs->is_directory = !!S_ISDIR(sb->st_mode);
+	attrs->is_writable = access(path, R_OK | W_OK) == 0;
+	attrs->is_seekable = true;
+	attrs->is_local = true;
+}
+
 static bool
 fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 {
@@ -388,14 +401,8 @@ fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 	if (fstat(f->local.fd, &sb) < 0) {
 		return false;
 	}
-	attrs->size = sb.st_size;
-	attrs->mtime = sb.st_mtime;
-	attrs->btime = 0;		/* XXX HAVE_STAT_ST_BIRTHTIME */
-	attrs->is_directory = f->local.is_directory;
-	attrs->is_writable = access(f->location, R_OK | W_OK) == 0;
-	attrs->is_seekable = true;
-	attrs->is_local = true;
 
+	fileio_stat_to_attrs(f->location, &sb, attrs);
 	return true;
 }
 
@@ -690,6 +697,23 @@ fileio_getattr(struct fileio *f, struct fileio_attrs *attrs)
 		rv = (*f->ops->io_getattr)(f, attrs);
 	}
 	return rv;
+}
+
+/*
+ * fileio_getattr_path --
+ *	Do a fileio_getattr(), but on a path instead of a fileio.
+ */
+bool
+fileio_getattr_path(const char *path, struct fileio_attrs *attrs)
+{
+	struct stat sb;
+
+	if (stat(path, &sb) < 0) {
+		return false;
+	}
+
+	fileio_stat_to_attrs(path, &sb, attrs);
+	return true;
 }
 
 /*
