@@ -555,7 +555,7 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		goto out;
 	}
 
-	log_debug("[%s] Opening '%s'", conn_name(ctx->conn), filename);
+	log_info("[%s] Opening '%s'", conn_name(ctx->conn), filename);
 	fileio = fileio_open(filename, FILEIO_O_LOCAL_ROOT | oflags,
 	    ctx->conn->file_root, attrs);
 	if (fileio == NULL) {
@@ -600,9 +600,11 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 
 	if (need_shadow) {
 		if (attrs->size > MAX_SHADOW_LENGTH) {
-			log_debug("[%s] '%s' exceeds maximum shadow length %u.",
+			log_debug("[%s] '%s' size %lld exceeds maximum "
+			    "shadow length %u.",
 			    conn_name(ctx->conn),
 			    fileio_location(fileio),
+			    (long long)attrs->size,
 			    MAX_SHADOW_LENGTH);
 			error = EFBIG;
 			goto out;
@@ -615,9 +617,11 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		f->ops = &stext_fileops_shadow;
 	} else {
 		if (attrs->size > MAX_FILEIO_LENGTH) {
-			log_debug("[%s] '%s' exceeds maximum file size %u.",
+			log_debug("[%s] '%s' size %lld exceeds maximum "
+			    "file size %u.",
 			    conn_name(ctx->conn),
 			    fileio_location(f->fileio.fileio),
+			    (long long)attrs->size,
 			    MAX_FILEIO_LENGTH);
 			error = EFBIG;
 			goto out;
