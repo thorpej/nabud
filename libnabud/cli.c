@@ -163,7 +163,28 @@ cli_command_unknown(int argc, char *argv[])
 
 #ifdef HAVE_LIBEDIT_READLINE
 static bool libedit_readline_initialized = false;
-#endif
+
+/*
+ * cli_command_completion_generator --
+ *	Command completion match generator.
+ */
+static char *
+cli_command_completion_generator(const char *text, int state)
+{
+	return NULL;
+}
+
+/*
+ * cli_command_completion --
+ *	Command completion callback.
+ */
+static char **
+cli_command_completion(const char *text, int start, int end)
+{
+	rl_attempted_completion_over = 1;
+	return rl_completion_matches(text, cli_command_completion_generator);
+}
+#endif /* HAVE_LIBEDIT_READLINE */
 
 /*
  * cli_commands --
@@ -189,6 +210,7 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 		using_history();
 		libedit_readline_initialized = true;
 	}
+	rl_attempted_completion_function = cli_command_completion;
 #endif
 
 	if (asprintf(&promptstr, "%s> ", prompt) < 0) {
