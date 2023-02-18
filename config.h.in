@@ -12,6 +12,9 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define if you have libedit with a readline() function on your OS */
+#undef HAVE_LIBEDIT_READLINE
+
 /* Define to 1 if you have OpenSSL. */
 #undef HAVE_OPENSSL
 

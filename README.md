@@ -511,6 +511,10 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.2
+* Added command history to nabuctl on systems that have the BSD
+  _libedit_ library.
+
 ### nabud-1.1.1
 * Fix an issue reported by jeffreystone on Discord -- if you selected a
   file on a "Listener" connection using nabuctl, it would not be properly

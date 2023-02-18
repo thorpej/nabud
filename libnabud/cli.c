@@ -28,6 +28,10 @@
  * Command line tool helper functions.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <assert.h>
 #include <setjmp.h>
 #include <stdbool.h>
@@ -38,7 +42,12 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef HAVE_LIBEDIT_READLINE
+#include <readline/readline.h>
+#endif
+
 #include "cli.h"
+#include "log.h"
 
 #define	MAXARGV		8
 
@@ -152,6 +161,10 @@ cli_command_unknown(int argc, char *argv[])
 	return false;
 }
 
+#ifdef HAVE_LIBEDIT_READLINE
+static bool libedit_readline_initialized = false;
+#endif
+
 /*
  * cli_commands --
  *	CLI command loop.
@@ -162,11 +175,26 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 {
 	const struct cmdtab *cmd;
 	char *line = NULL, *cp, *tok;
-	size_t zero;
-	ssize_t linelen;
 	char *argv[MAXARGV];
 	int argc;
 	bool all_done;
+	char *promptstr = NULL;
+#ifndef HAVE_LIBEDIT_READLINE
+	ssize_t linelen;
+	size_t zero;
+#endif
+
+#ifdef HAVE_LIBEDIT_READLINE
+	if (! libedit_readline_initialized) {
+		using_history();
+		libedit_readline_initialized = true;
+	}
+#endif
+
+	if (asprintf(&promptstr, "%s> ", prompt) < 0) {
+		log_error("Unable to allocate memory.");
+		abort();
+	}
 
 	if (setjmp(cli_quit_env)) {
 		goto quit;
@@ -182,7 +210,7 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 	 */
 	if (prepfunc != NULL && !(*prepfunc)(ctx)) {
 		/* Error already displayed. */
-		return;
+		goto out;
 	}
 
 	for (all_done = false;;) {
@@ -192,9 +220,16 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 			line = NULL;
 		}
 		if (all_done) {
-			return;			/* quiet return */
+			goto out;		/* quiet return */
 		}
-		fprintf(stdout, "%s> ", prompt);
+#ifdef HAVE_LIBEDIT_READLINE
+		line = readline(promptstr);
+		if (line == NULL) {
+			goto quit;		/* got EOF */
+		}
+		add_history(line);
+#else
+		fprintf(stdout, "%s", promptstr);
 		fflush(stdout);
 		zero = 0;
 		linelen = getline(&line, &zero, stdin);
@@ -202,6 +237,7 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 			goto quit;		/* got EOF */
 		}
 		line[linelen - 1] = '\0';	/* get rid of the newline */
+#endif /* HAVE_LIBEDIT_READLINE */
 
 		/* Break it into tokens. */
 		argc = 0;
@@ -232,6 +268,13 @@ cli_commands(const char *prompt, const struct cmdtab *cmdtab,
 
  quit:
 	printf("Quit!\n");
+ out:
+	if (promptstr != NULL) {
+		free(promptstr);
+	}
+	if (line != NULL) {
+		free(line);
+	}
 }
 
 /*

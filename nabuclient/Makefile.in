@@ -107,7 +107,9 @@ CONFIG_CLEAN_VPATH_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
 am_nabuclient_OBJECTS = nabuclient-nabuclient.$(OBJEXT)
 nabuclient_OBJECTS = $(am_nabuclient_OBJECTS)
-nabuclient_DEPENDENCIES = ../libnabud/libnabud.la
+am__DEPENDENCIES_1 =
+nabuclient_DEPENDENCIES = ../libnabud/libnabud.la \
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -186,6 +188,7 @@ CANONICAL_TARGET = @CANONICAL_TARGET@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CLI_LIBS = @CLI_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
@@ -320,7 +323,7 @@ top_srcdir = @top_srcdir@
 AM_CFLAGS = $(WARNCFLAGS)
 nabuclient_SOURCES = nabuclient.c
 nabuclient_CPPFLAGS = 
-nabuclient_LDADD = ../libnabud/libnabud.la
+nabuclient_LDADD = ../libnabud/libnabud.la $(CLI_LIBS)
 all: all-am
 
 .SUFFIXES:

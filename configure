@@ -663,6 +663,7 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+CLI_LIBS
 PTHREAD_CFLAGS
 PTHREAD_LIBS
 PTHREAD_CXX
@@ -14330,6 +14331,55 @@ else $as_nop
 printf "%s\n" "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+
+# Check for the BSD libedit and a readline() function in libedit.  This
+# gives us readline() functionality without having to deal with GPL nonsense.
+# Sorry, kids, I won't be allowing GNU readline().
+#
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for readline in -ledit" >&5
+printf %s "checking for readline in -ledit... " >&6; }
+if test ${ac_cv_lib_edit_readline+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ledit  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+char readline ();
+int
+main (void)
+{
+return readline ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"
+then :
+  ac_cv_lib_edit_readline=yes
+else $as_nop
+  ac_cv_lib_edit_readline=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_edit_readline" >&5
+printf "%s\n" "$ac_cv_lib_edit_readline" >&6; }
+if test "x$ac_cv_lib_edit_readline" = xyes
+then :
+
+printf "%s\n" "#define HAVE_LIBEDIT_READLINE 1" >>confdefs.h
+
+	 CLI_LIBS="-ledit"
+fi
+
+
 
 # Check for some useful BSD functions that, sadly, are not universal.
 #
