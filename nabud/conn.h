@@ -99,6 +99,7 @@ struct nabu_connection {
 struct conn_add_args {
 	char		*port;
 	char		*file_root;
+	char		*selected_file;
 	unsigned int	channel;
 };
 

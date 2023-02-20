@@ -178,6 +178,7 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 	if (args->channel != 0) {
 		image_channel_select(conn, (int16_t)args->channel);
 	}
+	conn->l_selected_file = args->selected_file;
 
 	if (! conn_io_start(&conn->io, func, conn)) {
 		/* Error already logged. */
@@ -315,6 +316,7 @@ conn_tcp_thread(void *arg)
 		args.channel = chan != NULL ? chan->number : 0;
 		args.file_root = conn->file_root != NULL ?
 		    strdup(conn->file_root) : NULL;
+		args.selected_file = conn_get_selected_file(conn);
 
 		conn_create_common(strdup(host), sock, &args,
 		    CONN_TYPE_TCP, conn_thread);
