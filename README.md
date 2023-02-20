@@ -511,6 +511,13 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.1.1
+* Fix an issue reported by jeffreystone on Discord -- if you selected a
+  file on a "Listener" connection using nabuctl, it would not be properly
+  inherited when the real TCP connection came in from an emulator.
+* Fix some typos / spelling errors in the document you're reading now.
+  Patch provided by cml37.  Thanks!
+
 ### nabud-1.1
 * Tweaks to image cache management: images from local sources are cached
   less aggressively.  This reduces the memory footprint of nabud at very
