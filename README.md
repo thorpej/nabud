@@ -46,20 +46,20 @@ configuration file must contain 3 stanzas, in the following order:
 
 ### Sources
 
-Each Source has 3 properies:
-* Name: a string that idenfies the source.  It's meant both for human
+Each Source has 3 properties:
+* Name: a string that identifies the source.  It's meant both for human
   consumption as well as for specifying which Source provides a Channel.
 * Location: a local path or a URL string that specifies the root of the source.
 
 ### Channels
 
-Each Channel has 4 mandatory properites and 3 optional properties:
+Each Channel has 4 mandatory properties and 3 optional properties:
 * Name: a string that identifies a Channel.  It's meant both for human
   consumption, but also specifies the name of the directory in the Source's
   location that contains the Channel's files.
 * Path: an optional string that overrides the default directory for the
   Channel's content.
-* ListURL: on optional string that specifes the URL for the Channel's file
+* ListURL: on optional string that specifies the URL for the Channel's file
   listing.
 * DefaultFile: an optional string that specifies the default file to serve
   when the NABU requests image 000001.  This is used only if the Connection
@@ -86,7 +86,7 @@ Each Connection has 3 properties:
       the connection.
     * tcp: a string that specifies the TCP port on which connections will be
       accepted.
-* Channel: a numnber from 1 to 255 that specifies which channel to use for
+* Channel: a number from 1 to 255 that specifies which channel to use for
   this connection.
 
 ### Example configuration file
@@ -284,7 +284,7 @@ nabud understands the following command line options:
 creating files.
 
 In addition to errors, nabud logs some basic information about the requests
-it servies.  Here is a system log snippet showing the messages you will
+it services.  Here is a system log snippet showing the messages you will
 typically see:
 
     Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: main: Welcome to NABU! I'm version 0.8 of your host, nabud.
@@ -325,7 +325,7 @@ the _-u user_ option.  Typically, you would do this by following these steps:
 2. Create a user specifically for running nabud, for example _nabu_.  Set
    the default group ID of that user to the group created in step 1.
 3. Select a group that will be used to grant permission to open serial ports
-   for NABU connections.  Historitcally, a _dialer_ group exists on some Unix
+   for NABU connections.  Historically, a _dialer_ group exists on some Unix
    systems for this purpose.  Create one, if necessary.
 4. Add the user created in step 2 to the group you selected in step 3.
 5. Ensure your serial port devices grant read/write permission to the group
@@ -458,7 +458,7 @@ Additional details for channels and connections can also be viewed:
          RetroNet: enabled
     nabuctl> 
 
-You can see the list of files available on a connections's channel, if
+You can see the list of files available on a connections' channel, if
 that channel provides a listing:
 
     nabuctl> connection 1 listing
@@ -502,7 +502,7 @@ that channel provides a listing:
     34 - ScrollTest.nabu           Scroll Test
     nabuctl> 
 
-And you can select a file to loaded wnen the NABU boots and requests image
+And you can select a file to loaded when the NABU boots and requests image
 000001:
 
     nabuctl> connection 1 file 13
@@ -613,7 +613,7 @@ as a reference for this project:
   for the Raspberry Pi Pico also served to clarify some bits of the Adaptor
   protocol.
 * Alistair Crooks' "Minimal JSON" (_libmj_) was used to build the
-  configuraiton file parser.
+  configuration file parser.
 * The _fetch_ library (_libfetch_) was written by primarily by Dag-Erling
   Smørgrav, with additional contributions by Joerg Sonnenberger and
   Thomas Klausner.  The version here comes from The NetBSD Project.
