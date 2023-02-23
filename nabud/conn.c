@@ -178,6 +178,7 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 	if (args->channel != 0) {
 		image_channel_select(conn, (int16_t)args->channel);
 	}
+	conn->l_selected_file = args->selected_file;
 
 	if (! conn_io_start(&conn->io, func, conn)) {
 		/* Error already logged. */
@@ -212,13 +213,13 @@ conn_add_serial(const struct conn_add_args *args)
 		log_error("Unable to open %s: %s", args->port, strerror(errno));
 		return;
 	}
-/*
+
 	if (tcgetattr(fd, &t) < 0) {
 		log_error("tcgetattr() failed on %s: %s", args->port,
 		    strerror(errno));
 		goto bad;
 	}
-*/
+
 	/*
 	 * The native protocol is 8N1 @ 111000 baud, but it's much
 	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
@@ -228,16 +229,13 @@ conn_add_serial(const struct conn_add_args *args)
 	cfmakeraw(&t);
 	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
 	t.c_cflag |= CLOCAL | CS8 | CSTOPB;
-/*	
-	log_info("cfsetspeed setting %s port to %d.", args->port, NABU_NATIVE_BPS);
 	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
 		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
 		    args->port);
 		goto fallback;
 	}
-*/
-	log_info("cfsetspeed setting %s port to %d.", args->port, NABU_FALLBACK_BPS);
-//	if (tcsetattr(fd, TCSANOW, &t) < 0) {
+
+	if (tcsetattr(fd, TCSANOW, &t) < 0) {
 		/*
 		 * If we failed to set the native NABU baud rate
 		 * (it's a little of an odd-ball after all), then
@@ -247,7 +245,7 @@ conn_add_serial(const struct conn_add_args *args)
 		 */
 		log_info("Failed to 8N2-%d on %s; falling back to 8N2-%d.",
 		    NABU_NATIVE_BPS, args->port, NABU_FALLBACK_BPS);
- //fallback:
+ fallback:
 		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
 			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
 			    args->port);
@@ -258,7 +256,7 @@ conn_add_serial(const struct conn_add_args *args)
 			    NABU_FALLBACK_BPS, args->port);
 			goto bad;
 		}
-//	}
+	}
 
 	conn_create_common(args->port, fd, args, CONN_TYPE_SERIAL,
 	    conn_thread);
@@ -318,6 +316,7 @@ conn_tcp_thread(void *arg)
 		args.channel = chan != NULL ? chan->number : 0;
 		args.file_root = conn->file_root != NULL ?
 		    strdup(conn->file_root) : NULL;
+		args.selected_file = conn_get_selected_file(conn);
 
 		conn_create_common(strdup(host), sock, &args,
 		    CONN_TYPE_TCP, conn_thread);

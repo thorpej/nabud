@@ -56,7 +56,7 @@
  * $ftpioId: ftpio.c,v 1.30 1998/04/11 07:28:53 phk Exp $
  *
  */
-#define _GNU_SOURCE
+
 #ifdef __linux__
 /* Keep this down to Linux, it can create surprises else where. */
 #ifndef _GNU_SOURCE

@@ -28,9 +28,6 @@
  * Support for control messages.
  */
 
-// need this for cygwin compiles
-#define _GNU_SOURCE
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif

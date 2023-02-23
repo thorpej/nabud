@@ -421,9 +421,7 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	//const char *nabud_conf = NABUD_CONF;
-	// for cygwin
-	const char *nabud_conf = ".\\nabud.conf";
+	const char *nabud_conf = NABUD_CONF;
 	unsigned int logopts = 0;
 	const char *logfile = NULL;
 	const char *as_user = NULL;
