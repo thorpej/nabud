@@ -514,6 +514,12 @@ And you can select a file to loaded when the NABU boots and requests image
 ### nabud-1.2
 * Added command history to nabuctl on systems that have the BSD
   _libedit_ library.
+* Added a Baud configuration property to Connection objects.  This allows
+  users who have modified their NABU to use a different HCCA baud rate
+  clock to specify the baud rate to use.
+* Renamed the FileRoot property on Connection objects to StorageArea,
+  as the old name could be confusing.  The old name is still accepted for
+  compatibility with existing configuration files.
 
 ### nabud-1.1.1
 * Fix an issue reported by jeffreystone on Discord -- if you selected a
