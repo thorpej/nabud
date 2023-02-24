@@ -292,8 +292,14 @@ config_load_connection(mj_t *atom)
 	}
 	args.baud = (unsigned int)val;
 
-	/* FileRoot is optional. */
-	file_root_atom = mj_get_atom(atom, "FileRoot");
+	/*
+	 * StorageArea is optional, and we also check for the old
+	 * name (FileRoot).
+	 */
+	file_root_atom = mj_get_atom(atom, "StorageArea");
+	if (file_root_atom == NULL) {
+		file_root_atom = mj_get_atom(atom, "FileRoot");
+	}
 	if (VALID_ATOM(file_root_atom, MJ_STRING)) {
 		mj_asprint(&args.file_root, file_root_atom, MJ_HUMAN);
 	}

@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 9, 2023
+.Dd February 24, 2023
 .Dt NABUD 8
 .Sh NAME
 .Nm nabud
@@ -291,7 +291,7 @@ The
 .Dq Connections
 stanza is an array of connection objects.
 Each connection object has the following properties:
-.Bl -tag -width "FileRoot"
+.Bl -tag -width "StorageArea"
 .It Type
 A string that specifies if the connection type, either
 .Dq serial
@@ -321,11 +321,15 @@ port to use a different baud rate clock.
 .It Channel
 An optional number between 1 and 255 that specifies the connection's
 default channel.
-.It FileRoot
-An optional string that specifies the local file storage root for
+.It StorageArea
+An optional string that specifies the local file storage directory for
 this connection.
-This option must be specified if you wish to use the NHACP storage
-extensions.
+This option must be specified if you wish to use the NHACP or RetroNet
+storage extensions.
+In previous releases, this property was called
+.Dq FileRoot ,
+and the old name is still recognized for compatibility with existing
+configuration files.
 .El
 .Pp
 Here is a simple example configuration file:
@@ -422,7 +426,7 @@ If you will be using the storage extensions to the NABU Adaptor protocol
 .Pq such as NHACP ,
 then you should create a directory for your NABU's files.
 This directory will be specified in the
-.Dq FileRoot
+.Dq StorageArea
 property of your NABU's connection object in the
 .Nm
 configuration file.

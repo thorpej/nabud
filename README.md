@@ -154,7 +154,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "serial",
           "Port": "/dev/tty-uftdi-A10MHWD6-0",
           "Channel": 11,
-          "FileRoot": "/home/nabu/storage/living-room-nabu",
+          "StorageArea": "/home/nabu/storage/living-room-nabu",
         },
         {
           "Type": "tcp",
@@ -170,7 +170,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "tcp",
           "Port": "5009",
           "Channel": 9,
-          "FileRoot": "/home/nabu/storage/mame-nabu",
+          "StorageArea": "/home/nabu/storage/mame-nabu",
         },
         {
           "Type": "tcp",
@@ -186,7 +186,7 @@ This is the _nabud.conf_ configuration file I use to serve my own NABU:
           "Type": "tcp",
           "Port": "5019",
           "Channel": 19,
-          "FileRoot": "/home/nabu/storage/mame-nabu",
+          "StorageArea": "/home/nabu/storage/mame-nabu",
         }
       ]
     }
