@@ -193,7 +193,15 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 	return;
 }
 
-#define	NABU_NATIVE_BPS		111000
+/*
+ * The native buad rate of the NABU is:
+ *
+ *	3.57954MHz	 / 2			/ 16
+ *	NTSC Colorbust	   on-board divider	  on-chip divider on TR1863
+ *
+ * ==> 111860.625
+ */
+#define	NABU_NATIVE_BPS		((3579540 / 2) / 16)
 #define	NABU_FALLBACK_BPS	115200
 
 /*
@@ -204,6 +212,7 @@ void
 conn_add_serial(const struct conn_add_args *args)
 {
 	struct termios t;
+	speed_t baud;
 	int fd;
 
 	log_info("Creating Serial connection on %s.", args->port);
@@ -221,7 +230,7 @@ conn_add_serial(const struct conn_add_args *args)
 	}
 
 	/*
-	 * The native protocol is 8N1 @ 111000 baud, but it's much
+	 * The native protocol is 8N1 @ 111860 baud, but it's much
 	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
 	 * can get out of sync when receiving a stream of bytes in
 	 * a packet.
@@ -229,9 +238,9 @@ conn_add_serial(const struct conn_add_args *args)
 	cfmakeraw(&t);
 	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
 	t.c_cflag |= CLOCAL | CS8 | CSTOPB;
-	if (cfsetspeed(&t, NABU_NATIVE_BPS) < 0) {
-		log_error("cfsetspeed(NABU_NATIVE_BPS) on %s failed.",
-		    args->port);
+	if (cfsetspeed(&t, (baud = NABU_NATIVE_BPS)) < 0) {
+		log_error("cfsetspeed(NABU_NATIVE_BPS:%d) on %s failed.",
+		    baud, args->port);
 		goto fallback;
 	}
 
@@ -244,19 +253,22 @@ conn_add_serial(const struct conn_add_args *args)
 		 * re-synchronizing with the next start bit.
 		 */
 		log_info("Failed to 8N2-%d on %s; falling back to 8N2-%d.",
-		    NABU_NATIVE_BPS, args->port, NABU_FALLBACK_BPS);
+		    baud, args->port, NABU_FALLBACK_BPS);
  fallback:
-		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
-			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
-			    args->port);
+		if (cfsetspeed(&t, (baud = NABU_FALLBACK_BPS))) {
+			log_error("cfsetspeed(NABU_FALLBACK_BPS:%d) on "
+			    "%s failed.", baud, args->port);
 			goto bad;
 		}
 		if (tcsetattr(fd, TCSANOW, &t) < 0) {
 			log_error("Failed to set 8N2-%d on %s.",
-			    NABU_FALLBACK_BPS, args->port);
+			    baud, args->port);
 			goto bad;
 		}
 	}
+
+	log_info("[%s] Using 8N%d-%d.", args->port,
+	    (t.c_cflag & CSTOPB) ? 2 : 1, baud);
 
 	conn_create_common(args->port, fd, args, CONN_TYPE_SERIAL,
 	    conn_thread);
