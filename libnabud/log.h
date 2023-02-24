@@ -39,8 +39,6 @@ typedef enum {
 #define	LOG_OPT_FOREGROUND	(1U << 0)
 #define	LOG_OPT_DEBUG		(1U << 1)
 
-extern bool debug;
-
 bool	log_init(const char *, unsigned int);
 void	log_message(log_type, const char *, const char *, ...)
 	    __attribute__((__format__(__printf__, 3, 4)));
