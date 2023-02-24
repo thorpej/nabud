@@ -229,6 +229,8 @@ conn_add_serial(const struct conn_add_args *args)
 		goto bad;
 	}
 
+#define	STOP_BITS		((t.c_cflag & CSTOPB) ? 2 : 1)
+
 	/*
 	 * The native protocol is 8N1 @ 111860 baud, but it's much
 	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
@@ -238,37 +240,56 @@ conn_add_serial(const struct conn_add_args *args)
 	cfmakeraw(&t);
 	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
 	t.c_cflag |= CLOCAL | CS8 | CSTOPB;
-	if (cfsetspeed(&t, (baud = NABU_NATIVE_BPS)) < 0) {
-		log_error("cfsetspeed(NABU_NATIVE_BPS:%d) on %s failed.",
-		    baud, args->port);
-		goto fallback;
-	}
 
-	if (tcsetattr(fd, TCSANOW, &t) < 0) {
-		/*
-		 * If we failed to set the native NABU baud rate
-		 * (it's a little of an odd-ball after all), then
-		 * try the fall back.  But add an extra stop bit
-		 * so that the NABU's UART has a better chance of
-		 * re-synchronizing with the next start bit.
-		 */
-		log_info("Failed to 8N2-%d on %s; falling back to 8N2-%d.",
-		    baud, args->port, NABU_FALLBACK_BPS);
- fallback:
-		if (cfsetspeed(&t, (baud = NABU_FALLBACK_BPS))) {
-			log_error("cfsetspeed(NABU_FALLBACK_BPS:%d) on "
-			    "%s failed.", baud, args->port);
+	if (args->baud != 0) {
+		if (cfsetspeed(&t, (baud = (speed_t)args->baud)) < 0) {
+			log_error("[%s] cfsetspeed(%d) failed: %s",
+			    args->port, baud, strerror(errno));
 			goto bad;
 		}
 		if (tcsetattr(fd, TCSANOW, &t) < 0) {
-			log_error("Failed to set 8N2-%d on %s.",
-			    baud, args->port);
+			log_error("[%s] Failed to set 8N%d-%d: %s", args->port,
+			    STOP_BITS, baud, strerror(errno));
 			goto bad;
 		}
-	}
+	} else {
+		if (cfsetspeed(&t, (baud = NABU_NATIVE_BPS)) < 0) {
+			log_error("[%s] cfsetspeed(%d[NATIVE]) failed: %s",
+			    args->port, baud, strerror(errno));
+			goto fallback;
+		}
 
-	log_info("[%s] Using 8N%d-%d.", args->port,
-	    (t.c_cflag & CSTOPB) ? 2 : 1, baud);
+		if (tcsetattr(fd, TCSANOW, &t) < 0) {
+			/*
+			 * If we failed to set the native NABU baud rate
+			 * (it's a little of an odd-ball after all), then
+			 * try the fall back.  But add an extra stop bit
+			 * so that the NABU's UART has a better chance of
+			 * re-synchronizing with the next start bit.
+			 */
+			log_error("[%s] Failed to set native 8N%d-%d: %s",
+			    args->port, STOP_BITS, baud, strerror(errno));
+ fallback:
+			t.c_cflag |= CSTOPB;
+			log_info("[%s] Falling back to 8N%d-%d.",
+			    args->port, STOP_BITS, NABU_FALLBACK_BPS);
+			if (cfsetspeed(&t, (baud = NABU_FALLBACK_BPS))) {
+				log_error("[%s] cfsetspeed(%d[FALLBACK]) "
+				    "failed: %s", args->port, baud,
+				    strerror(errno));
+				goto bad;
+			}
+			if (tcsetattr(fd, TCSANOW, &t) < 0) {
+				log_error("[%s] Failed to set fallback "
+				    "8N%d-%d: %s", args->port, STOP_BITS, baud,
+				    strerror(errno));
+				goto bad;
+			}
+		}
+	}
+	log_info("[%s] Using 8N%d-%d.", args->port, STOP_BITS, baud);
+
+#undef STOP_BITS
 
 	conn_create_common(args->port, fd, args, CONN_TYPE_SERIAL,
 	    conn_thread);
