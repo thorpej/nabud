@@ -243,8 +243,9 @@ config_load_source(mj_t *atom)
 static void
 config_load_connection(mj_t *atom)
 {
-	mj_t *type_atom, *port_atom, *channel_atom, *file_root_atom;
-	char *type = NULL, *channel = NULL;
+	mj_t *type_atom, *port_atom, *channel_atom, *file_root_atom,
+	    *baud_atom;
+	char *type = NULL, *channel = NULL, *baud = NULL;
 	struct conn_add_args args = { };
 	long val;
 
@@ -275,6 +276,21 @@ config_load_connection(mj_t *atom)
 		val = 0;
 	}
 	args.channel = (unsigned int)val;
+
+	/* Baud is optional. */
+	baud_atom = mj_get_atom(atom, "Baud");
+	if (VALID_ATOM(baud_atom, MJ_NUMBER)) {
+		mj_asprint(&baud, baud_atom, MJ_HUMAN);
+		val = strtol(baud, NULL, 10);
+		if (val < 1) {
+			config_error("Baud must be at least 1 %u",
+			    atom);
+			goto out;
+		}
+	} else {
+		val = 0;
+	}
+	args.baud = (unsigned int)val;
 
 	/* FileRoot is optional. */
 	file_root_atom = mj_get_atom(atom, "FileRoot");
@@ -312,6 +328,9 @@ config_load_connection(mj_t *atom)
 	}
 	if (channel != NULL) {
 		free(channel);
+	}
+	if (baud != NULL) {
+		free(baud);
 	}
 	if (args.file_root != NULL) {
 		free(args.file_root);

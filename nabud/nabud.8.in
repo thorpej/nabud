@@ -46,7 +46,7 @@ participating cable TV networks using an external appliance called
 the
 .Dq Adaptor .
 The NABU was connected to the Adaptor using an RS422 serial interface
-running at 111,000 baud and sent requests to the Adaptor for indiviual
+running at 111,860 baud and sent requests to the Adaptor for indiviual
 segments of numbered images.
 The communication with the cable TV network was one-way, so the content
 was broadcast in a continuous
@@ -309,6 +309,15 @@ For
 connections, this is the TCP port number on which
 .Nm
 will listen for incoming connections from NABU emulators.
+.It Baud
+An optional number with a value of at least 1 that specifies the baud
+rate to use for this connection.
+Baud rate is only applicable to serial connections.
+If the baud rate is un-specified, then the connection will default
+to the NABU native baud rate of 111860, and will fall back to 115200
+if the native baud rate is not supported by the serial interface.
+This option is really only useful if you have modified your NABU's HCCA
+port to use a different baud rate clock.
 .It Channel
 An optional number between 1 and 255 that specifies the connection's
 default channel.
