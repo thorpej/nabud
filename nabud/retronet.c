@@ -106,6 +106,13 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 	*fnamelenp = len;
 	*cursorp = bp + len;
 
+	/*
+	 * Go ahead and NUL-termiante the name now.  We might have to do
+	 * it again later if there are more arguments after the name, but
+	 * this is convient for those places that don't.
+	 */
+	*cursorp = '\0';
+
 	if (! fileio_location_is_local((char *)bp, len)) {
 		/* Remote locations don't get "normalized". Blech. */
 		return 0;
@@ -126,8 +133,8 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 	 * specific file-root, so the likelihood of actually encountering
 	 * anything other than a plan old file name is pretty low.
 	 */
-	log_debug("[%s] %s before normalization: '%*s'",
-	    conn_name(conn), which, (int)len, *fnamep);
+	log_debug("[%s] %s before normalization: '%s'",
+	    conn_name(conn), which, *fnamep);
 	for (char *cp = (char *)bp; cp < (char *)bp + len; cp++) {
 		if (*cp == '\\') {
 			*cp = '/';
@@ -135,8 +142,8 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 			*cp = toupper((unsigned char)*cp);
 		}
 	}
-	log_debug("[%s] %s after normalization: '%*s'",
-	    conn_name(conn), which, (int)len, *fnamep);
+	log_debug("[%s] %s after normalization: '%s'",
+	    conn_name(conn), which, *fnamep);
 
 	return 0;
 }
@@ -226,9 +233,6 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 		/* Error already logged. */
 		return error;
 	}
-
-	/* Have all the args -- we can safely NUL-terminate the name. */
-	fname[fnamelen] = '\0';
 
 	/*
 	 * Open the file so we can get the size.  Yes, open.
@@ -838,9 +842,6 @@ rn_req_file_delete(struct retronet_context *ctx)
 		/* Error already logged. */
 		return;
 	}
-
-	/* Have all the args -- we can safely NUL-terminate the name. */
-	fname[fnamelen] = '\0';
 
 	char *path =
 	    fileio_resolve_path(fname, conn->file_root, FILEIO_O_LOCAL_ROOT);
