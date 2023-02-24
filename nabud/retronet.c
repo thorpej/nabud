@@ -238,10 +238,14 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 	 * It's OK to open a directory here, because we want to be able
 	 * to convey that information.
 	 */
+	log_debug("[%s] Opening '%s' in order to get attributes.",
+	    conn_name(ctx->stext.conn), fname);
 	f = fileio_open(fname,
 	    FILEIO_O_RDONLY | FILEIO_O_DIROK | FILEIO_O_LOCAL_ROOT,
 	    conn->file_root, attrs);
 	if (f == NULL) {
+		log_info("[%s] Opening '%s' failed: %s",
+		    conn_name(ctx->stext.conn), fname, strerror(errno));
 		return errno;
 	}
 
