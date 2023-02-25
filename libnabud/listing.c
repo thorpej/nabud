@@ -254,7 +254,7 @@ listing_create(char *data, size_t length)
 	};
 
 	if (setjmp(ctx.alloc_fail_env)) {
-		log_debug("Memory allocation failed.");
+		log_error("Memory allocation failed.");
 		if (ctx.listing != NULL) {
 			listing_free(ctx.listing);
 		} else {
