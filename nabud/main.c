@@ -421,22 +421,31 @@ const char nabud_version[] = VERSION;
 
 #if defined(__APPLE__)
 #define	PLATFORM_GETOPT_FLAGS	"L"
+#define	PLATFORM_USAGE_STRING	" [-L]"
+#elif defined(__linux__)
+#define	PLATFORM_GETOPT_FLAGS	"S"
+#define	PLATFORM_USAGE_STRING	" [-S]"
 #else
 #define	PLATFORM_GETOPT_FLAGS	/* nothing */
+#define	PLATFORM_USAGE_STRING	""
 #endif
 
 static void __attribute__((__noreturn__))
 usage(void)
 {
 	fprintf(stderr, "%s version %s\n", getprogname(), nabud_version);
-	fprintf(stderr, "usage: %s [-c conf] [-d subsys] [-f] [-l logfile]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s [-c conf] [-d subsys] [-f] [-l logfile] "
+			          "[-u user] [-U umask]%s\n",
+	    getprogname(), PLATFORM_USAGE_STRING);
 	fprintf(stderr, "       -c conf    specifies the configuration file\n");
 	fprintf(stderr, "       -d subsys  enable debugging (implies -f)\n");
 	fprintf(stderr, "       -f         run in the foreground\n");
 	fprintf(stderr, "       -l logfile specifies the log file\n");
 #if defined(__APPLE__)
 	fprintf(stderr, "       -L         run in launchd mode\n");
+#endif
+#if defined(__linux__)
+	fprintf(stderr, "       -S         run in systemd mode\n");
 #endif
 	fprintf(stderr, "       -u user    specifies user to run as\n");
 	fprintf(stderr, "       -U umask   specifies umask for file creation\n");

@@ -203,6 +203,16 @@ is specified, all log message are written to the controlling terminal.
 .\" extras-darwin .Nm
 .\" extras-darwin to run in the foreground, but differs in that it
 .\" extras-darwin does not alter the logging configuration.
+.\" extras-linux .It Fl S
+.\" extras-linux Runs
+.\" extras-linux .Nm
+.\" extras-linux in systemd mode.
+.\" extras-linux This is similar to the
+.\" extras-linux .Fl f
+.\" extras-linux option in that it causes
+.\" extras-linux .Nm
+.\" extras-linux to run in the foreground, but differs in that it
+.\" extras-linux does not alter the logging configuration.
 .It Fl u Ar user
 Specifies an alternative user ID to run
 .Nm
@@ -551,6 +561,11 @@ XXXdatadirXXX/nabud/examples/nabud.conf
 .\" extras-freebsd XXXdatadirXXX/nabud/rc.conf.d/nabud
 .\" extras-freebsd XXXdatadirXXX/nabud/rc.d/nabud
 .\" extras-freebsd .Ed
+.\" extras-linux .Pp
+.\" extras-linux A systemd service file can be found at:
+.\" extras-linux .Bd -literal -offset indent
+.\" extras-linux XXXdatadirXXX/nabud/systemd/nabud.service
+.\" extras-linux .Ed
 .\" extras-netbsd .Pp
 .\" extras-netbsd rc.conf.d and rc.d files can be found at:
 .\" extras-netbsd .Bd -literal -offset indent
