@@ -78,10 +78,10 @@ static const struct log_subsys_desc {
 	{ .name		= "cli",	.subsys = LOG_SUBSYS_CLI },
 	{ .name		= "conn_io",	.subsys = LOG_SUBSYS_CONN_IO },
 	{ .name		= "fileio",	.subsys = LOG_SUBSYS_FILEIO },
-	{ .name		= "listing",	.subsys = LOG_SUBSYS_LISTING },
 	{ .name		= "" },
 
 	{ .name		= "adaptor",	.subsys = LOG_SUBSYS_ADAPTOR },
+	{ .name		= "control",	.subsys = LOG_SUBSYS_CONTROL },
 	{ .name		= "conn",	.subsys = LOG_SUBSYS_CONN },
 	{ .name		= "image",	.subsys = LOG_SUBSYS_IMAGE },
 	{ .name		= "nhacp",	.subsys = LOG_SUBSYS_NHACP },

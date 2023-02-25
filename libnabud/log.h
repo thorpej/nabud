@@ -45,9 +45,9 @@ typedef enum {
 	LOG_SUBSYS_CLI,
 	LOG_SUBSYS_CONN_IO,
 	LOG_SUBSYS_FILEIO,
-	LOG_SUBSYS_LISTING,
 
 	LOG_SUBSYS_ADAPTOR,
+	LOG_SUBSYS_CONTROL,
 	LOG_SUBSYS_CONN,
 	LOG_SUBSYS_IMAGE,
 	LOG_SUBSYS_NHACP,
@@ -70,8 +70,8 @@ void	log_subsys_list(FILE *, const char *);
 
 #define	log_info(...)		\
 	log_message(LOG_TYPE_INFO, LOG_SUBSYS_ANY, __func__, __VA_ARGS__)
-#define	log_debug(...)		\
-	log_message(LOG_TYPE_DEBUG, LOG_SUBSYS_ANY, __func__, __VA_ARGS__)
+#define	log_debug(s, ...)		\
+	log_message(LOG_TYPE_DEBUG, (s), __func__, __VA_ARGS__)
 #define	log_error(...)		\
 	log_message(LOG_TYPE_ERROR, LOG_SUBSYS_ANY, __func__, __VA_ARGS__)
 #define	log_fatal(...)		\
