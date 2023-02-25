@@ -1,0 +1,12 @@
+[Unit]
+Description=A server for the NABU PC
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=idle
+ExecStart=XXXsbindirXXX/nabud -u nabu -f -l /var/log/nabud
+WorkingDirectory=/home/nabu
+
+[Install]
+WantedBy=multi-user.target

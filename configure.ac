@@ -73,6 +73,8 @@ case "$CANONICAL_TARGET" in
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
+		EXTRAS_OS="linux"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/systemd"
 		;;
 esac
 
@@ -248,6 +250,7 @@ AC_CONFIG_FILES([
 	extras/darwin/launchd/Makefile
 	extras/freebsd/rc.conf.d/Makefile
 	extras/freebsd/rc.d/Makefile
+	extras/linux/systemd/Makefile
 	extras/netbsd/rc.conf.d/Makefile
 	extras/netbsd/rc.d/Makefile
 	extras/openbsd/rc.d/Makefile

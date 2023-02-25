@@ -5,6 +5,7 @@ GENERAL_SUBDIRS		= examples libfetch libmj libnabud \
 
 ALL_EXTRAS_SUBDIRS	= extras/darwin/launchd \
 			  extras/freebsd/rc.conf.d extras/freebsd/rc.d \
+			  extras/linux/systemd \
 			  extras/netbsd/rc.conf.d extras/netbsd/rc.d \
 			  extras/openbsd/rc.d
 

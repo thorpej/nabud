@@ -12797,6 +12797,8 @@ case "$CANONICAL_TARGET" in
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
+		EXTRAS_OS="linux"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/systemd"
 		;;
 esac
 
@@ -14442,7 +14444,7 @@ fi
 
 # Generate the Makefiles
 #
-ac_config_files="$ac_config_files Makefile examples/Makefile extras/darwin/launchd/Makefile extras/freebsd/rc.conf.d/Makefile extras/freebsd/rc.d/Makefile extras/netbsd/rc.conf.d/Makefile extras/netbsd/rc.d/Makefile extras/openbsd/rc.d/Makefile libfetch/Makefile libmj/Makefile libnabud/Makefile nabud/Makefile nabuclient/Makefile nabuctl/Makefile"
+ac_config_files="$ac_config_files Makefile examples/Makefile extras/darwin/launchd/Makefile extras/freebsd/rc.conf.d/Makefile extras/freebsd/rc.d/Makefile extras/linux/systemd/Makefile extras/netbsd/rc.conf.d/Makefile extras/netbsd/rc.d/Makefile extras/openbsd/rc.d/Makefile libfetch/Makefile libmj/Makefile libnabud/Makefile nabud/Makefile nabuclient/Makefile nabuctl/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -15461,6 +15463,7 @@ do
     "extras/darwin/launchd/Makefile") CONFIG_FILES="$CONFIG_FILES extras/darwin/launchd/Makefile" ;;
     "extras/freebsd/rc.conf.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/freebsd/rc.conf.d/Makefile" ;;
     "extras/freebsd/rc.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/freebsd/rc.d/Makefile" ;;
+    "extras/linux/systemd/Makefile") CONFIG_FILES="$CONFIG_FILES extras/linux/systemd/Makefile" ;;
     "extras/netbsd/rc.conf.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/netbsd/rc.conf.d/Makefile" ;;
     "extras/netbsd/rc.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/netbsd/rc.d/Makefile" ;;
     "extras/openbsd/rc.d/Makefile") CONFIG_FILES="$CONFIG_FILES extras/openbsd/rc.d/Makefile" ;;
