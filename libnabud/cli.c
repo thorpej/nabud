@@ -44,6 +44,7 @@
 
 #ifdef HAVE_LIBEDIT_READLINE
 #include <readline/readline.h>
+#include <readline/history.h>
 #endif
 
 #include "cli.h"
