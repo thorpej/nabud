@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +30,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -44,6 +45,7 @@
 static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t log_syslog_init_once = PTHREAD_ONCE_INIT;
 static bool log_using_syslog;
+static uint32_t log_debug_subsys_enabled;
 
 static unsigned int log_options;
 static FILE *log_file;
@@ -64,6 +66,66 @@ static const int log_type_to_syslog[] = {
 
 #define	log_type_is_valid(t)	((t) >= LOG_TYPE_INFO && (t) <= LOG_TYPE_FATAL)
 
+static const struct log_subsys_desc {
+	const char	*name;
+	log_subsys	subsys;
+} log_subsys_descs[] = {
+	{ .name		= "any",	.subsys = LOG_SUBSYS_ANY },
+	{ .name		= "all",	.subsys = LOG_SUBSYS_ANY },
+	{ .name		= "" },
+
+	{ .name		= "atom",	.subsys = LOG_SUBSYS_ATOM },
+	{ .name		= "cli",	.subsys = LOG_SUBSYS_CLI },
+	{ .name		= "conn_io",	.subsys = LOG_SUBSYS_CONN_IO },
+	{ .name		= "fileio",	.subsys = LOG_SUBSYS_FILEIO },
+	{ .name		= "listing",	.subsys = LOG_SUBSYS_LISTING },
+	{ .name		= "" },
+
+	{ .name		= "adaptor",	.subsys = LOG_SUBSYS_ADAPTOR },
+	{ .name		= "conn",	.subsys = LOG_SUBSYS_CONN },
+	{ .name		= "image",	.subsys = LOG_SUBSYS_IMAGE },
+	{ .name		= "nhacp",	.subsys = LOG_SUBSYS_NHACP },
+	{ .name		= "retronet",	.subsys = LOG_SUBSYS_RETRONET },
+	{ .name		= "stext",	.subsys = LOG_SUBSYS_STEXT },
+
+	{ .name		= NULL },
+};
+
+/*
+ * log_subsys_lookup --
+ *	Lookup a logging subsystem by name.
+ */
+static const struct log_subsys_desc *
+log_subsys_lookup(const char *name)
+{
+	const struct log_subsys_desc *d;
+
+	for (d = log_subsys_descs; d->name != NULL; d++) {
+		if (strcmp(d->name, name) == 0) {
+			return d;
+		}
+	}
+	return NULL;
+}
+
+/*
+ * log_subsys_list --
+ *	Print a list of the logging subsystems, one per line, with prefix.
+ */
+void
+log_subsys_list(FILE *fp, const char *prefix)
+{
+	const struct log_subsys_desc *d;
+
+	for (d = log_subsys_descs; d->name != NULL; d++) {
+		if (d->name[0] == '\0') {
+			fprintf(fp, "\n");
+		} else {
+			fprintf(fp, "%s%s\n", prefix, d->name);
+		}
+	}
+}
+
 /*
  * log_syslog_init --
  *	Initialize our interface to syslog.  Just once.
@@ -78,13 +140,36 @@ log_syslog_init(void)
 }
 
 /*
+ * log_debug_enable --
+ *	Enable debugging on the named subsystem.
+ */
+bool
+log_debug_enable(const char *name)
+{
+	const struct log_subsys_desc *d = log_subsys_lookup(name);
+
+	if (d == NULL) {
+		return false;
+	}
+
+	log_options |= LOG_OPT_DEBUG;
+	if (d->subsys == LOG_SUBSYS_ANY) {
+		log_debug_subsys_enabled |= UINT32_MAX;
+	} else {
+		log_debug_subsys_enabled |= (1U << d->subsys);
+	}
+
+	return true;
+}
+
+/*
  * log_init --
  *	Initialize the logging interface.
  */
 bool
 log_init(const char *path, unsigned int options)
 {
-	log_options = options;
+	log_options |= options;
 
 	/* If we're in the foreground, always log to stdout. */
 	if (log_options & LOG_OPT_FOREGROUND) {
@@ -126,12 +211,30 @@ log_fini(void)
 }
 
 /*
+ * log_debug_subsys_is_enabled --
+ *	Check that debug logging is enabled on the specified
+ *	subsystem.
+ */
+static bool
+log_debug_subsys_is_enabled(log_subsys subsys)
+{
+	assert(subsys >= LOG_SUBSYS_ANY && subsys < LOG_NSUBSYS);
+
+	if (subsys == LOG_SUBSYS_ANY) {
+		return true;
+	}
+
+	return !!(log_debug_subsys_enabled & (1U << subsys));
+}
+
+/*
  * log_message --
  *	Log a message.  This is usually invoked via the macros
  *	for specific log message types.
  */
 void
-log_message(log_type type, const char *func, const char *fmt, ...)
+log_message(log_type type, log_subsys subsys, const char *func,
+    const char *fmt, ...)
 {
 	va_list ap;
 	char *caller_string = NULL;
@@ -139,9 +242,13 @@ log_message(log_type type, const char *func, const char *fmt, ...)
 
 	assert(log_type_is_valid(type));
 
-	if (type == LOG_TYPE_DEBUG &&
-	    (log_options & LOG_OPT_DEBUG) == 0) {
-		return;
+	if (type == LOG_TYPE_DEBUG) {
+		if ((log_options & LOG_OPT_DEBUG) == 0) {
+			return;
+		}
+		if (!log_debug_subsys_is_enabled(subsys)) {
+			return;
+		}
 	}
 
 	va_start(ap, fmt);

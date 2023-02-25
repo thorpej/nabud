@@ -1367,7 +1367,7 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "d")) != -1) {
 		switch (ch) {
 		case 'd':
-			logopts |= LOG_OPT_DEBUG;
+			log_debug_enable("any");
 			break;
 
 		default:

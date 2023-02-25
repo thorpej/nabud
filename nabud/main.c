@@ -417,7 +417,7 @@ config_load(const char *path)
 
 const char nabud_version[] = VERSION;
 
-#define	GETOPT_FLAGS	"c:dfl:u:U:"
+#define	GETOPT_FLAGS	"c:d:fl:u:U:"
 
 #if defined(__APPLE__)
 #define	PLATFORM_GETOPT_FLAGS	"L"
@@ -429,10 +429,10 @@ static void __attribute__((__noreturn__))
 usage(void)
 {
 	fprintf(stderr, "%s version %s\n", getprogname(), nabud_version);
-	fprintf(stderr, "usage: %s [-c conf] [-d] [-f] [-l logfile]\n",
+	fprintf(stderr, "usage: %s [-c conf] [-d subsys] [-f] [-l logfile]\n",
 	    getprogname());
 	fprintf(stderr, "       -c conf    specifies the configuration file\n");
-	fprintf(stderr, "       -d         enable debugging (implies -f)\n");
+	fprintf(stderr, "       -d subsys  enable debugging (implies -f)\n");
 	fprintf(stderr, "       -f         run in the foreground\n");
 	fprintf(stderr, "       -l logfile specifies the log file\n");
 #if defined(__APPLE__)
@@ -440,6 +440,10 @@ usage(void)
 #endif
 	fprintf(stderr, "       -u user    specifies user to run as\n");
 	fprintf(stderr, "       -U umask   specifies umask for file creation\n");
+
+	fprintf(stderr, "\nValid subsystems for -d:\n");
+	log_subsys_list(stderr, "\t");
+
 	exit(EXIT_FAILURE);
 }
 
@@ -464,7 +468,9 @@ main(int argc, char *argv[])
 
 		case 'd':
 			/* debug implies foreground */
-			logopts |= LOG_OPT_DEBUG;
+			if (! log_debug_enable(optarg)) {
+				usage();
+			}
 			/* FALLTHROUGH */
 
 		case 'f':
