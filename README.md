@@ -289,10 +289,10 @@ systems on which it runs.
 If you are interested in providing extras for your favorite operating
 system, please let me know!
 
-## Running nabud
+## Configuring nabud
 
 After building nabud, copy the example _nabud.conf_ to the selected location
-(default: _/etc/nabud.conf_), tailor it to your system, and then run it:
+(default: _$(prefix)/etc/nabud.conf_), tailor it to your system, and then run it:
 
     # ./nabud
 
@@ -304,7 +304,8 @@ you're only using TCP functionality, it can run completely unprivileged.
 
 nabud understands the following command line options:
 * _-c conf_ -- specifies an alternate name / location for _nabud.conf_.
-* _-d_ -- enables debugging.  This option also implies _-f_.
+* _-d subsys_ -- enables debugging on the specified subsystem; see the
+   nabud(8) man page for details.  This option also implies _-f_.
 * _-f_ -- run in the foreground.  Without this, nabud will detach from the
   controlling terminal and run as a daemon.
 * _-l logfile_ -- specifies the path to a log file.  Without this option,
@@ -315,39 +316,18 @@ nabud understands the following command line options:
 * _-U umask_ -- Specifies the file creation mask that nabud should use when
 creating files.
 
-In addition to errors, nabud logs some basic information about the requests
-it services.  Here is a system log snippet showing the messages you will
-typically see:
+On macOS, nabud also understands the following command line options:
+* _-L- -- runs nabud in "launchd mode".  This is similar to the _-f_
+  option, but does not change the logging destination.
 
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: main: Welcome to NABU! I'm version 0.8 of your host, nabud.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: main: Running as UID 2000, file creation mask 002
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: control_init: Creating control channel at /tmp/nabuctl.sock
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_source: Adding Source Local at /home/nabu
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_source: Adding Source NabuRetroNet at https://cloud.nabu.ca
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding pak channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet) at https://cloud.nabu.ca/cycle1
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding pak channel 2 (NABU Network 1984 Cycle v2 on NabuRetroNet) at https://cloud.nabu.ca/cycle2
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding nabu channel 3 (HomeBrew on NabuRetroNet) at https://cloud.nabu.ca/HomeBrew/titles
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Channel 3 has a listing at: https://cloud.nabu.ca/HomeBrew/titles/files.txt
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding pak channel 11 (cycle1 on Local) at /home/nabu/cycle1
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_add_channel: Adding nabu channel 12 (homebrew on Local) at /home/nabu/homebrew
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_serial: Creating Serial connection on /dev/tty-uftdi-A10MHWD6-0.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [/dev/tty-uftdi-A10MHWD6-0] Selected channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5001.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5001] Selected channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5001] Selected channel 1 (NABU Network 1984 Cycle v1 on NabuRetroNet).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: adaptor_event_loop: [/dev/tty-uftdi-A10MHWD6-0] Connection starting.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5002.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5002] Selected channel 2 (NABU Network 1984 Cycle v2 on NabuRetroNet).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5002] Selected channel 2 (NABU Network 1984 Cycle v2 on NabuRetroNet).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5003.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5003] Selected channel 3 (HomeBrew on NabuRetroNet).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5003] Selected channel 3 (HomeBrew on NabuRetroNet).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5011.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5011] Selected channel 11 (cycle1 on Local).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5011] Selected channel 11 (cycle1 on Local).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: conn_add_tcp: Creating TCP listener on port 5012.
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv6-5012] Selected channel 12 (homebrew on Local).
-    Jan 14 11:00:23 the-ripe-vessel nabud[19985]: INFO: image_channel_select: [IPv4-5012] Selected channel 12 (homebrew on Local).
+On Linux, nabud also understands the following command line options:
+* _-S_ -- runs nabud in "systemd mode".  This is similar to the _-f_
+  option, but does not change the logging destination.
+
+(Astute readers will note that macOS's -L and Linux's -S are the same.)
+
+In addition to errors, nabud logs some basic information about the requests
+it services.
 
 It is recommended that you run nabud as a minimally-privileged user using
 the _-u user_ option.  Typically, you would do this by following these steps:
