@@ -523,9 +523,12 @@ And you can select a file to loaded when the NABU boots and requests image
 * Changed nabud's -d flag to enable debugging on specific subsystems,
   reducing the amount of logs you have to sift through when trying to
   figure out a problem.
+* Added "show all channels" and "show all connections" commands to
+  nabuctl, which shows the details for all channels and connections,
+  respectively, rather than just one at a time.
 
 ### nabud-1.1.1
-* Fix an issue reported by jeffreystone on Discord -- if you selected a
+* Fix an issue reported by jefferystone on Discord -- if you selected a
   file on a "Listener" connection using nabuctl, it would not be properly
   inherited when the real TCP connection came in from an emulator.
 * Fix some typos / spelling errors in the document you're reading now.
