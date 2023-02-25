@@ -248,6 +248,14 @@ distribution, getting OpenSSL installed is left as an exercise for the
 reader.  Once it's installed, there is not likely to be any additional
 magic that you need to perform; the configure script will probably find it.
 
+The nabuctl program has some basic command line history and editing
+support, provided by the _libedit_ library on BSD systems.  A compatible
+library may be available on other systems.  I was able to install the
+development file for such a library on my Ubuntu system like so:
+
+    % sudo apt update
+    % sudo apt install libreadline-dev
+
 Because an effort has been made to keep nabud fairly self-contained and
 reliant only on APIs provided by the operating system, building it just
 requires a toolchain.  For the BSDs and Linux, it's probably already
