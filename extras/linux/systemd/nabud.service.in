@@ -6,7 +6,7 @@ After=network-online.target
 [Service]
 Type=idle
 ExecStart=XXXsbindirXXX/nabud -u nabu -f -l /var/log/nabud
-WorkingDirectory=/home/nabu
+WorkingDirectory=/
 
 [Install]
 WantedBy=multi-user.target
