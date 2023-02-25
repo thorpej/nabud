@@ -78,7 +78,7 @@ Each Channel has 4 mandatory properties and 3 optional properties:
 
 Each Connection has 3 properties:
 * Type: a string that specifies the type of connection:
-    * serial: an RS422 serial connection to real NABU hardware.
+    * serial: a serial connection to real NABU hardware.
     * tcp: a TCP listener that accepts connections from emulators (e.g. MAME).
 * Port: a string that specifies the "port" to use for the connection, which
   varies based on the connection type:
@@ -538,6 +538,8 @@ And you can select a file to loaded when the NABU boots and requests image
 * Added "show all channels" and "show all connections" commands to
   nabuctl, which shows the details for all channels and connections,
   respectively, rather than just one at a time.
+* Added a systemd extra for Linux, along with some other Linux-specific
+  instructions, provided by sampson on Discord.
 
 ### nabud-1.1.1
 * Fix an issue reported by jefferystone on Discord -- if you selected a
