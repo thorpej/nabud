@@ -1050,9 +1050,28 @@ static bool
 command_show_usage(int argc, char *argv[])
 {
 	printf("Usage:\n");
-	printf("\tshow channel <numnber>\n");
+	printf("\tshow channel <number>\n");
 	printf("\tshow connection <number>\n");
+	printf("\tshow all channels\n");
+	printf("\tshow all connections\n");
 	return false;
+}
+
+static void
+show_one_channel(struct channel_desc *chan)
+{
+	printf("Channel %u:\n", chan->number);
+	printf("        Name: %s\n", chan->name);
+	printf("      Source: %s\n", chan->source);
+	printf("        Path: %s\n", chan->path);
+	printf("        Type: %s\n", chan->type);
+	if (chan->default_file != NULL) {
+		printf("Default file: %s\n", chan->default_file);
+	}
+	if (chan->list_url != NULL) {
+		printf(" Listing URL: %s\n", chan->list_url);
+	}
+	printf("    RetroNet: %s\n", enabledstr(chan->retronet_enabled));
 }
 
 static bool
@@ -1071,21 +1090,44 @@ command_show_channel(int argc, char *argv[])
 		printf("Invalid channel: %s\n", argv[2]);
 		return false;
 	}
-
-	printf("Channel %u:\n", chan->number);
-	printf("        Name: %s\n", chan->name);
-	printf("      Source: %s\n", chan->source);
-	printf("        Path: %s\n", chan->path);
-	printf("        Type: %s\n", chan->type);
-	if (chan->default_file != NULL) {
-		printf("Default file: %s\n", chan->default_file);
-	}
-	if (chan->list_url != NULL) {
-		printf(" Listing URL: %s\n", chan->list_url);
-	}
-	printf("    RetroNet: %s\n", enabledstr(chan->retronet_enabled));
+	show_one_channel(chan);
 
 	return false;
+}
+
+static bool
+command_show_all_channels(int argc, char *argv[])
+{
+	struct channel_desc *chan;
+	bool want_crlf = false;
+
+	TAILQ_FOREACH(chan, &channel_list, link) {
+		if (want_crlf) {
+			printf("\n");
+		}
+		show_one_channel(chan);
+		want_crlf = true;
+	}
+	return false;
+}
+
+static void
+show_one_connection(struct connection_desc *conn)
+{
+	printf("Connection %u:\n", conn->number);
+	printf("         Name: %s\n", conn->name);
+	printf("         Type: %s\n", conn->type);
+	printf("        State: %s\n", conn->state);
+	if (conn->channel != 0) {
+		printf("      Channel: %u\n", conn->channel);
+	}
+	if (conn->selected_file != NULL) {
+		printf("Selected file: %s\n", conn->selected_file);
+	}
+	if (conn->file_root != NULL) {
+		printf(" Storage area: %s\n", conn->file_root);
+	}
+	printf("     RetroNet: %s\n", enabledstr(conn->retronet_enabled));
 }
 
 static bool
@@ -1104,26 +1146,42 @@ command_show_connection(int argc, char *argv[])
 		printf("Invalid connection: %s\n", argv[2]);
 		return false;
 	}
-
-	printf("Connection %u:\n", conn->number);
-	printf("         Name: %s\n", conn->name);
-	printf("         Type: %s\n", conn->type);
-	printf("        State: %s\n", conn->state);
-	if (conn->channel != 0) {
-		printf("      Channel: %u\n", conn->channel);
-	}
-	if (conn->selected_file != NULL) {
-		printf("Selected file: %s\n", conn->selected_file);
-	}
-	if (conn->file_root != NULL) {
-		printf(" Storage area: %s\n", conn->file_root);
-	}
-	printf("     RetroNet: %s\n", enabledstr(conn->retronet_enabled));
+	show_one_connection(conn);
 
 	return false;
 }
 
+static bool
+command_show_all_connections(int argc, char *argv[])
+{
+	struct connection_desc *conn;
+	bool want_crlf = false;
+
+	TAILQ_FOREACH(conn, &connection_list, link) {
+		if (want_crlf) {
+			printf("\n");
+		}
+		show_one_connection(conn);
+		want_crlf = true;
+	}
+	return false;
+}
+
+static const struct cmdtab show_all_cmdtab[] = {
+	{ .name = "channels",		.func = command_show_all_channels },
+	{ .name = "connections",	.func = command_show_all_connections },
+
+	CMDTAB_EOL(command_show_usage)
+};
+
+static bool
+command_show_all(int argc, char *argv[])
+{
+	return cli_subcommand(show_all_cmdtab, argc, argv, 2);
+}
+
 static const struct cmdtab show_cmdtab[] = {
+	{ .name = "all",		.func = command_show_all },
 	{ .name = "channel",		.func = command_show_channel },
 	{ .name = "connection",		.func = command_show_connection },
 
