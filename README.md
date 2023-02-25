@@ -520,6 +520,9 @@ And you can select a file to loaded when the NABU boots and requests image
 * Renamed the FileRoot property on Connection objects to StorageArea,
   as the old name could be confusing.  The old name is still accepted for
   compatibility with existing configuration files.
+* Changed nabud's -d flag to enable debugging on specific subsystems,
+  reducing the amount of logs you have to sift through when trying to
+  figure out a problem.
 
 ### nabud-1.1.1
 * Fix an issue reported by jeffreystone on Discord -- if you selected a
