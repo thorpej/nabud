@@ -342,29 +342,33 @@ channel_deserialize(struct atom_list *reply_list, struct atom *atom)
 		switch (atom_tag(atom)) {
 		case NABUCTL_CHAN_NAME:
 			chan->name = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_NAME=%s", chan->name);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_NAME=%s", chan->name);
 			break;
 
 		case NABUCTL_CHAN_PATH:
 			chan->path = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_PATH=%s", chan->path);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_PATH=%s", chan->path);
 			break;
 
 		case NABUCTL_CHAN_LISTURL:
 			chan->list_url = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_LIST_URL=%s",
-			    chan->list_url);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_LIST_URL=%s", chan->list_url);
 			break;
 
 		case NABUCTL_CHAN_DEFAULT_FILE:
 			chan->default_file = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_DEFAULT_FILE=%s",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_DEFAULT_FILE=%s",
 			    chan->default_file);
 			break;
 
 		case NABUCTL_CHAN_NUMBER:
 			cp = atom_dataref(atom);
-			log_debug("Got NABUCTL_CHAN_NUMBER=%s", cp);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_NUMBER=%s", cp);
 			val = strtol(cp, NULL, 0);
 			if (val < 1 || val > 255) {
 				log_error("Invalid channel number: %s", cp);
@@ -376,22 +380,25 @@ channel_deserialize(struct atom_list *reply_list, struct atom *atom)
 
 		case NABUCTL_CHAN_TYPE:
 			chan->type = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_TYPE=%s", chan->type);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_TYPE=%s", chan->type);
 			break;
 
 		case NABUCTL_CHAN_SOURCE:
 			chan->source = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_SOURCE=%s", chan->source);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_SOURCE=%s", chan->source);
 			break;
 
 		case NABUCTL_CHAN_RETRONET_EXTENSIONS:
 			chan->retronet_enabled = atom_bool_value(atom);
-			log_debug("Got NABUCTL_CHAN_RETRONET_EXTENSIONS=%d",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_RETRONET_EXTENSIONS=%d",
 			    chan->retronet_enabled);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
-			log_debug("Got NABUCTL_DONE");
+			log_debug(LOG_SUBSYS_CONTROL, "Got NABUCTL_DONE");
 			goto out;
 
 		default:
@@ -434,11 +441,12 @@ channel_list_fetch(void)
 		}
 		switch (atom_tag(atom)) {
 		case NABUCTL_DONE:
-			log_debug("Finished enumerating channel list.");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Finished enumerating channel list.");
 			goto out;
 
 		case NABUCTL_OBJ_CHANNEL:
-			log_debug("Deserializing channel.");
+			log_debug(LOG_SUBSYS_CONTROL, "Deserializing channel.");
 			atom = channel_deserialize(&rr.reply_list, atom);
 			if (atom == NULL) {
 				/* Error already reported. */
@@ -698,22 +706,26 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 		switch (atom_tag(atom)) {
 		case NABUCTL_CONN_NAME:
 			conn->name = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_NAME=%s", conn->name);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_NAME=%s", conn->name);
 			break;
 
 		case NABUCTL_CONN_TYPE:
 			conn->type = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_TYPE=%s", conn->type);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_TYPE=%s", conn->type);
 			break;
 
 		case NABUCTL_CONN_STATE:
 			conn->state = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_STATE=%s", conn->state);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_STATE=%s", conn->state);
 			break;
 
 		case NABUCTL_CONN_CHANNEL:
 			cp = atom_dataref(atom);
-			log_debug("Got NABUCTL_CONN_CHANNEL=%s", cp);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_CHANNEL=%s", cp);
 			val = strtol(cp, NULL, 0);
 			if (val < 1 || val > 255) {
 				log_error("Invalid channel number: %s", cp);
@@ -725,24 +737,28 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 
 		case NABUCTL_CONN_SELECTED_FILE:
 			conn->selected_file = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_SELECTED_FILE=%s",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_SELECTED_FILE=%s",
 			    conn->selected_file);
 			break;
 
 		case NABUCTL_CONN_RETRONET_EXTENSIONS:
 			conn->retronet_enabled = atom_bool_value(atom);
-			log_debug("Got NABUCTL_CONN_RETRONET_EXTENSIONS=%d",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_RETRONET_EXTENSIONS=%d",
 			    conn->retronet_enabled);
 			break;
 
 		case NABUCTL_CONN_FILE_ROOT:
 			conn->file_root = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_FILE_ROOT=%s",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_FILE_ROOT=%s",
 			    conn->file_root);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
-			log_debug("Got NABUCTL_DONE");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_DONE");
 			goto out;
 
 		default:
@@ -785,11 +801,13 @@ connection_list_fetch(void)
 		}
 		switch (atom_tag(atom)) {
 		case NABUCTL_DONE:
-			log_debug("Finished enumerating channel list.");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Finished enumerating channel list.");
 			goto out;
 
 		case NABUCTL_OBJ_CONNECTION:
-			log_debug("Deserializing connection.");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Deserializing connection.");
 			atom = connection_deserialize(&rr.reply_list, atom);
 			if (atom == NULL) {
 				/* Error already reported. */

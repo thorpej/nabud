@@ -205,7 +205,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.storage_get.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn), ctx->request.storage_get.slot);
 		nhacp_send_error(ctx, 0, error_message_ebadf);
 		return;
@@ -214,7 +214,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_get.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_get.length);
 
-	log_debug("[%s] slot %u offset %u length %u",
+	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u offset %u length %u",
 	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
 	    offset, length);
 
@@ -243,7 +243,7 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.storage_put.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn), ctx->request.storage_put.slot);
 		nhacp_send_error(ctx, 0, error_message_ebadf);
 		return;
@@ -252,7 +252,7 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_put.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_put.length);
 
-	log_debug("[%s] slot %u offset %u length %u",
+	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u offset %u length %u",
 	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
 	    offset, length);
 
@@ -318,13 +318,13 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.storage_close.slot);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.storage_close.slot);
 		return;
 	}
-	log_debug("[%s] Closing file at slot %u.", conn_name(ctx->stext.conn),
-	    stext_file_slot(f));
+	log_debug(LOG_SUBSYS_NHACP, "[%s] Closing file at slot %u.",
+	    conn_name(ctx->stext.conn), stext_file_slot(f));
 	stext_file_close(f);
 }
 
@@ -409,7 +409,7 @@ nhacp_request_check(uint8_t req, uint16_t length)
 static inline void
 nhacp_request(struct nhacp_context *ctx)
 {
-	log_debug("[%s] Got %s.", conn_name(ctx->stext.conn),
+	log_debug(LOG_SUBSYS_NHACP, "[%s] Got %s.", conn_name(ctx->stext.conn),
 	    nhacp_request_types[ctx->request.generic.type].debug_desc);
 	(*nhacp_request_types[ctx->request.generic.type].handler)(ctx);
 }
@@ -451,8 +451,8 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	    getprogname(), nabud_version);
 	ctx->reply.nhacp_started.adapter_id_length =
 	    (uint8_t)strlen((char *)ctx->reply.nhacp_started.adapter_id);
-	log_debug("[%s] Sending server version: %s", conn_name(conn),
-	    (char *)ctx->reply.nhacp_started.adapter_id);
+	log_debug(LOG_SUBSYS_NHACP, "[%s] Sending server version: %s",
+	    conn_name(conn), (char *)ctx->reply.nhacp_started.adapter_id);
 	nhacp_send_reply(ctx, NHACP_RESP_NHACP_STARTED,
 	    sizeof(ctx->reply.nhacp_started) +
 	    ctx->reply.nhacp_started.adapter_id_length);
@@ -471,7 +471,8 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		 * Receive the first (LSB) byte of the length.  We need
 		 * to do this to guard against a NABU that's been reset.
 		 */
-		log_debug("[%s] Waiting for NABU.", conn_name(conn));
+		log_debug(LOG_SUBSYS_NHACP, "[%s] Waiting for NABU.",
+		     conn_name(conn));
 		if (! conn_recv_byte(conn, &ctx->request.length[0])) {
  recv_failure:
 			if (conn_state(conn) == CONN_STATE_EOF) {
@@ -532,7 +533,8 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		 * There's no payload and no reply -- we just get out.
 		 */
 		if (ctx->request.generic.type == NHACP_REQ_END_PROTOCOL) {
-			log_debug("[%s] Got NHACP_REQ_END_PROTOCOL.",
+			log_debug(LOG_SUBSYS_NHACP,
+			    "[%s] Got NHACP_REQ_END_PROTOCOL.",
 			    conn_name(conn));
 			break;
 		}
