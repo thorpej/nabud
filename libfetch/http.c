@@ -63,6 +63,11 @@
  * SUCH DAMAGE.
  */
 
+// need this for cygwin compiles
+#ifdef __CYGWIN__
+#define _GNU_SOURCE
+#endif
+
 #if defined(__linux__) || defined(__MINT__)
 /* Keep this down to Linux or MiNT, it can create surprises elsewhere. */
 #ifndef _GNU_SOURCE

@@ -27,7 +27,12 @@
 /*
  * Support for the NabuRetroNet protocol extensions.
  */
-
+ 
+// need this for cygwin compiles
+#ifdef __CYGWIN__
+#define _GNU_SOURCE
+#endif
+ 
 #include <sys/stat.h>
 #include <assert.h>
 #include <ctype.h>

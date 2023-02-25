@@ -56,7 +56,12 @@
 #include "../libmj/mj.h"
 
 #ifndef NABUD_CONF
+#ifndef __CYGWIN__	
 #define	NABUD_CONF		INSTALL_PREFIX "/etc/nabud.conf"
+#else	
+	// for cygwin
+#define	NABUD_CONF		INSTALL_PREFIX ".\\nabud.conf";
+#endif	
 #endif
 
 #define	VALID_ATOM(a, t)	((a) != NULL && (a)->type == (t))
