@@ -1,6 +1,6 @@
 /*	$NetBSD: http.c,v 1.4 2020/06/01 00:55:24 kamil Exp $	*/
 /*-
- * Copyright (c) 2000-2004 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 2000-2004 Dag-Erling CoÃ¯dan SmÃ¸rgrav
  * Copyright (c) 2003 Thomas Klausner <wiz@NetBSD.org>
  * Copyright (c) 2008, 2009 Joerg Sonnenberger <joerg@NetBSD.org>
  * All rights reserved.
@@ -64,7 +64,10 @@
  */
 
 // need this for cygwin compiles
+#ifdef __CYGWIN__
 #define _GNU_SOURCE
+#endif
+
 
 #if defined(__linux__) || defined(__MINT__)
 /* Keep this down to Linux or MiNT, it can create surprises elsewhere. */

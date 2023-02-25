@@ -29,7 +29,9 @@
  */
 
 // need this for cygwin compiles
+#ifdef __CYGWIN__
 #define _GNU_SOURCE
+#endif
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"

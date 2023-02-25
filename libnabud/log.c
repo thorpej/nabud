@@ -27,6 +27,11 @@
 /*
  * Logging functions.
  */
+ 
+// need this for cygwin compiles
+#ifdef __CYGWIN__
+#define _GNU_SOURCE
+#endif
 
 #include <assert.h>
 #include <errno.h>
@@ -63,6 +68,8 @@ static const int log_type_to_syslog[] = {
 };
 
 #define	log_type_is_valid(t)	((t) >= LOG_TYPE_INFO && (t) <= LOG_TYPE_FATAL)
+
+#define _GNU_SOURCE
 
 /*
  * log_syslog_init --
@@ -130,6 +137,7 @@ log_fini(void)
  *	Log a message.  This is usually invoked via the macros
  *	for specific log message types.
  */
+
 void
 log_message(log_type type, const char *func, const char *fmt, ...)
 {

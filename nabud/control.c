@@ -29,7 +29,9 @@
  */
 
 // need this for cygwin compiles
+#ifdef __CYGWIN__
 #define _GNU_SOURCE
+#endif
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -689,7 +691,7 @@ control_init(const char *path)
 	sun.sun_len = SUN_LEN(&sun);
 #endif
 	sun.sun_family = AF_LOCAL;
-
+/*
 	log_info("Creating control channel at %s", path);
 	if (unlink(path) < 0) {
 		if (errno != ENOENT) {
@@ -698,6 +700,7 @@ control_init(const char *path)
 			return;
 		}
 	}
+*/	
 
 	conn = calloc(1, sizeof(*conn));
 	if (conn == NULL) {
