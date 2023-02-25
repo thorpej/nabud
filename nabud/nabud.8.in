@@ -144,6 +144,11 @@ This option also implies the
 option.
 Available subystems:
 .Bl -tag -width "retronet"
+.It all
+Enables debugging for all subsystems.
+.It any
+This is an alias for
+.Dq all .
 .It adaptor
 The routines that implement the Adaptor protocol.
 .It atom
