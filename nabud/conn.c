@@ -212,6 +212,7 @@ conn_add_serial(const struct conn_add_args *args)
 		log_error("Unable to open %s: %s", args->port, strerror(errno));
 		return;
 	}
+
 #ifndef __CYGWIN__
 	if (tcgetattr(fd, &t) < 0) {
 		log_error("tcgetattr() failed on %s: %s", args->port,
@@ -219,6 +220,7 @@ conn_add_serial(const struct conn_add_args *args)
 		goto bad;
 	}
 #endif
+
 	/*
 	 * The native protocol is 8N1 @ 111000 baud, but it's much
 	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
@@ -235,11 +237,14 @@ conn_add_serial(const struct conn_add_args *args)
 		    args->port);
 		goto fallback;
 	}
+
 #endif
 	log_info("cfsetspeed setting %s port to %d.", args->port, NABU_FALLBACK_BPS);
 #ifndef __CYGWIN__	
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
 #endif			
+	log_info("cfsetspeed setting %s port to %d.", args->port, NABU_FALLBACK_BPS);
+
 		/*
 		 * If we failed to set the native NABU baud rate
 		 * (it's a little of an odd-ball after all), then
@@ -252,6 +257,7 @@ conn_add_serial(const struct conn_add_args *args)
 #ifndef __CYGWIN__			
 fallback:
 #endif	
+
 		if (cfsetspeed(&t, NABU_FALLBACK_BPS)) {
 			log_error("cfsetspeed(NABU_FALLBACK_BPS) on %s failed.",
 			    args->port);
