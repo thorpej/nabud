@@ -265,6 +265,30 @@ exercise for the reader.  For macOS, you will need to install the
 and then launch Xcode to perform the "first launch" task that takes care of
 setting up the command-line tools that nabud uses to build.
 
+## Extras for your operating system
+
+nabud comes with some extras that help with integration onto operating
+systems on which it runs.
+
+* NetBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
+  installed into $(prefix)/share.  Tweak them to your liking and copy them
+  into _/etc/rc.d_ and _/etc/rc.conf.d_.
+* FreeBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
+  installed into $(prefix)/share.  Tweak them to your liking and copy them
+  into _/etc/rc.d_ and _/etc/rc.conf.d_.
+* Linux - A systemd service unit is installed into $(prefix)/share.  Tweak
+  it to your liking and install it into _/lib/systemd/system_.  Once installed,
+  you will then need to configure systemd to use it; see below.
+* OpenBSD - An _rc.d_ script is installed into $(prefix)/share.
+  Tweak it to your liking and install it into _/etc/rc.d_.  Make sure to
+  update your "pkg_scripts" variable in _/etc/rc.conf_.
+* macOS - A launchd plist file (_nabud.plist_) is installed into
+  $(prefix)/share.  Tweak it to your liking and install it into
+  _/Library/LaunchDaemons_.
+
+If you are interested in providing extras for your favorite operating
+system, please let me know!
+
 ## Running nabud
 
 After building nabud, copy the example _nabud.conf_ to the selected location
@@ -363,33 +387,6 @@ configuration for nabud:
     0 crw-rw----  1 uucp  dialer  66, 7 May 19  2021 /dev/ttyU7
     
     # ./nabud -u nabu -U 002
-
-## Extras for your operating system
-
-nabud comes with some extras that help with integration onto operating
-systems on which it runs.
-
-* NetBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
-  installed into $(prefix)/share.  Tweak them to your liking and copy them
-  into _/etc/rc.d_ and _/etc/rc.conf.d_.
-* FreeBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
-  installed into $(prefix)/share.  Tweak them to your liking and copy them
-  into _/etc/rc.d_ and _/etc/rc.conf.d_.
-* Linux - A systemd service unit is installed into $(prefix)/share.  Tweak
-  it to your liking and install it into _/lib/systemd/system_.  Once installed,
-  you will then need to configure systemd to use it:
-    % sudo systemctl daemon-reload
-    % sudo systemctl enable nabud.service
-    % sudo systemctl start nabud.service
-* OpenBSD - An _rc.d_ script is installed into $(prefix)/share.
-  Tweak it to your liking and install it into _/etc/rc.d_.  Make sure to
-  update your "pkg_scripts" variable in _/etc/rc.conf_.
-* macOS - A launchd plist file (_nabud.plist_) is installed into
-  $(prefix)/share.  Tweak it to your liking and install it into
-  _/Library/LaunchDaemons_.
-
-If you are interested in providing extras for your favorite operating
-system, please let me know!
 
 ## Controlling nabud with nabuctl
 
