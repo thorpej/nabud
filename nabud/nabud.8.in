@@ -31,7 +31,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl c Ar conf
-.Op Fl d
+.Op Fl d Ar subsys
 .Op Fl f
 .Op Fl l Ar logfile
 .\" extras-darwin .Op Fl L
@@ -134,11 +134,39 @@ accepts the following options:
 Specifies an alternative location for the
 .Nm
 configuration file.
-.It Fl d
-Enables extremely verbose debugging messages.
+.It Fl d Ar subsys
+Enables debugging messages for the specified subsystem.
+Multiple
+.Fl d
+options can be specified.
 This option also implies the
 .Fl f
 option.
+Available subystems:
+.Bl -tag -width "retronet"
+.It adaptor
+The routines that implement the Adaptor protocol.
+.It atom
+The routines used to serialize control messages.
+.It cli
+The command line support routines.
+.It conn_io
+The connection I/O routines used by NABU connections and control connections.
+.It control
+The control message routines.
+.It fileio
+The abstracted file I/O routines used to read and write local and remote
+files.
+.It image
+The routines that manage NABU program images.
+.It nhacp
+The routines that implement the NHACP protocol.
+.It retronet
+The routines that implement the RetroNet protocol extensions.
+.It stext
+The routines that implement the storage extensions back-end, shared by
+NHACP and RetroNet.
+.El
 .It Fl f
 Runs
 .Nm
