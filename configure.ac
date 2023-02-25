@@ -217,13 +217,23 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
-# Check for the BSD libedit and a readline() function in libedit.  This
-# gives us readline() functionality without having to deal with GPL nonsense.
-# Sorry, kids, I won't be allowing GNU readline().
+# Check for the BSD libedit and a readline() function in libedit.
 #
-AC_CHECK_LIB(edit, readline,
-	[AC_DEFINE(HAVE_LIBEDIT_READLINE, 1, [Define if you have libedit with a readline() function on your OS])
-	 CLI_LIBS="-ledit"])
+AC_CHECK_LIB(edit, readline, [LIBEDIT_LIB="-ledit"])
+
+# Apparently, some systems have a libreadline library that has a
+# readline() function compatible with libedit's; We'll allow that, too.
+#
+if test x$LIBEDIT_LIB = x; then
+	AC_CHECK_LIB(readline, readline, [LIBEDIT_LIB="-lreadline"])
+fi
+
+if test x$LIBEDIT_LIB != x; then
+	AC_DEFINE(HAVE_LIBEDIT_READLINE, 1,
+		   [Define if you have library compatible with BSD libedit's readline() function on your OS])
+	CLI_LIBS="$CLI_LIBS $LIBEDIT_LIB"
+fi
+
 AC_SUBST(CLI_LIBS)
 
 # Check for some useful BSD functions that, sadly, are not universal.
