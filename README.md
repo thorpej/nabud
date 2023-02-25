@@ -375,6 +375,12 @@ systems on which it runs.
 * FreeBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
   installed into $(prefix)/share.  Tweak them to your liking and copy them
   into _/etc/rc.d_ and _/etc/rc.conf.d_.
+* Linux - A systemd service unit is installed into $(prefix)/share.  Tweak
+  it to your liking and install it into _/lib/systemd/system_.  Once installed,
+  you will then need to configure systemd to use it:
+    % sudo systemctl daemon-reload
+    % sudo systemctl enable nabud.service
+    % sudo systemctl start nabud.service
 * OpenBSD - An _rc.d_ script is installed into $(prefix)/share.
   Tweak it to your liking and install it into _/etc/rc.d_.  Make sure to
   update your "pkg_scripts" variable in _/etc/rc.conf_.
