@@ -14438,6 +14438,7 @@ printf %s "checking how to include <readline/readline.h>... " >&6; }
 /* end confdefs.h.  */
 
 
+				#include <stdio.h>
 				#include <readline/readline.h>
 
 int
