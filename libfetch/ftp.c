@@ -148,7 +148,7 @@ unmappedaddr(struct sockaddr_in6 *sin6, socklen_t *len)
 	sin4->sin_port = port;
 	sin4->sin_family = AF_INET;
 	*len = sizeof(struct sockaddr_in);
-#ifdef HAVE_SA_LEN
+#ifdef HAVE_SOCKADDR_IN_SIN_LEN
 	sin4->sin_len = sizeof(struct sockaddr_in);
 #endif
 }

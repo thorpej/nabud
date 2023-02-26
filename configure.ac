@@ -163,6 +163,21 @@ m4_include([m4/ax_pthread.m4])
 AX_PTHREAD([],
 	[AC_MSG_ERROR([Missing POSIX threads])])
 
+# Check for struct sockaddr_in::sin_len.
+#
+AC_MSG_CHECKING(for sin_len member in struct sockaddr_in)
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/socket.h>
+		#include <netinet/in.h>
+	]],[[
+		struct sockaddr_in dummy;
+		dummy.sin_len = 0;
+	]])],[
+		AC_DEFINE(HAVE_SOCKADDR_IN_SIN_LEN, 1, [Define if the struct sockaddr_in has a member sin_len on your OS])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for struct sockaddr_un::sun_len.
 #
 AC_MSG_CHECKING(for sun_len member in struct sockaddr_un)
