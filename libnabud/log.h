@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2022 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,6 +28,7 @@
 #define	log_h_included
 
 #include <stdbool.h>
+#include <stdio.h>
 
 typedef enum {
 	LOG_TYPE_INFO	= 0,
@@ -36,21 +37,45 @@ typedef enum {
 	LOG_TYPE_FATAL	= 3,
 } log_type;
 
+/* This is mainly for debug messages. */
+typedef enum {
+	LOG_SUBSYS_ANY		= -1,
+
+	LOG_SUBSYS_ATOM		= 0,
+	LOG_SUBSYS_CLI,
+	LOG_SUBSYS_CONN_IO,
+	LOG_SUBSYS_FILEIO,
+
+	LOG_SUBSYS_ADAPTOR,
+	LOG_SUBSYS_CONTROL,
+	LOG_SUBSYS_IMAGE,
+	LOG_SUBSYS_NHACP,
+	LOG_SUBSYS_RETRONET,
+	LOG_SUBSYS_STEXT,
+
+	LOG_NSUBSYS
+} log_subsys;
+
 #define	LOG_OPT_FOREGROUND	(1U << 0)
 #define	LOG_OPT_DEBUG		(1U << 1)
 
-extern bool debug;
-
 bool	log_init(const char *, unsigned int);
-void	log_message(log_type, const char *, const char *, ...)
-	    __attribute__((__format__(__printf__, 3, 4)));
+void	log_message(log_type, log_subsys, const char *, const char *, ...)
+	    __attribute__((__format__(__printf__, 4, 5)));
 void	log_fini(void);
 
-#define	log_info(...)	log_message(LOG_TYPE_INFO, __func__, __VA_ARGS__)
-#define	log_debug(...)	log_message(LOG_TYPE_DEBUG, __func__, __VA_ARGS__)
-#define	log_error(...)	log_message(LOG_TYPE_ERROR, __func__, __VA_ARGS__)
-#define	log_fatal(...)	\
+bool	log_debug_enable(const char *);
+void	log_subsys_list(FILE *, const char *);
+
+#define	log_info(...)		\
+	log_message(LOG_TYPE_INFO, LOG_SUBSYS_ANY, __func__, __VA_ARGS__)
+#define	log_debug(s, ...)		\
+	log_message(LOG_TYPE_DEBUG, (s), __func__, __VA_ARGS__)
+#define	log_error(...)		\
+	log_message(LOG_TYPE_ERROR, LOG_SUBSYS_ANY, __func__, __VA_ARGS__)
+#define	log_fatal(...)		\
 	/* This one doesn't return; trick the compiler */		\
-	for (log_message(LOG_TYPE_FATAL, __func__, __VA_ARGS__);;)
+	for (log_message(LOG_TYPE_FATAL, LOG_SUBSYS_ANY, __func__,	\
+			 __VA_ARGS__);;)
 
 #endif /* log_h_included */

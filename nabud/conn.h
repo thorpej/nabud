@@ -101,6 +101,7 @@ struct conn_add_args {
 	char		*file_root;
 	char		*selected_file;
 	unsigned int	channel;
+	unsigned int	baud;
 };
 
 extern unsigned int conn_count;

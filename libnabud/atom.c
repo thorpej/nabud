@@ -254,7 +254,7 @@ atom_recv(struct conn_io *conn)
 	}
 	hdr.tag = ntohl(hdr.tag);
 	hdr.length = ntohl(hdr.length);
-	log_debug("Atom header: tag=0x%08x type=%s length=%u",
+	log_debug(LOG_SUBSYS_ATOM, "Atom header: tag=0x%08x type=%s length=%u",
 	    hdr.tag, atom_typedesc(hdr.tag), hdr.length);
 
 	/* Sanity-check the data type vs payload. */
@@ -540,17 +540,20 @@ atom_list_recv(struct conn_io *conn, struct atom_list *list)
 		switch (atom->hdr.tag) {
 		case NABUCTL_DONE:
 			if (objtype == 0) {
-				log_debug("[%s] Received complete atom list.",
+				log_debug(LOG_SUBSYS_ATOM,
+				    "[%s] Received complete atom list.",
 				    conn_io_name(conn));
 				return true;
 			}
-			log_debug("[%s] Finished receiving %s object.",
+			log_debug(LOG_SUBSYS_ATOM,
+			    "[%s] Finished receiving %s object.",
 			    conn_io_name(conn), atom_objdesc(objtype));
 			objtype = 0;
 			break;
 
 		case NABUCTL_ERROR:
-			log_debug("[%s] Received error atom.",
+			log_debug(LOG_SUBSYS_ATOM,
+			    "[%s] Received error atom.",
 			    conn_io_name(conn));
 			return true;
 

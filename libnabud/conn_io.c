@@ -302,7 +302,8 @@ conn_io_polltimo(struct conn_io *conn, const struct timespec *deadline,
 	const char *which = is_recv ? "recv" : "send";
 
 	if (deadline->tv_sec == 0 && deadline->tv_nsec == 0) {
-		log_debug("[%s] No %s deadline, returning INFTIM.", conn->name,
+		log_debug(LOG_SUBSYS_CONN_IO,
+		    "[%s] No %s deadline, returning INFTIM.", conn->name,
 		    which);
 		return INFTIM;
 	}
@@ -316,7 +317,7 @@ conn_io_polltimo(struct conn_io *conn, const struct timespec *deadline,
 	if (timo.tv_sec < 0 ||
 	    (timo.tv_sec == 0 && timo.tv_nsec <= 0)) {
 		/* Deadline has passed. */
-		log_debug(
+		log_debug(LOG_SUBSYS_CONN_IO,
 		    "[%s] Deadline for %s has passed, returning 0 ms.",
 		    conn->name, which);
 		return 0;
@@ -333,7 +334,8 @@ conn_io_polltimo(struct conn_io *conn, const struct timespec *deadline,
 	} else if (millis == 0) {
 		millis = 1;
 	}
-	log_debug("[%s] next %s timeout: %d ms", conn->name, which,
+	log_debug(LOG_SUBSYS_CONN_IO,
+	    "[%s] next %s timeout: %d ms", conn->name, which,
 	    (int)millis);
 	return (int)millis;
 }
@@ -374,7 +376,8 @@ conn_io_wait(struct conn_io *conn, const struct timespec *deadline,
 	}
 	if (fds[1].revents) {
 		if (fds[1].revents & POLLIN) {
-			log_debug("[%s] Connection cancelled.", conn->name);
+			log_debug(LOG_SUBSYS_CONN_IO,
+			    "[%s] Connection cancelled.", conn->name);
 			return false;
 		}
 		log_fatal("[%s] %s fds[1].revents = 0x%04x", conn->name,
@@ -430,7 +433,8 @@ conn_io_send(struct conn_io *conn, const void *vbuf, size_t len)
 			return;
 		}
 		if (actual == 0) {
-			log_debug("[%s] Got End-of-File", conn->name);
+			log_debug(LOG_SUBSYS_CONN_IO,
+			    "[%s] Got End-of-File", conn->name);
 			conn->state = CONN_STATE_EOF;
 			return;
 		}
@@ -492,7 +496,8 @@ conn_io_recv(struct conn_io *conn, void *vbuf, size_t len)
 			return false;
 		}
 		if (actual == 0) {
-			log_debug("[%s] Got End-of-File", conn->name);
+			log_debug(LOG_SUBSYS_CONN_IO,
+			    "[%s] Got End-of-File", conn->name);
 			conn->state = CONN_STATE_EOF;
 			return false;
 		}

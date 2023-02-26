@@ -224,6 +224,8 @@ CANONICAL_TARGET = @CANONICAL_TARGET@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CLI_INCLUDES = @CLI_INCLUDES@
+CLI_LIBS = @CLI_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
@@ -361,6 +363,7 @@ GENERAL_SUBDIRS = examples libfetch libmj libnabud \
 
 ALL_EXTRAS_SUBDIRS = extras/darwin/launchd \
 			  extras/freebsd/rc.conf.d extras/freebsd/rc.d \
+			  extras/linux/systemd \
 			  extras/netbsd/rc.conf.d extras/netbsd/rc.d \
 			  extras/openbsd/rc.d
 

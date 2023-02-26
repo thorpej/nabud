@@ -199,8 +199,8 @@ stext_context_fini(struct stext_context *ctx)
 	struct stext_file *f;
 
 	while ((f = LIST_FIRST(&ctx->files)) != NULL) {
-		log_debug("[%s] Freeing file at slot %u.", conn_name(ctx->conn),
-		    f->slot);
+		log_debug(LOG_SUBSYS_STEXT, "[%s] Freeing file at slot %u.",
+		    conn_name(ctx->conn), f->slot);
 		stext_file_close(f);
 	}
 }
@@ -567,7 +567,8 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		fileio = fileio_open(filename, FILEIO_O_LOCAL_ROOT | oflags,
 		    ctx->conn->file_root, attrs);
 		if (fileio != NULL) {
-			log_debug("[%s] Need R/W shadow buffer for '%s'",
+			log_debug(LOG_SUBSYS_STEXT,
+			    "[%s] Need R/W shadow buffer for '%s'",
 			    conn_name(ctx->conn), filename);
 			need_shadow = true;
 		}
@@ -593,14 +594,16 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 	 * positional I/O.
 	 */
 	if (! attrs->is_seekable) {
-		log_debug("[%s] Need seekable shadow buffer for '%s'",
+		log_debug(LOG_SUBSYS_STEXT,
+		    "[%s] Need seekable shadow buffer for '%s'",
 		    conn_name(ctx->conn), fileio_location(fileio));
 		need_shadow = true;
 	}
 
 	if (need_shadow) {
 		if (attrs->size > MAX_SHADOW_LENGTH) {
-			log_debug("[%s] '%s' size %lld exceeds maximum "
+			log_debug(LOG_SUBSYS_STEXT,
+			    "[%s] '%s' size %lld exceeds maximum "
 			    "shadow length %u.",
 			    conn_name(ctx->conn),
 			    fileio_location(fileio),
@@ -617,7 +620,8 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		f->ops = &stext_fileops_shadow;
 	} else {
 		if (attrs->size > MAX_FILEIO_LENGTH) {
-			log_debug("[%s] '%s' size %lld exceeds maximum "
+			log_debug(LOG_SUBSYS_STEXT,
+			    "[%s] '%s' size %lld exceeds maximum "
 			    "file size %u.",
 			    conn_name(ctx->conn),
 			    fileio_location(f->fileio.fileio),

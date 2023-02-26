@@ -94,7 +94,8 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 		return ETIMEDOUT;
 	}
 	uint8_t len = *bp++;
-	log_debug("[%s] name length: %u", conn_name(conn), len);
+	log_debug(LOG_SUBSYS_RETRONET,
+	    "[%s] name length: %u", conn_name(conn), len);
 
 	/* Now we can receive the file name itself. */
 	if (! conn_recv(conn, bp, len)) {
@@ -105,6 +106,13 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 	*fnamep = (char *)bp;
 	*fnamelenp = len;
 	*cursorp = bp + len;
+
+	/*
+	 * Go ahead and NUL-termiante the name now.  We might have to do
+	 * it again later if there are more arguments after the name, but
+	 * this is convient for those places that don't.
+	 */
+	*(bp + len) = '\0';
 
 	if (! fileio_location_is_local((char *)bp, len)) {
 		/* Remote locations don't get "normalized". Blech. */
@@ -126,8 +134,8 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 	 * specific file-root, so the likelihood of actually encountering
 	 * anything other than a plan old file name is pretty low.
 	 */
-	log_debug("[%s] %s before normalization: '%*s'",
-	    conn_name(conn), which, (int)len, *fnamep);
+	log_debug(LOG_SUBSYS_RETRONET, "[%s] %s before normalization: '%s'",
+	    conn_name(conn), which, *fnamep);
 	for (char *cp = (char *)bp; cp < (char *)bp + len; cp++) {
 		if (*cp == '\\') {
 			*cp = '/';
@@ -135,8 +143,8 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 			*cp = toupper((unsigned char)*cp);
 		}
 	}
-	log_debug("[%s] %s after normalization: '%*s'",
-	    conn_name(conn), which, (int)len, *fnamep);
+	log_debug(LOG_SUBSYS_RETRONET, "[%s] %s after normalization: '%s'",
+	    conn_name(conn), which, *fnamep);
 
 	return 0;
 }
@@ -227,9 +235,6 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 		return error;
 	}
 
-	/* Have all the args -- we can safely NUL-terminate the name. */
-	fname[fnamelen] = '\0';
-
 	/*
 	 * Open the file so we can get the size.  Yes, open.
 	 * This is necessary for remote files on the other
@@ -238,10 +243,15 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 	 * It's OK to open a directory here, because we want to be able
 	 * to convey that information.
 	 */
+	log_debug(LOG_SUBSYS_RETRONET,
+	    "[%s] Opening '%s' in order to get attributes.",
+	    conn_name(ctx->stext.conn), fname);
 	f = fileio_open(fname,
 	    FILEIO_O_RDONLY | FILEIO_O_DIROK | FILEIO_O_LOCAL_ROOT,
 	    conn->file_root, attrs);
 	if (f == NULL) {
+		log_info("[%s] Opening '%s' failed: %s",
+		    conn_name(ctx->stext.conn), fname, strerror(errno));
 		return errno;
 	}
 
@@ -336,7 +346,7 @@ rn_req_fh_size(struct retronet_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.fh_size.fileHandle);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.fh_size.fileHandle);
 		size = -1;
@@ -383,12 +393,13 @@ rn_req_fh_read(struct retronet_context *ctx)
 	uint16_t length = nabu_get_uint16(ctx->request.fh_read.length);
 
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.fh_read.fileHandle);
 		length = 0;
 	} else {
-		log_debug("[%s] slot %u offset %u length %u",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] slot %u offset %u length %u",
 		    conn_name(conn), ctx->request.fh_read.fileHandle,
 		    offset, length);
 
@@ -422,12 +433,13 @@ rn_req_fh_close(struct retronet_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.fh_close.fileHandle);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.fh_close.fileHandle);
 		return;
 	}
-	log_debug("[%s] Closing file at slot %u.", conn_name(conn),
+	log_debug(LOG_SUBSYS_RETRONET,
+	    "[%s] Closing file at slot %u.", conn_name(conn),
 	    stext_file_slot(f));
 	stext_file_close(f);
 }
@@ -495,7 +507,7 @@ rn_req_fh_append(struct retronet_context *ctx)
 	}
 
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(conn), ctx->request.fh_append.fileHandle);
 		return;
 	}
@@ -558,15 +570,15 @@ rn_req_fh_insert(struct retronet_context *ctx)
 	}
 
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(conn), ctx->request.fh_replace.fileHandle);
 		return;
 	}
 
 	/* No work to do if the length to insert is zero. */
 	if (length == 0) {
-		log_debug("[%s] length is zero; no work to do.",
-		    conn_name(conn));
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] length is zero; no work to do.", conn_name(conn));
 		return;
 	}
 
@@ -687,15 +699,16 @@ rn_req_fh_delete_range(struct retronet_context *ctx)
 	    nabu_get_uint16(ctx->request.fh_delete_range.deleteLen);
 
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
-		    conn_name(conn), ctx->request.fh_delete_range.fileHandle);
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] No file for slot %u.", conn_name(conn),
+		    ctx->request.fh_delete_range.fileHandle);
 		return;
 	}
 
 	/* No work to do if the length to delete is zero. */
 	if (length == 0) {
-		log_debug("[%s] length is zero; no work to do.",
-		    conn_name(conn));
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] length is zero; no work to do.", conn_name(conn));
 		return;
 	}
 
@@ -714,13 +727,15 @@ rn_req_fh_delete_range(struct retronet_context *ctx)
 	}
 
 	if (offset >= attrs.size) {
-		log_debug("[%s] Offset %u beyond end-of-file.",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Offset %u beyond end-of-file.",
 		    conn_name(conn), offset);
 		return;
 	}
 
 	if (attrs.size - offset <= length) {
-		log_debug("[%s] Deleted range at tail-of-file (%u).",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Deleted range at tail-of-file (%u).",
 		    conn_name(conn), offset);
 		/*
 		 * No need to move any data in this case; we can just
@@ -804,7 +819,7 @@ rn_req_fh_replace(struct retronet_context *ctx)
 	}
 
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(conn), ctx->request.fh_replace.fileHandle);
 		return;
 	}
@@ -835,9 +850,6 @@ rn_req_file_delete(struct retronet_context *ctx)
 		return;
 	}
 
-	/* Have all the args -- we can safely NUL-terminate the name. */
-	fname[fnamelen] = '\0';
-
 	char *path =
 	    fileio_resolve_path(fname, conn->file_root, FILEIO_O_LOCAL_ROOT);
 	if (path != NULL) {
@@ -847,8 +859,8 @@ rn_req_file_delete(struct retronet_context *ctx)
 		}
 		free(path);
 	} else {
-		log_debug("[%s] Unable to resolve path: %s",
-		    conn_name(conn), fname);
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Unable to resolve path: %s", conn_name(conn), fname);
 	}
 }
 
@@ -931,7 +943,8 @@ rn_req_file_copy(struct retronet_context *ctx)
 	char *dst_path = fileio_resolve_path(dst_fname, conn->file_root,
 	    FILEIO_O_LOCAL_ROOT);
 	if (dst_path == NULL) {
-		log_debug("[%s] Unable to resolve dst path: %s",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Unable to resolve dst path: %s",
 		    conn_name(conn), dst_fname);
 		return;
 	}
@@ -942,7 +955,8 @@ rn_req_file_copy(struct retronet_context *ctx)
 	    FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT,
 	    conn->file_root, NULL);
 	if (src_f == NULL) {
-		log_debug("[%s] Unable to open src '%s': %s",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Unable to open src '%s': %s",
 		    conn_name(conn), src_fname, strerror(errno));
 		goto out;
 	}
@@ -954,7 +968,8 @@ rn_req_file_copy(struct retronet_context *ctx)
 	dst_f = fileio_open(dst_path,
 	    FILEIO_O_RDWR | FILEIO_O_CREAT | dst_oflags, NULL, NULL);
 	if (dst_f == NULL) {
-		log_debug("[%s] Unable to open dst '%s': %s",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Unable to open dst '%s': %s",
 		    conn_name(conn), dst_path, strerror(errno));
 		goto out;
 	}
@@ -969,7 +984,8 @@ rn_req_file_copy(struct retronet_context *ctx)
 		}
 		if (actual == 0) {
 			/* EOF! */
-			log_debug("[%s] Copy complete.", conn_name(conn));
+			log_debug(LOG_SUBSYS_RETRONET,
+			    "[%s] Copy complete.", conn_name(conn));
 			break;
 		}
 		actual = fileio_write(dst_f, COPY_BUF, actual);
@@ -1018,12 +1034,14 @@ rn_req_file_move(struct retronet_context *ctx)
 	bool replace = (flags & RN_FILE_COPY_MOVE_REPLACE) != 0;
 
 	if (src_path == NULL) {
-		log_debug("[%s] Unable to resolve src path: %s",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Unable to resolve src path: %s",
 		    conn_name(conn), src_fname);
 		goto out;
 	}
 	if (dst_path == NULL) {
-		log_debug("[%s] Unable to resolve dst path: %s",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Unable to resolve dst path: %s",
 		    conn_name(conn), dst_fname);
 		goto out;
 	}
@@ -1078,8 +1096,8 @@ rn_req_fh_truncate(struct retronet_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.fh_truncate.fileHandle);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn),
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] No file for slot %u.", conn_name(ctx->stext.conn),
 		    ctx->request.fh_truncate.fileHandle);
 		return;
 	}
@@ -1137,11 +1155,13 @@ rn_req_file_list(struct retronet_context *ctx)
 	path = fileio_resolve_path(where, conn->file_root,
 	    FILEIO_O_LOCAL_ROOT);
 	if (path == NULL) {
-		log_debug("[%s] Unable to resolve path: %s",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] Unable to resolve path: %s",
 		    conn_name(conn), where);
 		goto out;
 	}
-	log_debug("[%s] Resolved path: %s", conn_name(conn), path);
+	log_debug(LOG_SUBSYS_RETRONET, "[%s] Resolved path: %s",
+	    conn_name(conn), path);
 
 	/*
 	 * Get rid of any trailing /'s -- we'll ensure there is
@@ -1160,7 +1180,8 @@ rn_req_file_list(struct retronet_context *ctx)
 	free(path);
 	path = cp;
 
-	log_debug("[%s] Pattern for glob: %s", conn_name(conn), path);
+	log_debug(LOG_SUBSYS_RETRONET, "[%s] Pattern for glob: %s",
+	    conn_name(conn), path);
 
 	/*
 	 * We've already converted \ to / in the string, so just
@@ -1168,12 +1189,12 @@ rn_req_file_list(struct retronet_context *ctx)
 	 */
 	int globret = glob(path, GLOB_NOESCAPE, NULL, &g);
 	if (globret != 0) {
-		log_debug("[%s] glob() returned %d.", conn_name(conn),
-		    globret);
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] glob() returned %d.",
+		    conn_name(conn), globret);
 		goto out;
 	}
-	log_debug("[%s] glob() returned %zd matches.", conn_name(conn),
-	    (size_t)g.gl_pathc);
+	log_debug(LOG_SUBSYS_RETRONET, "[%s] glob() returned %zd matches.",
+	    conn_name(conn), (size_t)g.gl_pathc);
 
 	for (int i = 0; i < g.gl_pathc; i++) {
 		struct fileio_attrs attrs;
@@ -1194,13 +1215,14 @@ rn_req_file_list(struct retronet_context *ctx)
 		check_flag = attrs.is_directory ? RN_FILE_LIST_DIRS
 						: RN_FILE_LIST_FILES;
 		if ((flags & check_flag) == 0) {
-			log_debug("[%s] Skipping '%s' due to flags.",
+			log_debug(LOG_SUBSYS_RETRONET,
+			    "[%s] Skipping '%s' due to flags.",
 			    conn_name(conn), g.gl_pathv[i]);
 			free(e);
 			continue;
 		}
-		log_debug("[%s] Will return '%s'.", conn_name(conn),
-		     g.gl_pathv[i]);
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] Will return '%s'.",
+		    conn_name(conn), g.gl_pathv[i]);
 		rn_fileio_attrs_to_file_details(g.gl_pathv[i], &attrs,
 		    &e->details);
 		e->idx = ctx->file_list_count++;
@@ -1316,7 +1338,7 @@ rn_req_fh_details(struct retronet_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.fh_details.fileHandle);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.fh_details.fileHandle);
 		return;
@@ -1356,12 +1378,12 @@ rn_req_fh_readseq(struct retronet_context *ctx)
 	uint16_t length = nabu_get_uint16(ctx->request.fh_readseq.length);
 
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.fh_readseq.fileHandle);
 		length = 0;
 	} else {
-		log_debug("[%s] slot %u length %u",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] slot %u length %u",
 		    conn_name(conn), ctx->request.fh_readseq.fileHandle,
 		    length);
 
@@ -1396,7 +1418,7 @@ rn_req_fh_seek(struct retronet_context *ctx)
 
 	f = stext_file_find(&ctx->stext, ctx->request.fh_seek.fileHandle);
 	if (f == NULL) {
-		log_debug("[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.fh_seek.fileHandle);
 		return;
@@ -1515,7 +1537,7 @@ retronet_request(struct nabu_connection *conn, uint8_t msg)
 	}
 
 	if (! conn->retronet_enabled) {
-		log_debug("[%s] RetroNet is not enabled.",
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] RetroNet is not enabled.",
 		    conn_name(conn));
 		return false;
 	}
@@ -1540,7 +1562,7 @@ retronet_request(struct nabu_connection *conn, uint8_t msg)
 		}
 	}
 
-	log_debug("[%s] Got %s.", conn_name(conn),
+	log_debug(LOG_SUBSYS_RETRONET, "[%s] Got %s.", conn_name(conn),
 	    retronet_request_types[idx].debug_desc);
 	(*retronet_request_types[idx].handler)(ctx);
 	return true;

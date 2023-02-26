@@ -197,8 +197,8 @@ control_req_hello(struct conn_io *conn, struct atom *req,
 	}
 
 	char *client_version = atom_dataref(req);
-	log_debug("[%s] Client version: %s", conn_io_name(conn),
-	    client_version);
+	log_debug(LOG_SUBSYS_CONTROL,
+	    "[%s] Client version: %s", conn_io_name(conn), client_version);
 
 	if (strcmp(client_version, nabud_version) != 0) {
 		log_info("[%s] Client version (%s) does not match %s (%s).",
@@ -450,52 +450,59 @@ control_connection_thread(void *arg)
 
 		switch (atom_tag(req)) {
 		case NABUCTL_REQ_HELLO:
-			log_debug("[%s] Got NABUCTL_REQ_HELLO.",
-			    conn_io_name(conn));
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_HELLO.", conn_io_name(conn));
 			ok = control_req_hello(conn, req,
 			    &req_list, &reply_list);
 			break;
 
 		case NABUCTL_REQ_LIST_CHANNELS:
-			log_debug("[%s] Got NABUCTL_REQ_LIST_CHANNELS.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_LIST_CHANNELS.",
 			    conn_io_name(conn));
 			ok = control_req_list_channels(&reply_list);
 			break;
 
 		case NABUCTL_REQ_LIST_CONNECTIONS:
-			log_debug("[%s] Got NABUCTL_REQ_LIST_CONNECTIONS.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_LIST_CONNECTIONS.",
 			    conn_io_name(conn));
 			ok = control_req_list_connections(&reply_list);
 			break;
 
 		case NABUCTL_REQ_CONN_CANCEL:
-			log_debug("[%s] Got NABUCTL_REQ_CONN_CANCEL.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_CONN_CANCEL.",
 			    conn_io_name(conn));
 			ok = control_req_connection_cancel(req, &reply_list);
 			break;
 
 		case NABUCTL_REQ_CONN_CHANGE_CHANNEL:
-			log_debug("[%s] Got NABUCTL_REQ_CONN_CHANGE_CHANNEL.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_CONN_CHANGE_CHANNEL.",
 			    conn_io_name(conn));
 			ok = control_req_connection_change_channel(conn,
 			    req, &req_list, &reply_list);
 			break;
 
 		case NABUCTL_REQ_CONN_SELECT_FILE:
-			log_debug("[%s] Got NABUCTL_REQ_CONN_SELECT_FILE.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_CONN_SELECT_FILE.",
 			    conn_io_name(conn));
 			ok = control_req_connection_select_file(conn,
 			    req, &req_list, &reply_list);
 			break;
 
 		case NABUCTL_REQ_CHAN_CLEAR_CACHE:
-			log_debug("[%s] Got NABUCTL_REQ_CHAN_CLEAR_CACHE.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_CHAN_CLEAR_CACHE.",
 			    conn_io_name(conn));
 			ok = control_req_channel_clear_cache(req, &reply_list);
 			break;
 
 		case NABUCTL_REQ_CHAN_FETCH_LISTING:
-			log_debug("[%s] Got NABUCTL_REQ_CHAN_FETCH_LISTING.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "[%s] Got NABUCTL_REQ_CHAN_FETCH_LISTING.",
 			    conn_io_name(conn));
 			ok = control_req_channel_fetch_listing(req,
 			    &reply_list);
@@ -708,13 +715,15 @@ control_init(const char *path)
 			 * by anyone who is a member of the group with
 			 * our effective GID.
 			 */
-			log_debug("Changing group on %s to %d.",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Changing group on %s to %d.",
 			    path, (int)getegid());
 			if (chown(path, (uid_t)-1, getegid()) == 0) {
 				struct stat sb;
 				if (stat(path, &sb) == 0) {
 					sb.st_mode |= S_IWGRP;
-					log_debug("Cnanging mode on %s to "
+					log_debug(LOG_SUBSYS_CONTROL,
+					    "Cnanging mode on %s to "
 					    "0%03o", path, sb.st_mode & 0777);
 					if (chmod(path, sb.st_mode) < 0) {
 						log_error("chmod(%s, 0%03o): "

@@ -105,7 +105,8 @@ static void
 image_free(struct nabu_image *img)
 {
 	if (img != NULL) {
-		log_debug("[Channel %u] Freeing image %s.",
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[Channel %u] Freeing image %s.",
 		    img->channel->number, img->name);
 		assert(img->refcnt == 0);
 		assert(img->cached == false);
@@ -397,7 +398,8 @@ image_cache_remove_locked(struct nabu_image *img)
 {
 	if (img->cached) {
 		image_cache_size -= img->length;
-		log_debug("[Channel %u] Removing image %s from cache; "
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[Channel %u] Removing image %s from cache; "
 		    "total cache size: %zu",
 		    img->channel->number, img->name, image_cache_size);
 		LIST_REMOVE(img, link);
@@ -453,19 +455,21 @@ image_channel_copy_listing(struct image_channel *chan, size_t *sizep)
 	unsigned int attempt = 0;
 
  top:
-	log_debug("[%s] Attempt #%d to get listing.", chan->name, attempt++);
+	log_debug(LOG_SUBSYS_IMAGE,
+	    "[%s] Attempt #%d to get listing.", chan->name, attempt++);
 	pthread_mutex_lock(&image_cache_lock);
 	if (chan->listing == NULL) {
 		/* No listing yet; need to fetch. */
 		pthread_mutex_unlock(&image_cache_lock);
-		log_debug("[%s] No cached listing; need to fetch.",
-		    chan->name);
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[%s] No cached listing; need to fetch.", chan->name);
 		goto fetch;
 	}
 	allocsize = chan->listing_size;
 	pthread_mutex_unlock(&image_cache_lock);
 
-	log_debug("[%s] Cached listing is %zu bytes.", chan->name, allocsize);
+	log_debug(LOG_SUBSYS_IMAGE,
+	    "[%s] Cached listing is %zu bytes.", chan->name, allocsize);
 	data = malloc(allocsize);
 	if (data == NULL) {
 		log_error("[%s] Unable to allocate %zu byte for listing.",
@@ -478,7 +482,8 @@ image_channel_copy_listing(struct image_channel *chan, size_t *sizep)
 		memcpy(data, chan->listing, chan->listing_size);
 		*sizep = chan->listing_size;
 		pthread_mutex_unlock(&image_cache_lock);
-		log_debug("[%s] Copied %zu bytes of cached listing.",
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[%s] Copied %zu bytes of cached listing.",
 		    chan->name, *sizep);
 		return data;
 	}
@@ -493,12 +498,14 @@ image_channel_copy_listing(struct image_channel *chan, size_t *sizep)
  fetch:
 	if (chan->list_url == NULL) {
 		/* No listing. */
-		log_debug("[%s] No listing for this channel.", chan->name);
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[%s] No listing for this channel.", chan->name);
 		return NULL;
 	}
 
 	/* Allocate an extra byte to ensure there's a \n\0 at the end. */
-	log_debug("[%s] Fetching listing from %s", chan->name, chan->list_url);
+	log_debug(LOG_SUBSYS_IMAGE,
+	    "[%s] Fetching listing from %s", chan->name, chan->list_url);
 	data = fileio_load_file_from_location(chan->list_url, 2, 0, NULL,
 	    &filesize);
 	if (data == NULL) {
@@ -720,8 +727,8 @@ image_from_pak(struct image_channel *chan, uint32_t image,
 			goto bad;
 		}
 
-		log_debug("[%s] Decrypting PAK image %s.",
-		    chan->name, image_name);
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[%s] Decrypting PAK image %s.", chan->name, image_name);
 		    
 		if (! image_decrypt_pak(pakbuf, pakdata, paklen)) {
 			log_error("[%s] Unable to decrypt PAK image %s.",
@@ -846,14 +853,15 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		if (image == IMAGE_NUMBER_NAMED &&
 		    strcmp(img->name, selected_name) == 0) {
 			/* Cache hit! */
-			log_debug("[%s] Connection cache hit for named "
-			    "image: %s", conn_name(conn), img->name);
+			log_debug(LOG_SUBSYS_IMAGE,
+			    "[%s] Connection cache hit for named image: %s",
+			    conn_name(conn), img->name);
 		} else if (image != IMAGE_NUMBER_NAMED &&
 			   img->number == image) {
 			/* Cache hit! */
-			log_debug("[%s] Connection cache hit for "
-			    "image %06X: %s", conn_name(conn), image,
-			    img->name);
+			log_debug(LOG_SUBSYS_IMAGE,
+			    "[%s] Connection cache hit for image %06X: %s",
+			    conn_name(conn), image, img->name);
 		} else {
 			/* Boo, cache miss. */
 			img = NULL;
@@ -876,7 +884,8 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		struct nabu_image *oimg;
 
 		/* Cache hit! */
-		log_debug("Channel %u cache hit for image %06X: %s",
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "Channel %u cache hit for image %06X: %s",
 		    chan->number, image, img->name);
 
 		/* Add an extra retain for the last-image cache. */
@@ -894,7 +903,8 @@ image_load(struct nabu_connection *conn, uint32_t image)
 	if (selected_name != NULL) {
 		rv = asprintf(&image_url, "%s/%s", chan->path, selected_name);
 		assert(rv != -1 && image_url != NULL);
-		log_debug("[%s] Loading '%s' from %s", conn_name(conn),
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[%s] Loading '%s' from %s", conn_name(conn),
 		    selected_name, image_url);
 	} else {
 		const char *imgtype;
@@ -914,7 +924,8 @@ image_load(struct nabu_connection *conn, uint32_t image)
 		}
 		rv = asprintf(&image_url, "%s/%s", chan->path, fname);
 		assert(rv != -1 && image_url != NULL);
-		log_debug("[%s] Loading %s-%06X from %s", conn_name(conn),
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[%s] Loading %s-%06X from %s", conn_name(conn),
 		    imgtype, image, image_url);
 		free(fname);
 	}
@@ -981,18 +992,21 @@ image_unload(struct nabu_connection *conn, struct nabu_image *img,
 	 * get rid of caching retains before dropping the primary retain.
 	 */
 	if (lastuse) {
-		log_debug("[%s] dropping last-image retain of %s.",
+		log_debug(LOG_SUBSYS_IMAGE,
+		    "[%s] dropping last-image retain of %s.",
 		    conn_name(conn), img->name);
 		oimg = conn_set_last_image(conn, NULL);
 		assert(oimg == img);
 		image_release_locked(oimg);
 
 		if (img->is_local) {
-			log_debug("[%s] Removing %s from channel cache.",
+			log_debug(LOG_SUBSYS_IMAGE,
+			    "[%s] Removing %s from channel cache.",
 			    conn_name(conn), img->name);
 			oimg = image_cache_remove_locked(img);
 			if (oimg != NULL) {
-				log_debug("[%s] Dropping cache retain for %s.",
+				log_debug(LOG_SUBSYS_IMAGE,
+				    "[%s] Dropping cache retain for %s.",
 				    conn_name(conn), img->name);
 				image_release_locked(oimg);
 			}

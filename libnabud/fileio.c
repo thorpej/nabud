@@ -876,7 +876,7 @@ fileio_load_file(struct fileio *f, struct fileio_attrs *attrs, size_t extra,
 		return NULL;
 	} else {
 		filesize = (size_t)attrs->size;
-		log_debug("Size of %s is %zu bytes.",
+		log_debug(LOG_SUBSYS_FILEIO, "Size of %s is %zu bytes.",
 		    fileio_location(f), filesize);
 	}
 

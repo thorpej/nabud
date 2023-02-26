@@ -123,7 +123,7 @@ adaptor_expect_byte(struct nabu_connection *conn, uint8_t val)
 		return false;
 	}
 
-	log_debug("[%s] Expected 0x%02x, got 0x%02x (%s)",
+	log_debug(LOG_SUBSYS_ADAPTOR, "[%s] Expected 0x%02x, got 0x%02x (%s)",
 	    conn_name(conn), val, c, val == c ? "success" : "fail");
 	return val == c;
 }
@@ -184,11 +184,14 @@ adaptor_send_confirmed(struct nabu_connection *conn)
 static void
 adaptor_send_unauthorized(struct nabu_connection *conn)
 {
-	log_debug("[%s] Sending UNAUTHORIZED.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending UNAUTHORIZED.", conn_name(conn));
 	conn_send_byte(conn, NABU_SERVICE_UNAUTHORIZED);
-	log_debug("[%s] Waiting for NABU to ACK.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Waiting for NABU to ACK.", conn_name(conn));
 	if (adaptor_expect_ack(conn)) {
-		log_debug("[%s] Received ACK.", conn_name(conn));
+		log_debug(LOG_SUBSYS_ADAPTOR,
+		    "[%s] Received ACK.", conn_name(conn));
 	} else {
 		log_error("[%s] NABU failed to ACK.", conn_name(conn));
 	}
@@ -205,12 +208,14 @@ adaptor_send_packet(struct nabu_connection *conn, uint8_t *buf, size_t len)
 	assert(len <= NABU_MAXPACKETSIZE);
 
 	adaptor_escape_packet(conn, buf, len);
-	log_debug("[%s] Sending AUTHORIZED.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending AUTHORIZED.", conn_name(conn));
 	conn_send_byte(conn, NABU_SERVICE_AUTHORIZED);
-	log_debug("[%s] Waiting for NABU to ACK.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Waiting for NABU to ACK.", conn_name(conn));
 	if (adaptor_expect_ack(conn)) {
-		log_debug("[%s] Received ACK, sending packet.",
-		    conn_name(conn));
+		log_debug(LOG_SUBSYS_ADAPTOR,
+		    "[%s] Received ACK, sending packet.", conn_name(conn));
 		conn_send(conn, conn->pktbuf, conn->pktlen);
 		conn_send(conn, nabu_msg_finished,
 		    sizeof(nabu_msg_finished));
@@ -266,7 +271,8 @@ adaptor_send_pak(struct nabu_connection *conn, uint32_t image,
 
 	nabu_set_crc(&pktbuf[len - 2], nabu_crc(pktbuf, len - 2));
 
-	log_debug("[%s] Sending segment %u of image %06X%s", conn_name(conn),
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending segment %u of image %06X%s", conn_name(conn),
 	    segment, image, last ? " (last segment)" : "");
 
 	adaptor_send_packet(conn, pktbuf, len);
@@ -332,7 +338,8 @@ adaptor_send_image(struct nabu_connection *conn, uint32_t image,
 		log_fatal("internal packet length error");
 	}
 
-	log_debug("[%s] Sending segment %u of image %06X%s", conn_name(conn),
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending segment %u of image %06X%s", conn_name(conn),
 	    segment, image, last ? " (last segment)" : "");
 	adaptor_send_packet(conn, pktbuf, pktlen);
 	return last;
@@ -394,7 +401,8 @@ adaptor_msg_reset(struct nabu_connection *conn)
 		    conn_name(conn));
 		retronet_conn_fini(conn);
 	}
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
 	adaptor_send_ack(conn);
 	adaptor_send_confirmed(conn);
@@ -409,18 +417,22 @@ adaptor_msg_mystery(struct nabu_connection *conn)
 {
 	uint8_t msg[2];
 
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending NABU_MSGSEQ_ACK.", conn_name(conn));
 	adaptor_send_ack(conn);
 
-	log_debug("[%s] Expecting the NABU to send 2 bytes.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Expecting the NABU to send 2 bytes.", conn_name(conn));
 	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] Those two bytes never arrived.",
 		    conn_name(conn));
 	} else {
-		log_debug("[%s] msg[0] = 0x%02x msg[1] = 0x%02x",
+		log_debug(LOG_SUBSYS_ADAPTOR,
+		    "[%s] msg[0] = 0x%02x msg[1] = 0x%02x",
 		    conn_name(conn), msg[0], msg[1]);
 	}
-	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
 	adaptor_send_confirmed(conn);
 }
 
@@ -434,13 +446,15 @@ adaptor_msg_channel_status(struct nabu_connection *conn)
 	struct image_channel *chan = conn_get_channel(conn);
 
 	if (chan != NULL) {
-		log_debug("[%s] Sending NABU_SIGNAL_STATUS_YES.",
+		log_debug(LOG_SUBSYS_ADAPTOR,
+		    "[%s] Sending NABU_SIGNAL_STATUS_YES.",
 		    conn_name(conn));
 		conn_send_byte(conn, NABU_SIGNAL_STATUS_YES);
 		conn_send(conn, nabu_msg_finished,
 		    sizeof(nabu_msg_finished));
 	} else {
-		log_debug("[%s] Sending NABU_SIGNAL_STATUS_NO.",
+		log_debug(LOG_SUBSYS_ADAPTOR,
+		    "[%s] Sending NABU_SIGNAL_STATUS_NO.",
 		    conn_name(conn));
 		conn_send_byte(conn, NABU_SIGNAL_STATUS_NO);
 		conn_send(conn, nabu_msg_finished,
@@ -455,7 +469,8 @@ adaptor_msg_channel_status(struct nabu_connection *conn)
 static void
 adaptor_msg_transmit_status(struct nabu_connection *conn)
 {
-	log_debug("[%s] Sending MABU_MSGSEQ_FINISHED.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending MABU_MSGSEQ_FINISHED.", conn_name(conn));
 	conn_send(conn, nabu_msg_finished, sizeof(nabu_msg_finished));
 }
 
@@ -468,24 +483,26 @@ adaptor_msg_get_status(struct nabu_connection *conn)
 {
 	uint8_t msg;
 
-	log_debug("[%s] Sending MABU_MSGSEQ_ACK.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending MABU_MSGSEQ_ACK.", conn_name(conn));
 	adaptor_send_ack(conn);
 
-	log_debug("[%s] Expecting the NABU to send status type.",
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Expecting the NABU to send status type.",
 	    conn_name(conn));
 	if (! conn_recv_byte(conn, &msg)) {
 		log_error("[%s] Status type never arrived.", conn_name(conn));
 	} else {
 		switch (msg) {
 		case NABU_STATUS_SIGNAL:
-			log_debug("[%s] Channel status requested.",
-			    conn_name(conn));
+			log_debug(LOG_SUBSYS_ADAPTOR,
+			    "[%s] Channel status requested.", conn_name(conn));
 			adaptor_msg_channel_status(conn);
 			break;
 
 		case NABU_STATUS_TRANSMIT:
-			log_debug("[%s] Transmit status requested.",
-			    conn_name(conn));
+			log_debug(LOG_SUBSYS_ADAPTOR,
+			    "[%s] Transmit status requested.", conn_name(conn));
 			adaptor_msg_transmit_status(conn);
 			break;
 
@@ -504,7 +521,8 @@ adaptor_msg_get_status(struct nabu_connection *conn)
 static void
 adaptor_msg_start_up(struct nabu_connection *conn)
 {
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
 	adaptor_send_ack(conn);
 	adaptor_send_confirmed(conn);
@@ -519,7 +537,8 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 {
 	uint8_t msg[4];
 
-	log_debug("[%s] Sending NABU_MSGSEQ_ACK.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending NABU_MSGSEQ_ACK.", conn_name(conn));
 	adaptor_send_ack(conn);
 
 	if (! conn_recv(conn, msg, sizeof(msg))) {
@@ -531,15 +550,18 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 
 	uint16_t segment = msg[0];
 	uint32_t image = nabu_get_uint24(&msg[1]);
-	log_debug("[%s] NABU requested segment %u of image %06X.",
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] NABU requested segment %u of image %06X.",
 	    conn_name(conn), segment, image);
 
-	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
 	adaptor_send_confirmed(conn);
 
 	if (image == NABU_IMAGE_TIME) {
 		if (segment == 0) {
-			log_debug("[%s] Sending time packet.", conn_name(conn));
+			log_debug(LOG_SUBSYS_ADAPTOR,
+			    "[%s] Sending time packet.", conn_name(conn));
 			adaptor_send_time(conn);
 			return;
 		}
@@ -558,7 +580,8 @@ adaptor_msg_packet_request(struct nabu_connection *conn)
 		return;
 	}
 
-	log_debug("[%s] Sending segment %u of image %06X.",
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending segment %u of image %06X.",
 	    conn_name(conn), segment, image);
 	image_unload(conn, img,
 	    adaptor_send_image(conn, image, segment, img));
@@ -573,10 +596,12 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 {
 	uint8_t msg[2];
 
-	log_debug("[%s] Sending MABU_MSGSEQ_ACK.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending MABU_MSGSEQ_ACK.", conn_name(conn));
 	adaptor_send_ack(conn);
 
-	log_debug("[%s] Wating for NABU to send channel code.",
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Wating for NABU to send channel code.",
 	    conn_name(conn));
 	if (! conn_recv(conn, msg, sizeof(msg))) {
 		log_error("[%s] NABU failed to send channel code.",
@@ -591,7 +616,8 @@ adaptor_msg_change_channel(struct nabu_connection *conn)
 
 	image_channel_select(conn, channel);
 
-	log_debug("[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
+	log_debug(LOG_SUBSYS_ADAPTOR,
+	    "[%s] Sending NABU_STATE_CONFIRMED.", conn_name(conn));
 	adaptor_send_confirmed(conn);
 }
 
@@ -636,8 +662,8 @@ adaptor_msg_classic(struct nabu_connection *conn, uint8_t msg)
 		return false;
 	}
 
-	log_debug("[%s] Got %s.", conn_name(conn),
-	    adaptor_msg_types[idx].debug_desc);
+	log_debug(LOG_SUBSYS_ADAPTOR, 
+	    "[%s] Got %s.", conn_name(conn), adaptor_msg_types[idx].debug_desc);
 	(*adaptor_msg_types[idx].handler)(conn);
 	return true;
 }
@@ -657,7 +683,8 @@ adaptor_event_loop(struct nabu_connection *conn)
 		/* We want to block "forever" waiting for requests. */
 		conn_stop_watchdog(conn);
 
-		log_debug("[%s] Waiting for NABU.", conn_name(conn));
+		log_debug(LOG_SUBSYS_ADAPTOR,
+		    "[%s] Waiting for NABU.", conn_name(conn));
 		if (! conn_recv_byte(conn, &msg)) {
 			if (conn_state(conn) == CONN_STATE_EOF) {
 				log_info("[%s] Peer disconnected.",

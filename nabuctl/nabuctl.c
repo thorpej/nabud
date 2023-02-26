@@ -342,29 +342,33 @@ channel_deserialize(struct atom_list *reply_list, struct atom *atom)
 		switch (atom_tag(atom)) {
 		case NABUCTL_CHAN_NAME:
 			chan->name = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_NAME=%s", chan->name);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_NAME=%s", chan->name);
 			break;
 
 		case NABUCTL_CHAN_PATH:
 			chan->path = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_PATH=%s", chan->path);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_PATH=%s", chan->path);
 			break;
 
 		case NABUCTL_CHAN_LISTURL:
 			chan->list_url = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_LIST_URL=%s",
-			    chan->list_url);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_LIST_URL=%s", chan->list_url);
 			break;
 
 		case NABUCTL_CHAN_DEFAULT_FILE:
 			chan->default_file = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_DEFAULT_FILE=%s",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_DEFAULT_FILE=%s",
 			    chan->default_file);
 			break;
 
 		case NABUCTL_CHAN_NUMBER:
 			cp = atom_dataref(atom);
-			log_debug("Got NABUCTL_CHAN_NUMBER=%s", cp);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_NUMBER=%s", cp);
 			val = strtol(cp, NULL, 0);
 			if (val < 1 || val > 255) {
 				log_error("Invalid channel number: %s", cp);
@@ -376,22 +380,25 @@ channel_deserialize(struct atom_list *reply_list, struct atom *atom)
 
 		case NABUCTL_CHAN_TYPE:
 			chan->type = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_TYPE=%s", chan->type);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_TYPE=%s", chan->type);
 			break;
 
 		case NABUCTL_CHAN_SOURCE:
 			chan->source = atom_consume(atom);
-			log_debug("Got NABUCTL_CHAN_SOURCE=%s", chan->source);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_SOURCE=%s", chan->source);
 			break;
 
 		case NABUCTL_CHAN_RETRONET_EXTENSIONS:
 			chan->retronet_enabled = atom_bool_value(atom);
-			log_debug("Got NABUCTL_CHAN_RETRONET_EXTENSIONS=%d",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CHAN_RETRONET_EXTENSIONS=%d",
 			    chan->retronet_enabled);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
-			log_debug("Got NABUCTL_DONE");
+			log_debug(LOG_SUBSYS_CONTROL, "Got NABUCTL_DONE");
 			goto out;
 
 		default:
@@ -434,11 +441,12 @@ channel_list_fetch(void)
 		}
 		switch (atom_tag(atom)) {
 		case NABUCTL_DONE:
-			log_debug("Finished enumerating channel list.");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Finished enumerating channel list.");
 			goto out;
 
 		case NABUCTL_OBJ_CHANNEL:
-			log_debug("Deserializing channel.");
+			log_debug(LOG_SUBSYS_CONTROL, "Deserializing channel.");
 			atom = channel_deserialize(&rr.reply_list, atom);
 			if (atom == NULL) {
 				/* Error already reported. */
@@ -698,22 +706,26 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 		switch (atom_tag(atom)) {
 		case NABUCTL_CONN_NAME:
 			conn->name = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_NAME=%s", conn->name);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_NAME=%s", conn->name);
 			break;
 
 		case NABUCTL_CONN_TYPE:
 			conn->type = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_TYPE=%s", conn->type);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_TYPE=%s", conn->type);
 			break;
 
 		case NABUCTL_CONN_STATE:
 			conn->state = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_STATE=%s", conn->state);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_STATE=%s", conn->state);
 			break;
 
 		case NABUCTL_CONN_CHANNEL:
 			cp = atom_dataref(atom);
-			log_debug("Got NABUCTL_CONN_CHANNEL=%s", cp);
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_CHANNEL=%s", cp);
 			val = strtol(cp, NULL, 0);
 			if (val < 1 || val > 255) {
 				log_error("Invalid channel number: %s", cp);
@@ -725,24 +737,28 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 
 		case NABUCTL_CONN_SELECTED_FILE:
 			conn->selected_file = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_SELECTED_FILE=%s",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_SELECTED_FILE=%s",
 			    conn->selected_file);
 			break;
 
 		case NABUCTL_CONN_RETRONET_EXTENSIONS:
 			conn->retronet_enabled = atom_bool_value(atom);
-			log_debug("Got NABUCTL_CONN_RETRONET_EXTENSIONS=%d",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_RETRONET_EXTENSIONS=%d",
 			    conn->retronet_enabled);
 			break;
 
 		case NABUCTL_CONN_FILE_ROOT:
 			conn->file_root = atom_consume(atom);
-			log_debug("Got NABUCTL_CONN_FILE_ROOT=%s",
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_FILE_ROOT=%s",
 			    conn->file_root);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
-			log_debug("Got NABUCTL_DONE");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_DONE");
 			goto out;
 
 		default:
@@ -785,11 +801,13 @@ connection_list_fetch(void)
 		}
 		switch (atom_tag(atom)) {
 		case NABUCTL_DONE:
-			log_debug("Finished enumerating channel list.");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Finished enumerating channel list.");
 			goto out;
 
 		case NABUCTL_OBJ_CONNECTION:
-			log_debug("Deserializing connection.");
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Deserializing connection.");
 			atom = connection_deserialize(&rr.reply_list, atom);
 			if (atom == NULL) {
 				/* Error already reported. */
@@ -1032,9 +1050,28 @@ static bool
 command_show_usage(int argc, char *argv[])
 {
 	printf("Usage:\n");
-	printf("\tshow channel <numnber>\n");
+	printf("\tshow channel <number>\n");
 	printf("\tshow connection <number>\n");
+	printf("\tshow all channels\n");
+	printf("\tshow all connections\n");
 	return false;
+}
+
+static void
+show_one_channel(struct channel_desc *chan)
+{
+	printf("Channel %u:\n", chan->number);
+	printf("        Name: %s\n", chan->name);
+	printf("      Source: %s\n", chan->source);
+	printf("        Path: %s\n", chan->path);
+	printf("        Type: %s\n", chan->type);
+	if (chan->default_file != NULL) {
+		printf("Default file: %s\n", chan->default_file);
+	}
+	if (chan->list_url != NULL) {
+		printf(" Listing URL: %s\n", chan->list_url);
+	}
+	printf("    RetroNet: %s\n", enabledstr(chan->retronet_enabled));
 }
 
 static bool
@@ -1053,21 +1090,44 @@ command_show_channel(int argc, char *argv[])
 		printf("Invalid channel: %s\n", argv[2]);
 		return false;
 	}
-
-	printf("Channel %u:\n", chan->number);
-	printf("        Name: %s\n", chan->name);
-	printf("      Source: %s\n", chan->source);
-	printf("        Path: %s\n", chan->path);
-	printf("        Type: %s\n", chan->type);
-	if (chan->default_file != NULL) {
-		printf("Default file: %s\n", chan->default_file);
-	}
-	if (chan->list_url != NULL) {
-		printf(" Listing URL: %s\n", chan->list_url);
-	}
-	printf("    RetroNet: %s\n", enabledstr(chan->retronet_enabled));
+	show_one_channel(chan);
 
 	return false;
+}
+
+static bool
+command_show_all_channels(int argc, char *argv[])
+{
+	struct channel_desc *chan;
+	bool want_crlf = false;
+
+	TAILQ_FOREACH(chan, &channel_list, link) {
+		if (want_crlf) {
+			printf("\n");
+		}
+		show_one_channel(chan);
+		want_crlf = true;
+	}
+	return false;
+}
+
+static void
+show_one_connection(struct connection_desc *conn)
+{
+	printf("Connection %u:\n", conn->number);
+	printf("         Name: %s\n", conn->name);
+	printf("         Type: %s\n", conn->type);
+	printf("        State: %s\n", conn->state);
+	if (conn->channel != 0) {
+		printf("      Channel: %u\n", conn->channel);
+	}
+	if (conn->selected_file != NULL) {
+		printf("Selected file: %s\n", conn->selected_file);
+	}
+	if (conn->file_root != NULL) {
+		printf(" Storage area: %s\n", conn->file_root);
+	}
+	printf("     RetroNet: %s\n", enabledstr(conn->retronet_enabled));
 }
 
 static bool
@@ -1086,26 +1146,42 @@ command_show_connection(int argc, char *argv[])
 		printf("Invalid connection: %s\n", argv[2]);
 		return false;
 	}
-
-	printf("Connection %u:\n", conn->number);
-	printf("         Name: %s\n", conn->name);
-	printf("         Type: %s\n", conn->type);
-	printf("        State: %s\n", conn->state);
-	if (conn->channel != 0) {
-		printf("      Channel: %u\n", conn->channel);
-	}
-	if (conn->selected_file != NULL) {
-		printf("Selected file: %s\n", conn->selected_file);
-	}
-	if (conn->file_root != NULL) {
-		printf(" Storage area: %s\n", conn->file_root);
-	}
-	printf("     RetroNet: %s\n", enabledstr(conn->retronet_enabled));
+	show_one_connection(conn);
 
 	return false;
 }
 
+static bool
+command_show_all_connections(int argc, char *argv[])
+{
+	struct connection_desc *conn;
+	bool want_crlf = false;
+
+	TAILQ_FOREACH(conn, &connection_list, link) {
+		if (want_crlf) {
+			printf("\n");
+		}
+		show_one_connection(conn);
+		want_crlf = true;
+	}
+	return false;
+}
+
+static const struct cmdtab show_all_cmdtab[] = {
+	{ .name = "channels",		.func = command_show_all_channels },
+	{ .name = "connections",	.func = command_show_all_connections },
+
+	CMDTAB_EOL(command_show_usage)
+};
+
+static bool
+command_show_all(int argc, char *argv[])
+{
+	return cli_subcommand(show_all_cmdtab, argc, argv, 2);
+}
+
 static const struct cmdtab show_cmdtab[] = {
+	{ .name = "all",		.func = command_show_all },
 	{ .name = "channel",		.func = command_show_channel },
 	{ .name = "connection",		.func = command_show_connection },
 
@@ -1367,7 +1443,7 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "d")) != -1) {
 		switch (ch) {
 		case 'd':
-			logopts |= LOG_OPT_DEBUG;
+			log_debug_enable("any");
 			break;
 
 		default:

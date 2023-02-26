@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 #
 
-m4_define([nabud_VERSION], [1.1.1])
+m4_define([nabud_VERSION], [1.2])
 
 AC_INIT([nabud],
 	m4_defn([nabud_VERSION]),
@@ -73,6 +73,8 @@ case "$CANONICAL_TARGET" in
 	*-*-linux*)
 		# Enable _GNU_SOURCE for things like asprintf(3).
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
+		EXTRAS_OS="linux"
+		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/systemd"
 		;;
 esac
 
@@ -217,6 +219,50 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for the BSD libedit and a readline() function in libedit.
+#
+AC_CHECK_LIB(edit, readline, [LIBEDIT_LIB="-ledit"])
+
+# Apparently, some systems have a libreadline library that has a
+# readline() function compatible with libedit's; We'll allow that, too.
+#
+if test x$LIBEDIT_LIB = x; then
+	AC_CHECK_LIB(readline, readline, [LIBEDIT_LIB="-lreadline"])
+fi
+
+if test x$LIBEDIT_LIB != x; then
+	editdirs="/usr/include /usr/include/edit"
+	LIBEDIT_INCLUDES=
+	libedit_works=
+	AC_MSG_CHECKING([how to include <readline/readline.h>])
+	for editdir in $editdirs; do
+		save_CPPFLAGS="$CPPFLAGS"
+		LIBEDIT_INCLUDES="-I$editdir"
+		CPPFLAGS="$LIBEDIT_INCLUDES $CPPFLAGS"
+		AC_COMPILE_IFELSE([
+			AC_LANG_PROGRAM([[
+				#include <readline/readline.h>
+			]],[[
+				int dummy = 0;
+			]])],[
+				libedit_works=true
+				break],[])
+		CPPFLAGS="$save_CPPFLAGS"
+	done
+	if test x$libedit_works = xtrue; then
+		AC_MSG_RESULT([$LIBEDIT_INCLUDES])
+		AC_DEFINE(HAVE_LIBEDIT_READLINE, 1,
+			   [Define if you have a library compatible with BSD libedit's readline() function on your OS])
+		CLI_LIBS="$LIBEDIT_LIB"
+		CLI_INCLUDES="$LIBEDIT_INCLUDES"
+	else
+		AC_MSG_RESULT([unable])
+	fi
+fi
+
+AC_SUBST(CLI_LIBS)
+AC_SUBST(CLI_INCLUDES)
+
 # Check for some useful BSD functions that, sadly, are not universal.
 #
 AC_CHECK_FUNCS(getprogname)
@@ -229,6 +275,7 @@ AC_CONFIG_FILES([
 	extras/darwin/launchd/Makefile
 	extras/freebsd/rc.conf.d/Makefile
 	extras/freebsd/rc.d/Makefile
+	extras/linux/systemd/Makefile
 	extras/netbsd/rc.conf.d/Makefile
 	extras/netbsd/rc.d/Makefile
 	extras/openbsd/rc.d/Makefile
@@ -261,4 +308,6 @@ AC_MSG_NOTICE([PAK file support:         $WITH_PAK])
 AC_MSG_NOTICE([PAK file includes:        $PAK_INCLUDES])
 AC_MSG_NOTICE([PAK file libraries:       $PAK_LIBS])
 AC_MSG_NOTICE([PAK file LDFLAGS:         $PAK_LDFLAGS])
+AC_MSG_NOTICE([CLI includes:             $CLI_INCLUDES])
+AC_MSG_NOTICE([CLI libraries:            $CLI_LIBS])
 AC_MSG_NOTICE([=============================])

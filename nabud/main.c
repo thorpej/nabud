@@ -243,8 +243,9 @@ config_load_source(mj_t *atom)
 static void
 config_load_connection(mj_t *atom)
 {
-	mj_t *type_atom, *port_atom, *channel_atom, *file_root_atom;
-	char *type = NULL, *channel = NULL;
+	mj_t *type_atom, *port_atom, *channel_atom, *file_root_atom,
+	    *baud_atom;
+	char *type = NULL, *channel = NULL, *baud = NULL;
 	struct conn_add_args args = { };
 	long val;
 
@@ -276,8 +277,29 @@ config_load_connection(mj_t *atom)
 	}
 	args.channel = (unsigned int)val;
 
-	/* FileRoot is optional. */
-	file_root_atom = mj_get_atom(atom, "FileRoot");
+	/* Baud is optional. */
+	baud_atom = mj_get_atom(atom, "Baud");
+	if (VALID_ATOM(baud_atom, MJ_NUMBER)) {
+		mj_asprint(&baud, baud_atom, MJ_HUMAN);
+		val = strtol(baud, NULL, 10);
+		if (val < 1) {
+			config_error("Baud must be at least 1 %u",
+			    atom);
+			goto out;
+		}
+	} else {
+		val = 0;
+	}
+	args.baud = (unsigned int)val;
+
+	/*
+	 * StorageArea is optional, and we also check for the old
+	 * name (FileRoot).
+	 */
+	file_root_atom = mj_get_atom(atom, "StorageArea");
+	if (file_root_atom == NULL) {
+		file_root_atom = mj_get_atom(atom, "FileRoot");
+	}
 	if (VALID_ATOM(file_root_atom, MJ_STRING)) {
 		mj_asprint(&args.file_root, file_root_atom, MJ_HUMAN);
 	}
@@ -312,6 +334,9 @@ config_load_connection(mj_t *atom)
 	}
 	if (channel != NULL) {
 		free(channel);
+	}
+	if (baud != NULL) {
+		free(baud);
 	}
 	if (args.file_root != NULL) {
 		free(args.file_root);
@@ -392,29 +417,42 @@ config_load(const char *path)
 
 const char nabud_version[] = VERSION;
 
-#define	GETOPT_FLAGS	"c:dfl:u:U:"
+#define	GETOPT_FLAGS	"c:d:fl:u:U:"
 
 #if defined(__APPLE__)
 #define	PLATFORM_GETOPT_FLAGS	"L"
+#define	PLATFORM_USAGE_STRING	" [-L]"
+#elif defined(__linux__)
+#define	PLATFORM_GETOPT_FLAGS	"S"
+#define	PLATFORM_USAGE_STRING	" [-S]"
 #else
 #define	PLATFORM_GETOPT_FLAGS	/* nothing */
+#define	PLATFORM_USAGE_STRING	""
 #endif
 
 static void __attribute__((__noreturn__))
 usage(void)
 {
 	fprintf(stderr, "%s version %s\n", getprogname(), nabud_version);
-	fprintf(stderr, "usage: %s [-c conf] [-d] [-f] [-l logfile]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s [-c conf] [-d subsys] [-f] [-l logfile] "
+			          "[-u user] [-U umask]%s\n",
+	    getprogname(), PLATFORM_USAGE_STRING);
 	fprintf(stderr, "       -c conf    specifies the configuration file\n");
-	fprintf(stderr, "       -d         enable debugging (implies -f)\n");
+	fprintf(stderr, "       -d subsys  enable debugging (implies -f)\n");
 	fprintf(stderr, "       -f         run in the foreground\n");
 	fprintf(stderr, "       -l logfile specifies the log file\n");
 #if defined(__APPLE__)
 	fprintf(stderr, "       -L         run in launchd mode\n");
 #endif
+#if defined(__linux__)
+	fprintf(stderr, "       -S         run in systemd mode\n");
+#endif
 	fprintf(stderr, "       -u user    specifies user to run as\n");
 	fprintf(stderr, "       -U umask   specifies umask for file creation\n");
+
+	fprintf(stderr, "\nValid subsystems for -d:\n");
+	log_subsys_list(stderr, "\t");
+
 	exit(EXIT_FAILURE);
 }
 
@@ -439,7 +477,9 @@ main(int argc, char *argv[])
 
 		case 'd':
 			/* debug implies foreground */
-			logopts |= LOG_OPT_DEBUG;
+			if (! log_debug_enable(optarg)) {
+				usage();
+			}
 			/* FALLTHROUGH */
 
 		case 'f':
@@ -453,6 +493,12 @@ main(int argc, char *argv[])
 
 #if defined(__APPLE__)
 		case 'L':
+			/* Run in foreground, but with normal logging. */
+			foreground = true;
+			break;
+#endif
+#if defined(__linux__)
+		case 'S':
 			/* Run in foreground, but with normal logging. */
 			foreground = true;
 			break;

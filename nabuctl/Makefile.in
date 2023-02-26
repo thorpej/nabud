@@ -108,7 +108,8 @@ am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(man1dir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_nabuctl_OBJECTS = nabuctl-nabuctl.$(OBJEXT)
 nabuctl_OBJECTS = $(am_nabuctl_OBJECTS)
-nabuctl_DEPENDENCIES = ../libnabud/libnabud.la
+am__DEPENDENCIES_1 =
+nabuctl_DEPENDENCIES = ../libnabud/libnabud.la $(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -217,6 +218,8 @@ CANONICAL_TARGET = @CANONICAL_TARGET@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CLI_INCLUDES = @CLI_INCLUDES@
+CLI_LIBS = @CLI_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
@@ -351,7 +354,7 @@ top_srcdir = @top_srcdir@
 AM_CFLAGS = $(WARNCFLAGS)
 nabuctl_SOURCES = nabuctl.c
 nabuctl_CPPFLAGS = 
-nabuctl_LDADD = ../libnabud/libnabud.la
+nabuctl_LDADD = ../libnabud/libnabud.la $(CLI_LIBS)
 man1_MANS = nabuctl.1
 all: all-am
 
