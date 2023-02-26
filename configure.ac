@@ -231,12 +231,41 @@ if test x$LIBEDIT_LIB = x; then
 fi
 
 if test x$LIBEDIT_LIB != x; then
-	AC_DEFINE(HAVE_LIBEDIT_READLINE, 1,
-		   [Define if you have library compatible with BSD libedit's readline() function on your OS])
-	CLI_LIBS="$CLI_LIBS $LIBEDIT_LIB"
+	editdirs="/usr/include /usr/include/edit"
+	LIBEDIT_INCLUDES=
+	libedit_works=
+	AC_MSG_CHECKING([how to include <readline/readline.h>])
+	for editdir in $editdirs; do
+		save_CPPFLAGS="$CPPFLAGS"
+		LIBEDIT_INCLUDES="-I$editdir"
+		CPPFLAGS="$LIBEDIT_INCLUDES $CPPFLAGS"
+		AC_COMPILE_IFELSE([
+			AC_LANG_PROGRAM([[
+				#include <readline/readline.h>
+			]],[[
+				int dummy = 0;
+			]])],[
+				libedit_works=true
+				break],[])
+		CPPFLAGS="$save_CPPFLAGS"
+	done
+	# Elide -I/usr/include.
+	if test x$LIBEDIT_INCLUDES = "x-I/usr/include"; then
+		LIBEDIT_INCLUDES=
+	fi
+	if test x$libedit_works = xtrue; then
+		AC_MSG_RESULT([$LIBEDIT_INCLUDES])
+		AC_DEFINE(HAVE_LIBEDIT_READLINE, 1,
+			   [Define if you have a library compatible with BSD libedit's readline() function on your OS])
+		CLI_LIBS="$CLI_LIBS $LIBEDIT_LIB"
+		CLI_INCLUDES="$CLI_INCLUDES $LIBEDIT_INCLUDES"
+	else
+		AC_MSG_RESULT([unable])
+	fi
 fi
 
 AC_SUBST(CLI_LIBS)
+AC_SUBST(CLI_INCLUDES)
 
 # Check for some useful BSD functions that, sadly, are not universal.
 #

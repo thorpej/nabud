@@ -663,6 +663,7 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+CLI_INCLUDES
 CLI_LIBS
 PTHREAD_CFLAGS
 PTHREAD_LIBS
@@ -14424,11 +14425,58 @@ fi
 fi
 
 if test x$LIBEDIT_LIB != x; then
+	editdirs="/usr/include /usr/include/edit"
+	LIBEDIT_INCLUDES=
+	libedit_works=
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking how to include <readline/readline.h>" >&5
+printf %s "checking how to include <readline/readline.h>... " >&6; }
+	for editdir in $editdirs; do
+		save_CPPFLAGS="$CPPFLAGS"
+		LIBEDIT_INCLUDES="-I$editdir"
+		CPPFLAGS="$LIBEDIT_INCLUDES $CPPFLAGS"
+		cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+				#include <readline/readline.h>
+
+int
+main (void)
+{
+
+				int dummy = 0;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+
+				libedit_works=true
+				break
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+		CPPFLAGS="$save_CPPFLAGS"
+	done
+	# Elide -I/usr/include.
+	if test x$LIBEDIT_INCLUDES = "x-I/usr/include"; then
+		LIBEDIT_INCLUDES=
+	fi
+	if test x$libedit_works = xtrue; then
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $LIBEDIT_INCLUDES" >&5
+printf "%s\n" "$LIBEDIT_INCLUDES" >&6; }
 
 printf "%s\n" "#define HAVE_LIBEDIT_READLINE 1" >>confdefs.h
 
-	CLI_LIBS="$CLI_LIBS $LIBEDIT_LIB"
+		CLI_LIBS="$CLI_LIBS $LIBEDIT_LIB"
+		CLI_INCLUDES="$CLI_INCLUDES $LIBEDIT_INCLUDES"
+	else
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: unable" >&5
+printf "%s\n" "unable" >&6; }
+	fi
 fi
+
 
 
 
