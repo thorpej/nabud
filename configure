@@ -14459,18 +14459,14 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 		CPPFLAGS="$save_CPPFLAGS"
 	done
-	# Elide -I/usr/include.
-	if test x$LIBEDIT_INCLUDES = "x-I/usr/include"; then
-		LIBEDIT_INCLUDES=
-	fi
 	if test x$libedit_works = xtrue; then
 		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $LIBEDIT_INCLUDES" >&5
 printf "%s\n" "$LIBEDIT_INCLUDES" >&6; }
 
 printf "%s\n" "#define HAVE_LIBEDIT_READLINE 1" >>confdefs.h
 
-		CLI_LIBS="$CLI_LIBS $LIBEDIT_LIB"
-		CLI_INCLUDES="$CLI_INCLUDES $LIBEDIT_INCLUDES"
+		CLI_LIBS="$LIBEDIT_LIB"
+		CLI_INCLUDES="$LIBEDIT_INCLUDES"
 	else
 		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: unable" >&5
 printf "%s\n" "unable" >&6; }
@@ -16831,6 +16827,10 @@ printf "%s\n" "$as_me: PAK file includes:        $PAK_INCLUDES" >&6;}
 printf "%s\n" "$as_me: PAK file libraries:       $PAK_LIBS" >&6;}
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: PAK file LDFLAGS:         $PAK_LDFLAGS" >&5
 printf "%s\n" "$as_me: PAK file LDFLAGS:         $PAK_LDFLAGS" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: CLI includes:             $CLI_INCLUDES" >&5
+printf "%s\n" "$as_me: CLI includes:             $CLI_INCLUDES" >&6;}
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: CLI libraries:            $CLI_LIBS" >&5
+printf "%s\n" "$as_me: CLI libraries:            $CLI_LIBS" >&6;}
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: =============================" >&5
 printf "%s\n" "$as_me: =============================" >&6;}
 

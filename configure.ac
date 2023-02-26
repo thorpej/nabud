@@ -249,16 +249,12 @@ if test x$LIBEDIT_LIB != x; then
 				break],[])
 		CPPFLAGS="$save_CPPFLAGS"
 	done
-	# Elide -I/usr/include.
-	if test x$LIBEDIT_INCLUDES = "x-I/usr/include"; then
-		LIBEDIT_INCLUDES=
-	fi
 	if test x$libedit_works = xtrue; then
 		AC_MSG_RESULT([$LIBEDIT_INCLUDES])
 		AC_DEFINE(HAVE_LIBEDIT_READLINE, 1,
 			   [Define if you have a library compatible with BSD libedit's readline() function on your OS])
-		CLI_LIBS="$CLI_LIBS $LIBEDIT_LIB"
-		CLI_INCLUDES="$CLI_INCLUDES $LIBEDIT_INCLUDES"
+		CLI_LIBS="$LIBEDIT_LIB"
+		CLI_INCLUDES="$LIBEDIT_INCLUDES"
 	else
 		AC_MSG_RESULT([unable])
 	fi
@@ -312,4 +308,6 @@ AC_MSG_NOTICE([PAK file support:         $WITH_PAK])
 AC_MSG_NOTICE([PAK file includes:        $PAK_INCLUDES])
 AC_MSG_NOTICE([PAK file libraries:       $PAK_LIBS])
 AC_MSG_NOTICE([PAK file LDFLAGS:         $PAK_LDFLAGS])
+AC_MSG_NOTICE([CLI includes:             $CLI_INCLUDES])
+AC_MSG_NOTICE([CLI libraries:            $CLI_LIBS])
 AC_MSG_NOTICE([=============================])
