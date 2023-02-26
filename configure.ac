@@ -76,6 +76,11 @@ case "$CANONICAL_TARGET" in
 		EXTRAS_OS="linux"
 		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/systemd"
 		;;
+
+	*-*-cygwin*)
+		# Enable _GNU_SOURCE for things like asprintf(3).
+		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
+		;;
 esac
 
 AC_SUBST([EXTRAS_OS])
