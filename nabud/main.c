@@ -497,6 +497,12 @@ main(int argc, char *argv[])
 			foreground = true;
 			break;
 #endif
+#if defined(__linux__)
+		case 'S':
+			/* Run in foreground, but with normal logging. */
+			foreground = true;
+			break;
+#endif
 
 		case 'u':
 			as_user = optarg;
