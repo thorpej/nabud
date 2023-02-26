@@ -244,18 +244,18 @@ conn_add_serial(const struct conn_add_args *args)
 	if (args->baud != 0) {
 		if (cfsetspeed(&t, (baud = (speed_t)args->baud)) < 0) {
 			log_error("[%s] cfsetspeed(%d) failed: %s",
-			    args->port, baud, strerror(errno));
+			    args->port, (int)baud, strerror(errno));
 			goto bad;
 		}
 		if (tcsetattr(fd, TCSANOW, &t) < 0) {
 			log_error("[%s] Failed to set 8N%d-%d: %s", args->port,
-			    STOP_BITS, baud, strerror(errno));
+			    STOP_BITS, (int)baud, strerror(errno));
 			goto bad;
 		}
 	} else {
 		if (cfsetspeed(&t, (baud = NABU_NATIVE_BPS)) < 0) {
 			log_error("[%s] cfsetspeed(%d[NATIVE]) failed: %s",
-			    args->port, baud, strerror(errno));
+			    args->port, (int)baud, strerror(errno));
 			goto fallback;
 		}
 
@@ -268,26 +268,26 @@ conn_add_serial(const struct conn_add_args *args)
 			 * re-synchronizing with the next start bit.
 			 */
 			log_error("[%s] Failed to set native 8N%d-%d: %s",
-			    args->port, STOP_BITS, baud, strerror(errno));
+			    args->port, STOP_BITS, (int)baud, strerror(errno));
  fallback:
 			t.c_cflag |= CSTOPB;
 			log_info("[%s] Falling back to 8N%d-%d.",
 			    args->port, STOP_BITS, NABU_FALLBACK_BPS);
 			if (cfsetspeed(&t, (baud = NABU_FALLBACK_BPS))) {
 				log_error("[%s] cfsetspeed(%d[FALLBACK]) "
-				    "failed: %s", args->port, baud,
+				    "failed: %s", args->port, (int)baud,
 				    strerror(errno));
 				goto bad;
 			}
 			if (tcsetattr(fd, TCSANOW, &t) < 0) {
 				log_error("[%s] Failed to set fallback "
-				    "8N%d-%d: %s", args->port, STOP_BITS, baud,
-				    strerror(errno));
+				    "8N%d-%d: %s", args->port, STOP_BITS,
+				    (int)baud, strerror(errno));
 				goto bad;
 			}
 		}
 	}
-	log_info("[%s] Using 8N%d-%d.", args->port, STOP_BITS, baud);
+	log_info("[%s] Using 8N%d-%d.", args->port, STOP_BITS, (int)baud);
 
 #undef STOP_BITS
 
