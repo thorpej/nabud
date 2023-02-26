@@ -1,0 +1,7 @@
+services:
+  nabud:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 5816:5816
