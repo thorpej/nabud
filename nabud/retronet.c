@@ -112,7 +112,7 @@ rn_recv_filename(struct nabu_connection *conn, const char *which,
 	 * it again later if there are more arguments after the name, but
 	 * this is convient for those places that don't.
 	 */
-	*cursorp = '\0';
+	*(bp + len) = '\0';
 
 	if (! fileio_location_is_local((char *)bp, len)) {
 		/* Remote locations don't get "normalized". Blech. */
