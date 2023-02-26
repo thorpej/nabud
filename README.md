@@ -1,9 +1,9 @@
 # nabud - A server for the NABU PC
 
 This is a server for the NABU Personal Computer.  For more information about
-the NABU PC, please check out [NabuRetroNet](https://nabu.ca) as well as
-[Adrian Black's video](https://www.youtube.com/watch?v=HLYjZoShjy0) about
-the NABU.
+the NABU PC, please check out [The NABU Network](https://www.nabunetwork.com)
+as well as [Adrian Black's video](https://www.youtube.com/watch?v=HLYjZoShjy0)
+about the NABU.
 
 This server is written in C and is intended to be very portable to the
 Unix-like systems available today (the various BSDs, Linux, etc.) while
@@ -32,183 +32,6 @@ and _daemon(3)_.
   channel used by a NABU connection, select programs to load from homebrew
   channels (that vend ".nabu" files), view listings provided by such channels,
   etc.
-
-## Configuration
-
-nabud's configuration is held in a JSON-format configuration file.  This
-configuration file must contain 3 stanzas, in the following order:
-
-* Sources: an array of content sources.  Sources provide the content that
-  is served by Channels.
-* Channels: an array of content channels.  Connections get their content
-  from Channels.  Each Channel can be served by any source.
-* Connections: an array of connections.
-
-### Sources
-
-Each Source has 3 properties:
-* Name: a string that identifies the source.  It's meant both for human
-  consumption as well as for specifying which Source provides a Channel.
-* Location: a local path or a URL string that specifies the root of the source.
-
-### Channels
-
-Each Channel has 4 mandatory properties and 3 optional properties:
-* Name: a string that identifies a Channel.  It's meant both for human
-  consumption, but also specifies the name of the directory in the Source's
-  location that contains the Channel's files.
-* Path: an optional string that overrides the default directory for the
-  Channel's content.
-* ListURL: on optional string that specifies the URL for the Channel's file
-  listing.
-* DefaultFile: an optional string that specifies the default file to serve
-  when the NABU requests image 000001.  This is used only if the Connection
-  has not specified a selected file.
-* Number: a unique number from 1 to 255 that identifies the Channel to the
-  NABU.
-* Type: a string that specifies the type of files provided by the Channel:
-    * pak: NABU _pak_ files (content that is pre-wrapped in packet headers).
-      These are the original NABU Network files and can be downloaded from
-      NabuRetroNet.
-    * nabu: Raw _nabu_ binary files, such as those you build yourself.
-      nabud packetizes these files on-the-fly.
-* Source: a string that specifies the Source that provides the Channel.
-
-### Connections
-
-Each Connection has 3 properties:
-* Type: a string that specifies the type of connection:
-    * serial: a serial connection to real NABU hardware.
-    * tcp: a TCP listener that accepts connections from emulators (e.g. MAME).
-* Port: a string that specifies the "port" to use for the connection, which
-  varies based on the connection type:
-    * serial: a string that specifies the path to the serial port to use for
-      the connection.
-    * tcp: a string that specifies the TCP port on which connections will be
-      accepted.
-* Channel: a number from 1 to 255 that specifies which channel to use for
-  this connection.
-
-### Example configuration file
-
-This is the _nabud.conf_ configuration file I use to serve my own NABU:
-
-    {
-      "Sources": [
-        {
-          "Name": "Local",
-          "Location": "/home/nabu/channels",
-        },
-        {
-          "Name": "NabuRetroNet",
-          "Location": "https://cloud.nabu.ca",
-        }
-      ],
-      "Channels": [
-        {
-          "Name": "NABU Network 1984 Cycle v1",
-          "Path": "cycle1",
-          "Number": 1,
-          "Type": "pak",
-          "Source": "NabuRetroNet"
-        },
-        {
-          "Name": "NABU Network 1984 Cycle v2",
-          "Path": "cycle2",
-          "Number": 2,
-          "Type": "pak",
-          "Source": "NabuRetroNet",
-        },
-        {
-          "Name": "HomeBrew",
-          "Path": "HomeBrew/titles",
-          "ListURL": "https://cloud.nabu.ca/HomeBrew/titles/filesv2.txt",
-          "Number": 9,
-          "Type": "nabu",
-          "Source": "NabuRetroNet",
-          "RetroNetExtensions": true,
-        },
-        {
-          "Name": "NABU Network 1984 Cycle v1",
-          "Path": "cycle1",
-          "Number": 11,
-          "Type": "pak",
-          "Source": "Local",
-        },
-        {
-          "Name": "NABU Network 1984 Cycle v2",
-          "Path": "cycle2",
-          "Number": 12,
-          "Type": "pak",
-          "Source": "Local",
-        },
-        {
-          "Name": "homebrew",
-          "Number": 19,
-          "Type": "nabu",
-          "Source": "Local",
-        }
-      ],
-      "Connections": [
-        {
-          "Type": "serial",
-          "Port": "/dev/tty-uftdi-A10MHWD6-0",
-          "Channel": 11,
-          "StorageArea": "/home/nabu/storage/living-room-nabu",
-        },
-        {
-          "Type": "tcp",
-          "Port": "5001",
-          "Channel": 1,
-        },
-        {
-          "Type": "tcp",
-          "Port": "5002",
-          "Channel": 2,
-        },
-        {
-          "Type": "tcp",
-          "Port": "5009",
-          "Channel": 9,
-          "StorageArea": "/home/nabu/storage/mame-nabu",
-        },
-        {
-          "Type": "tcp",
-          "Port": "5011",
-          "Channel": 11,
-        },
-        {
-          "Type": "tcp",
-          "Port": "5012",
-          "Channel": 12,
-        },
-        {
-          "Type": "tcp",
-          "Port": "5019",
-          "Channel": 19,
-          "StorageArea": "/home/nabu/storage/mame-nabu",
-        }
-      ]
-    }
-
-And this is the file layout of my one Source location:
-
-    the-ripe-vessel:thorpej 256$ ls -l /home/nabu/channels
-    total 28
-    24 drwxr-xr-x  2 thorpej  wheel  22528 Dec 28 14:49 cycle1/
-     4 drwxr-xr-x  2 thorpej  wheel    512 Dec 28 14:36 homebrew/
-    the-ripe-vessel:thorpej 257$ ls -l /home/nabu/channels/homebrew
-    total 8
-    8 -rw-r--r--  1 thorpej  users  6732 Dec 28 09:09 000001.nabu
-    the-ripe-vessel:thorpej 258$ ls -l /home/nabu/channels/cycle1    
-    total 6764
-     28 -rw-r--r--  1 thorpej  users   27712 Dec 28 11:14 00-DD-5C-C5-82-58-D9-BA-33-D9-80-2D-19-1D-FC-55.npak
-      4 -rw-r--r--  1 thorpej  users    3160 Dec 28 11:14 01-43-6A-DF-BE-45-CB-E8-A1-D7-EB-8D-AB-63-06-E7.npak
-     16 -rw-r--r--  1 thorpej  users   15696 Dec 28 11:14 02-E1-D8-97-CF-F9-82-38-D0-ED-9F-8A-8B-FA-F4-73.npak
-     .
-     .
-     .
-     [ lots more .npak files ]
 
 ## Building nabud
 
@@ -265,45 +88,11 @@ exercise for the reader.  For macOS, you will need to install the
 and then launch Xcode to perform the "first launch" task that takes care of
 setting up the command-line tools that nabud uses to build.
 
-## Extras for your operating system
-
-nabud comes with some extras that help with integration onto operating
-systems on which it runs.
-
-* NetBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
-  installed into $(prefix)/share.  Tweak them to your liking and copy them
-  into _/etc/rc.d_ and _/etc/rc.conf.d_.
-* FreeBSD - An _rc.d_ script and an _rc.conf.d_ configuration file are
-  installed into $(prefix)/share.  Tweak them to your liking and copy them
-  into _/etc/rc.d_ and _/etc/rc.conf.d_.
-* Linux - A systemd service unit is installed into $(prefix)/share.  Tweak
-  it to your liking and install it into _/lib/systemd/system_.  Once installed,
-  you will then need to configure systemd to use it; see below.
-* OpenBSD - An _rc.d_ script is installed into $(prefix)/share.
-  Tweak it to your liking and install it into _/etc/rc.d_.  Make sure to
-  update your "pkg_scripts" variable in _/etc/rc.conf_.
-* macOS - A launchd plist file (_nabud.plist_) is installed into
-  $(prefix)/share.  Tweak it to your liking and install it into
-  _/Library/LaunchDaemons_.
-
-If you are interested in providing extras for your favorite operating
-system, please let me know!
-
-## Configuring nabud
-
-After building nabud, copy the example _nabud.conf_ to the selected location
-(default: _$(prefix)/etc/nabud.conf_), tailor it to your system, and then run it:
-
-    # ./nabud
-
-nabud requires no special permissions; only the ability to open files to be
-served to the NABU for reading, and the ability to open the serial ports for
-reading and writing.  You can choose to run it as _root_ or as an unprivileged
-user if you set the permissions on your serial port devices properly.  If
-you're only using TCP functionality, it can run completely unprivileged.
+## Configuring and running nabud
 
 nabud understands the following command line options:
 * _-c conf_ -- specifies an alternate name / location for _nabud.conf_.
+  The default location is _$(prefix)/etc/nabud.conf_.
 * _-d subsys_ -- enables debugging on the specified subsystem; see the
    nabud(8) man page for details.  This option also implies _-f_.
 * _-f_ -- run in the foreground.  Without this, nabud will detach from the
@@ -317,7 +106,7 @@ nabud understands the following command line options:
 creating files.
 
 On macOS, nabud also understands the following command line options:
-* _-L- -- runs nabud in "launchd mode".  This is similar to the _-f_
+* _-L_ -- runs nabud in "launchd mode".  This is similar to the _-f_
   option, but does not change the logging destination.
 
 On Linux, nabud also understands the following command line options:
@@ -326,10 +115,12 @@ On Linux, nabud also understands the following command line options:
 
 (Astute readers will note that macOS's -L and Linux's -S are the same.)
 
-In addition to errors, nabud logs some basic information about the requests
-it services.
+nabud requires no special permissions; only the ability to open files to be
+served to the NABU for reading, and the ability to open the serial ports for
+reading and writing.  You can choose to run it as _root_ or as a minimally-
+privileged user if you set the permissions on your serial port devices properly.
 
-It is recommended that you run nabud as a minimally-privileged user using
+It is strongly recommended that you run nabud as a minimally-privileged user using
 the _-u user_ option.  Typically, you would do this by following these steps:
 
 1. Create a group that will be able to modify any files created by nabud,
@@ -337,8 +128,8 @@ the _-u user_ option.  Typically, you would do this by following these steps:
 2. Create a user specifically for running nabud, for example _nabu_.  Set
    the default group ID of that user to the group created in step 1.
 3. Select a group that will be used to grant permission to open serial ports
-   for NABU connections.  Historically, a _dialer_ group exists on some Unix
-   systems for this purpose.  Create one, if necessary.
+   for NABU connections.  Historically, a _dialer_ or _dialout_ group exists
+   on some Unix systems for this purpose.  Create one, if necessary.
 4. Add the user created in step 2 to the group you selected in step 3.
 5. Ensure your serial port devices grant read/write permission to the group
    selected in step 3.
@@ -365,8 +156,108 @@ configuration for nabud:
     0 crw-rw----  1 uucp  dialer  66, 5 May 19  2021 /dev/ttyU5
     0 crw-rw----  1 uucp  dialer  66, 6 May 19  2021 /dev/ttyU6
     0 crw-rw----  1 uucp  dialer  66, 7 May 19  2021 /dev/ttyU7
-    
-    # ./nabud -u nabu -U 002
+
+To create the nabu group and user on NetBSD or Ubuntu Linux, you can
+use the following procedure:
+
+    % sudo groupadd nabu
+    % sudo useradd -d /nonexistent -s /sbin/nologin -g nabu -c "NABU User" nabu
+    % sudo usermod -G dialer nabu     # NetBSD
+      -- or --
+    % sudo usermod -G dialout nabu    # Ubuntu
+
+The procedure on other systems is left as an exercise for the reader.
+
+If you plan to serve local files or use any of the storage extensions (either
+NHACP or RetroNet), then you will want to create select locations for this
+purpose and create the necessary directories.  On my local NABU server, I have
+the following directory layout:
+
+    neo2-nas:thorpej 26$ pwd
+    /export/nabu
+    neo2-nas:thorpej 27$ ls -l 
+    channels/  storage/   
+    neo2-nas:thorpej 27$ pwd    
+    /export/nabu
+    neo2-nas:thorpej 28$ ls -l                                                     
+    total 8
+    4 drwxr-xr-x  6 thorpej  wheel  512 Feb 15 13:46 channels/
+    4 drwxr-xr-x  4 thorpej  wheel  512 Feb 15 13:48 storage/
+    neo2-nas:thorpej 29$ ls -l channels/                                           
+    total 24
+    8 drwxr-xr-x  2 thorpej  wheel  7168 Feb  4 10:17 cycle1/
+    8 drwxr-xr-x  2 thorpej  wheel  7168 Feb  4 10:21 cycle2/
+    4 drwxr-xr-x  2 thorpej  wheel   512 Feb 15 13:36 hacking/
+    4 drwxr-xr-x  2 thorpej  wheel   512 Feb 15 13:46 rn-hacking/
+    neo2-nas:thorpej 30$ pwd             
+    neo2-nas:thorpej 30$ ls -l storage/                                            
+    total 8
+    4 drwxrwxr-x  2 thorpej  nabu  512 Feb 15 13:48 living-room-nabu/
+    4 drwxrwxr-x  2 thorpej  nabu  512 Feb 15 13:48 mame-nabu/
+    neo2-nas:thorpej 31$ 
+
+In this example, I have local copies of the original 1984 NABU Network
+cycles (that I slurped down from cloud.nabu.ca), plus a couple of additional
+local channels for my own hacking purposes.  I've also configured locations
+for the NABU to access locally stored files using the storage extensions.
+
+The next step is to set up your nabud configuration file in
+_$(prefix)/etc/nabud.conf_.  nabud's configuration is held in a JSON-format
+file.  You can start with the example configuration file provided
+[here](examples/nabud.conf).  Note that the example has a lot of things
+in it that you may not need.  The configuration file is documented in
+the nabud(8) man page.
+
+The next step is to install the appropriate start-up "extra" for your
+system.  If you are interested in providing extras for your favorite
+operating system, please let me know!
+
+### macOS
+
+A launchd plist file for nabud is provided in _$(prefix)/share/nabud/launchd/nabud.plist_.
+By default, it runs nabud as the "nabu" user and sets its umask to 002.
+Install it and start nabud like so:
+
+    % sudo cp $(prefix)/share/nabud/launchd/nabud.plist /Library/LaunchDaemons
+    % sudo launchctl load /Library/LaunchDaemons/nabud.plist
+
+### NetBSD and FreeBSD
+
+A start-up script and configuration file are provided in
+_$(prefix)/share/nabud/rc.d/nabud_ and
+_$(prefix)/share/nabud/rc.conf.d/nabud_.  By default, they run nabud
+as the "nabu" user and set its umask to 002.  Install them and run
+it like so:
+
+    % sudo cp $(prefix)/share/nabud/rc.d/nabud /etc/rc.d
+    % sudo cp $(prefix)/share/nabud/rc.conf.d/nabud /etc/rc.conf.d
+    % sudo /etc/rc.d/nabud start
+
+### OpenBSD
+
+A start-up script is provided in _$(prefix)/share/nabud/rc.d/nabud_.
+You will need to edit your _/etc/rc.conf.local_ file to specify the
+options to pass to nabud.  The recommended settings are:
+
+    nabud_flags="-u nabu -U 002"
+
+Next, edit your _/etc/rc.conf_ file to add nabud to the "pkg_scripts"
+variable.  Then copy the start-up script into place and run it:
+
+    % sudo cp $(prefix)/share/nabud/rc.d/nabud /etc/rc.d
+    % sudo /etc/rc.d/nabud start
+
+### Linux (systemd)
+
+A systemd service file is provided in
+_$(prefix)/share/nabud/systemd/nabud.service_.  By default, it runs
+nabud as the "nabu" user and sets its umask to 002.  Install it and
+run it like so:
+
+    % sudo cp $(prefix)/share/nabud/systemd/nabud.service /lib/systemd/system
+    % sudo systemctl daemon-reload
+    % sudo systemctl enable nabud.service
+    % sudo systemctl start nabud.service
 
 ## Controlling nabud with nabuctl
 
@@ -612,7 +503,7 @@ NABU "Great Awakening":
 * DJ Sures (his YouTube channel [here](https://www.youtube.com/@DJSures))
   who has some family history with the NABU and did a bunch of reverse
   engineering on the Adaptor protocol and has led the charge on the
-  NabuRetroNet.
+  [NABU RetroNet](https://nabu.ca).
 * Leo Binkowski (his YouTube channel [here](https://www.youtube.com/@leo.binkowski)),
   a former NABU engineer who preserved a TON of stuff when the NABU company
   folded.
