@@ -241,6 +241,7 @@ if test x$LIBEDIT_LIB != x; then
 		CPPFLAGS="$LIBEDIT_INCLUDES $CPPFLAGS"
 		AC_COMPILE_IFELSE([
 			AC_LANG_PROGRAM([[
+				#include <stdio.h>
 				#include <readline/readline.h>
 			]],[[
 				int dummy = 0;
