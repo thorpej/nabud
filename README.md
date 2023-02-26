@@ -411,6 +411,7 @@ And you can select a file to loaded when the NABU boots and requests image
   respectively, rather than just one at a time.
 * Added a systemd extra for Linux, along with some other Linux-specific
   instructions, provided by sampson on Discord.
+* Added Docker support, provided by Christopher Masto.
 
 ### nabud-1.1.1
 * Fix an issue reported by jefferystone on Discord -- if you selected a
