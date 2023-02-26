@@ -42,4 +42,5 @@ VOLUME $LIBDIR
 
 EXPOSE 5816/tcp
 
-CMD ["/sbin/nabud", "-f", "-u", "nabu"]
+ENTRYPOINT ["/sbin/nabud"]
+CMD ["-f", "-u", "nabu"]
