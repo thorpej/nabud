@@ -205,6 +205,48 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 #define	NABU_FALLBACK_BPS	115200
 
 /*
+ * conn_serial_setparam --
+ *	Set the specified parameters on the serial port.
+ */
+static bool
+conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits)
+{
+	struct termios t;
+
+	assert(stop_bits == 1 || stop_bits == 2);
+
+	if (tcgetattr(fd, &t) < 0) {
+		log_error("[%s] tcgetattr() failed: %s", port,
+		    strerror(errno));
+		return false;
+	}
+
+	cfmakeraw(&t);
+	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
+	t.c_cflag |= CLOCAL | CS8;
+
+	if (stop_bits == 2) {
+		t.c_cflag |= CSTOPB;
+	} else {
+		t.c_cflag &= ~CSTOPB;
+	}
+
+	if (cfsetspeed(&t, baud) < 0) {
+		log_error("[%s] cfsetspeed(%d) failed: %s", port, (int)baud,
+		    strerror(errno));
+		return false;
+	}
+
+	if (tcsetattr(fd, TCSANOW, &t) < 0) {
+		log_error("[%s] Failed to set 8N%d-%d: %s", port,
+		    stop_bits, (int)baud, strerror(errno));
+		return false;
+	}
+
+	return true;
+}
+
+/*
  * conn_add_serial --
  *	Add a serial connection.
  */
@@ -213,6 +255,7 @@ conn_add_serial(const struct conn_add_args *args)
 {
 	struct termios t;
 	speed_t baud;
+	int stop_bits;
 	int fd;
 
 	log_info("Creating Serial connection on %s.", args->port);
@@ -229,67 +272,47 @@ conn_add_serial(const struct conn_add_args *args)
 		goto bad;
 	}
 
-#define	STOP_BITS		((t.c_cflag & CSTOPB) ? 2 : 1)
-
 	/*
 	 * The native protocol is 8N1 @ 111860 baud, but it's much
 	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
 	 * can get out of sync when receiving a stream of bytes in
 	 * a packet.
 	 */
-	cfmakeraw(&t);
-	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
-	t.c_cflag |= CLOCAL | CS8 | CSTOPB;
+	stop_bits = 2;	/* Eventually, we'll be able to configure this. */
 
 	if (args->baud != 0) {
-		if (cfsetspeed(&t, (baud = (speed_t)args->baud)) < 0) {
-			log_error("[%s] cfsetspeed(%d) failed: %s",
-			    args->port, (int)baud, strerror(errno));
-			goto bad;
-		}
-		if (tcsetattr(fd, TCSANOW, &t) < 0) {
-			log_error("[%s] Failed to set 8N%d-%d: %s", args->port,
-			    STOP_BITS, (int)baud, strerror(errno));
+		if (! conn_serial_setparam(args->port, fd,
+					   (baud = (speed_t)args->baud),
+					   stop_bits)) {
+			log_error("[%s] Unable to set configured baud rate.",
+			    args->port);
 			goto bad;
 		}
 	} else {
-		if (cfsetspeed(&t, (baud = NABU_NATIVE_BPS)) < 0) {
-			log_error("[%s] cfsetspeed(%d[NATIVE]) failed: %s",
-			    args->port, (int)baud, strerror(errno));
-			goto fallback;
-		}
-
-		if (tcsetattr(fd, TCSANOW, &t) < 0) {
+		/*
+		 * We first try to set the NABU's native baud rate,
+		 * and if that fails, fall back to a more "standard"
+		 * 115.2K.
+		 */
+		if (! conn_serial_setparam(args->port, fd,
+					   (baud = NABU_NATIVE_BPS),
+					   stop_bits)) {
+			log_error("[%s] Failed to set NABU-native baud rate; "
+			    "falling back...", args->port);
 			/*
-			 * If we failed to set the native NABU baud rate
-			 * (it's a little of an odd-ball after all), then
-			 * try the fall back.  But add an extra stop bit
-			 * so that the NABU's UART has a better chance of
-			 * re-synchronizing with the next start bit.
+			 * If we're falling back, definitely make sure
+			 * we're using 2 stop bits.
 			 */
-			log_error("[%s] Failed to set native 8N%d-%d: %s",
-			    args->port, STOP_BITS, (int)baud, strerror(errno));
- fallback:
-			t.c_cflag |= CSTOPB;
-			log_info("[%s] Falling back to 8N%d-%d.",
-			    args->port, STOP_BITS, NABU_FALLBACK_BPS);
-			if (cfsetspeed(&t, (baud = NABU_FALLBACK_BPS))) {
-				log_error("[%s] cfsetspeed(%d[FALLBACK]) "
-				    "failed: %s", args->port, (int)baud,
-				    strerror(errno));
-				goto bad;
-			}
-			if (tcsetattr(fd, TCSANOW, &t) < 0) {
+			if (! conn_serial_setparam(args->port, fd,
+						   (baud = NABU_FALLBACK_BPS),
+						   (stop_bits = 2))) {
 				log_error("[%s] Failed to set fallback "
-				    "8N%d-%d: %s", args->port, STOP_BITS,
-				    (int)baud, strerror(errno));
+				    "baud rate.", args->port);
 				goto bad;
 			}
 		}
 	}
-	log_info("[%s] Using 8N%d-%d.", args->port, STOP_BITS, (int)baud);
-
-#undef STOP_BITS
+	log_info("[%s] Using 8N%d-%d.", args->port, stop_bits, (int)baud);
 
 	conn_create_common(args->port, fd, args, CONN_TYPE_SERIAL,
 	    conn_thread);
