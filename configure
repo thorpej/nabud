@@ -12759,7 +12759,7 @@ then :
 	 WARNCFLAGS="-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
 		     -Wpointer-arith -Wno-sign-compare -Wreturn-type -Wswitch \
 		     -Wshadow -Wcast-qual -Wwrite-strings \
-		     -Wformat=2 -Wno-format-zero-length -Wstringop-truncation"
+		     -Wformat=2 -Wno-format-zero-length"
 	 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes; adding to CFLAGS: \"$WARNCFLAGS\"" >&5
 printf "%s\n" "yes; adding to CFLAGS: \"$WARNCFLAGS\"" >&6; }
 else $as_nop
