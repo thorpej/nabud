@@ -1474,7 +1474,7 @@ main(int argc, char *argv[])
 		    path);
 	}
 	memset(&sun, 0, sizeof(sun));
-	strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+	strncpy(sun.sun_path, path, sizeof(sun.sun_path) - 1);
 #ifdef HAVE_SOCKADDR_UN_SUN_LEN
 	sun.sun_len = SUN_LEN(&sun);
 #endif

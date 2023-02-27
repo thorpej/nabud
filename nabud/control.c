@@ -129,7 +129,7 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	    conn_name(conn));
 
 	struct image_channel *chan;
-	char selected_file[256];	/* reasonable limit */
+	char selected_file[256] = { 0 };	/* reasonable limit */
 
 	pthread_mutex_lock(&conn->mutex);
 	chan = conn->l_channel;
@@ -140,8 +140,6 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 		}
 		strncpy(selected_file, conn->l_selected_file,
 		    sizeof(selected_file) - 1);
-	} else {
-		selected_file[0] = '\0';
 	}
 	pthread_mutex_unlock(&conn->mutex);
 
@@ -682,13 +680,13 @@ control_init(const char *path)
 	}
 	nabuctl_sock_path = path;
 
-	if (strlen(path) > sizeof(sun.sun_path)) {
+	if (strlen(path) > sizeof(sun.sun_path) - 1) {
 		log_error("Path to control socket is too long: %s", path);
 		return;
 	}
 
 	memset(&sun, 0, sizeof(sun));
-	strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+	strncpy(sun.sun_path, path, sizeof(sun.sun_path) - 1);
 #ifdef HAVE_SOCKADDR_UN_SUN_LEN
 	sun.sun_len = SUN_LEN(&sun);
 #endif
