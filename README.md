@@ -88,6 +88,13 @@ exercise for the reader.  For macOS, you will need to install the
 and then launch Xcode to perform the "first launch" task that takes care of
 setting up the command-line tools that nabud uses to build.
 
+### Building on Cygwin
+
+Building on Cygwin is a little more complicated.  In addition to the basic
+toolchain (gcc-core, binutils, make), you need to ensure you've installed the
+libssl-devel and libreadline-devel packages (make sure they match the
+versions of the run-time packages that are installed).
+
 ## Configuring and running nabud
 
 nabud understands the following command line options:
