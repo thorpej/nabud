@@ -19,6 +19,12 @@
 /* Define to 1 if you have OpenSSL. */
 #undef HAVE_OPENSSL
 
+/* Define if your OS has O_BINARY in <sys/fcntl.h> */
+#undef HAVE_O_BINARY
+
+/* Define if your OS has O_TEXT in <sys/fcntl.h> */
+#undef HAVE_O_TEXT
+
 /* Define if you have POSIX threads libraries and header files. */
 #undef HAVE_PTHREAD
 

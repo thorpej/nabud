@@ -506,7 +506,7 @@ image_channel_copy_listing(struct image_channel *chan, size_t *sizep)
 	/* Allocate an extra byte to ensure there's a \n\0 at the end. */
 	log_debug(LOG_SUBSYS_IMAGE,
 	    "[%s] Fetching listing from %s", chan->name, chan->list_url);
-	data = fileio_load_file_from_location(chan->list_url, 2, 0, NULL,
+	data = fileio_load_file_from_location(chan->list_url, 0, 2, 0, NULL,
 	    &filesize);
 	if (data == NULL) {
 		log_error("[%s] Unable to fetch listing from %s\n",
@@ -768,7 +768,7 @@ image_load_image_from_url(struct image_channel *chan, uint32_t image,
 	size_t filesize;
 	struct fileio_attrs attrs;
 
-	filebuf = fileio_load_file_from_location(url, 0, NABU_MAXSEGMENTSIZE,
+	filebuf = fileio_load_file_from_location(url, 0, 0, NABU_MAXSEGMENTSIZE,
 	    &attrs, &filesize);
 	if (filebuf == NULL) {
 		/* Error already logged. */

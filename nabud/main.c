@@ -356,8 +356,8 @@ config_load(const char *path)
 	 * Read in the config file.  Ask for 1 extra byte to be allocated
 	 * so we can ensure NUL-termination.
 	 */
-	file_data = fileio_load_file_from_location(path, 1 /*extra*/,
-	    0 /*maxsize*/, NULL, &file_size);
+	file_data = fileio_load_file_from_location(path, FILEIO_O_TEXT,
+	    1 /*extra*/, 0 /*maxsize*/, NULL, &file_size);
 	if (file_data == NULL) {
 		log_error("Unable to load configuration file.");
 		return false;

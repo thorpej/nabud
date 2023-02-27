@@ -341,6 +341,15 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	if (f->flags & FILEIO_O_EXCL) {
 		open_flags |= O_EXCL;
 	}
+	if (f->flags & FILEIO_O_TEXT) {
+#ifdef HAVE_O_TEXT
+		open_flags |= O_TEXT;
+#endif
+	} else {
+#ifdef HAVE_O_BINARY
+		open_flags |= O_BINARY;
+#endif
+	}
 
 	f->local.fd = open(f->location, open_flags, 0666);
 	if (f->local.fd < 0) {
@@ -900,7 +909,7 @@ fileio_load_file(struct fileio *f, struct fileio_attrs *attrs, size_t extra,
  *	Load a file from the specified location.
  */
 void *
-fileio_load_file_from_location(const char *location, size_t extra,
+fileio_load_file_from_location(const char *location, int oflags, size_t extra,
     size_t maxsize, struct fileio_attrs *attrs, size_t *filesizep)
 {
 	struct fileio_attrs attrs_store;
@@ -911,7 +920,9 @@ fileio_load_file_from_location(const char *location, size_t extra,
 		attrs = &attrs_store;
 	}
 
-	f = fileio_open(location, FILEIO_O_RDONLY, NULL, attrs);
+	assert((oflags & ~FILEIO_O_TEXT) == 0);
+
+	f = fileio_open(location, FILEIO_O_RDONLY | oflags, NULL, attrs);
 	if (f == NULL) {
 		log_error("Unable to open %s", location);
 		return NULL;
