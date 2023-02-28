@@ -28,6 +28,11 @@
  * Logging functions.
  */
 
+// need this for cygwin compiles
+#ifdef __CYGWIN__
+#define _GNU_SOURCE
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>

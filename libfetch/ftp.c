@@ -56,6 +56,11 @@
  * $ftpioId: ftpio.c,v 1.30 1998/04/11 07:28:53 phk Exp $
  *
  */
+ 
+// need this for cygwin compiles
+#ifdef __CYGWIN__
+#define _GNU_SOURCE
+#endif
 
 #ifdef __linux__
 /* Keep this down to Linux, it can create surprises else where. */
@@ -149,7 +154,9 @@ unmappedaddr(struct sockaddr_in6 *sin6, socklen_t *len)
 	sin4->sin_family = AF_INET;
 	*len = sizeof(struct sockaddr_in);
 #ifdef HAVE_SA_LEN
+#ifndef __CYGWIN__
 	sin4->sin_len = sizeof(struct sockaddr_in);
+#endif	
 #endif
 }
 
