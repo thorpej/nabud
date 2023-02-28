@@ -28,7 +28,11 @@
 #define	nabuctl_proto_h_included
 
 /* Default path to the nabud control channel. */
+#ifdef __CYGWIN__
+#define	NABUCTL_PATH_DEFAULT	".\nabuctl.sock"
+#else
 #define	NABUCTL_PATH_DEFAULT	"/tmp/nabuctl.sock"
+#endif
 
 /*
  * Each nabuctl message and each field within each message is prefixed with
