@@ -218,7 +218,7 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits)
 	if (tcgetattr(fd, &t) < 0) {
 		log_error("[%s] tcgetattr() failed: %s", port,
 		    strerror(errno));
-		return false;
+		goto failed;
 	}
 
 	cfmakeraw(&t);
@@ -234,16 +234,18 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits)
 	if (cfsetspeed(&t, baud) < 0) {
 		log_error("[%s] cfsetspeed(%d) failed: %s", port, (int)baud,
 		    strerror(errno));
-		return false;
+		goto failed;
 	}
 
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
 		log_error("[%s] Failed to set 8N%d-%d: %s", port,
 		    stop_bits, (int)baud, strerror(errno));
-		return false;
+		goto failed;
 	}
 
 	return true;
+ failed:
+	return false;
 }
 
 /*
