@@ -29,7 +29,7 @@
 
 /* Default path to the nabud control channel. */
 #ifdef __CYGWIN__
-#define	NABUCTL_PATH_DEFAULT	".\nabuctl.sock"
+#define	NABUCTL_PATH_DEFAULT	".\\nabuctl.sock"
 #else
 #define	NABUCTL_PATH_DEFAULT	"/tmp/nabuctl.sock"
 #endif
