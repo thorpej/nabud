@@ -371,7 +371,6 @@ conn_io_wait(struct conn_io *conn, const struct timespec *deadline,
 	}
 	if (pollret == 0) {
 		log_info("[%s] Connection (%s) timed out.", conn->name, which);
-		conn->state = CONN_STATE_ABORTED;
 		return false;
 	}
 	if (fds[1].revents) {
