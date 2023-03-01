@@ -90,6 +90,8 @@ void	conn_io_send_byte(struct conn_io *, uint8_t);
 bool	conn_io_recv(struct conn_io *, void *, size_t);
 bool	conn_io_recv_byte(struct conn_io *, uint8_t *);
 
+bool	conn_io_check_state(struct conn_io *);
+
 void	conn_io_start_watchdog(struct conn_io *, unsigned int);
 void	conn_io_stop_watchdog(struct conn_io *);
 

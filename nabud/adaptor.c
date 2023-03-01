@@ -686,24 +686,14 @@ adaptor_event_loop(struct nabu_connection *conn)
 		log_debug(LOG_SUBSYS_ADAPTOR,
 		    "[%s] Waiting for NABU.", conn_name(conn));
 		if (! conn_recv_byte(conn, &msg)) {
-			if (conn_state(conn) == CONN_STATE_EOF) {
-				log_info("[%s] Peer disconnected.",
-				    conn_name(conn));
+			if (! conn_check_state(conn)) {
+				/* Error already logged. */
 				break;
 			}
-			if (conn_state(conn) == CONN_STATE_CANCELLED) {
-				log_info("[%s] Received cancellation request.",
-				    conn_name(conn));
-				break;
-			}
-			if (conn_state(conn) == CONN_STATE_ABORTED) {
-				log_error("[%s] Connection aborted.",
-				    conn_name(conn));
-				break;
-			}
-			log_error("[%s] conn_recv_byte() failed, "
-			    "exiting event loop.", conn_name(conn));
-			break;
+			log_debug(LOG_SUBSYS_ADAPTOR,
+			    "[%s] conn_recv_byte() failed, "
+			    "continuing event loop.", conn_name(conn));
+			continue;
 		}
 
 		/*

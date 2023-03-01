@@ -140,6 +140,8 @@ void	conn_set_selected_file(struct nabu_connection *, char *);
 #define	conn_recv(c, b, l)	conn_io_recv(&(c)->io, (b), (l))
 #define	conn_recv_byte(c, b)	conn_io_recv_byte(&(c)->io, (b))
 
+#define	conn_check_state(c)	conn_io_check_state(&(c)->io)
+
 #define	conn_start_watchdog(c, t) conn_io_start_watchdog(&(c)->io, (t))
 #define	conn_stop_watchdog(c)	conn_io_stop_watchdog(&(c)->io)
 

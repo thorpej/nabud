@@ -557,3 +557,34 @@ conn_io_cancel(struct conn_io *conn)
 		    conn_io_name(conn));
 	}
 }
+
+/*
+ * conn_io_check_state --
+ *	Check a connection's state, returns true if it's OK
+ *	to keep going.
+ */
+bool
+conn_io_check_state(struct conn_io *conn)
+{
+	switch (conn_io_state(conn)) {
+	case CONN_STATE_OK:
+		return true;
+
+	case CONN_STATE_EOF:
+		log_info("[%s] Peer disconnected.", conn_io_name(conn));
+		return false;
+
+	case CONN_STATE_CANCELLED:
+		log_info("[%s] Received cancellation request.",
+		    conn_io_name(conn));
+		return false;
+
+	case CONN_STATE_ABORTED:
+		log_error("[%s] Connection aborted.", conn_io_name(conn));
+		return false;
+
+	default:
+		log_fatal("[%s] Invalid connection state: %d",
+		    conn_io_name(conn), (int)conn_io_state(conn));
+	}
+}

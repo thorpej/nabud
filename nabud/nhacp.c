@@ -475,24 +475,14 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		     conn_name(conn));
 		if (! conn_recv_byte(conn, &ctx->request.length[0])) {
  recv_failure:
-			if (conn_state(conn) == CONN_STATE_EOF) {
-				log_info("[%s] Peer disconnected.",
-				    conn_name(conn));
+			if (! conn_check_state(conn)) {
+				/* Error already logged. */
 				break;
 			}
-			if (conn_state(conn) == CONN_STATE_CANCELLED) {
-				log_info("[%s] Received cancellation request.",
-				    conn_name(conn));
-				break;
-			}
-			if (conn_state(conn) == CONN_STATE_ABORTED) {
-				log_error("[%s] Connection aborted.",
-				    conn_name(conn));
-				break;
-			}
-			log_error("[%s] conn_recv_byte() failed, "
-			    "exiting event loop.", conn_name(conn));
-			break;
+			log_debug(LOG_SUBSYS_NHACP,
+			    "[%s] conn_recv_byte() failed, "
+			    "continuing event loop.", conn_name(conn));
+			continue;
 		}
 
 		/*
