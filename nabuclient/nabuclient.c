@@ -1205,6 +1205,7 @@ command_rn_fh_seek(int argc, char *argv[])
 }
 
 static union {
+	struct nabu_msg_start_nhacp start;
 	struct nhacp_request request;
 	struct nhacp_response reply;
 } nhacp_buf;
@@ -1247,11 +1248,12 @@ nhacp_decode_reply(void)
 			printf("*** RUNT ***\n");
 			cli_throw();
 		}
+		nhacp_buf.reply.nhacp_started.adapter_id[
+		    nhacp_buf.reply.nhacp_started.adapter_id_length] = '\0';
 		printf("Got: NHACP_RESP_NHACP_STARTED.\n");
-		printf("Server Vers=$%02X $%02X ID len=%u '%-*s'\n",
+		printf("Server Vers=$%02X $%02X ID len=%u '%s'\n",
 		    nhacp_buf.reply.nhacp_started.version[0],
 		    nhacp_buf.reply.nhacp_started.version[1],
-		    nhacp_buf.reply.nhacp_started.adapter_id_length,
 		    nhacp_buf.reply.nhacp_started.adapter_id_length,
 		    nhacp_buf.reply.nhacp_started.adapter_id);
 		break;
@@ -1266,10 +1268,16 @@ nhacp_decode_reply(void)
 			printf("*** RUNT ***\n");
 			cli_throw();
 		}
-		printf("--> Code %u Message '%-*s' <--\n",
-		    nabu_get_uint16(nhacp_buf.reply.error.code),
-		    nhacp_buf.reply.error.message_length,
-		    (char *)nhacp_buf.reply.error.message);
+		if (nhacp_buf.reply.error.message_length != 0) {
+			nhacp_buf.reply.error.message[
+			    nhacp_buf.reply.error.message_length] = '\0';
+			printf("--> Code %u Message '%s' <--\n",
+			    nabu_get_uint16(nhacp_buf.reply.error.code),
+			    (char *)nhacp_buf.reply.error.message);
+		} else {
+			printf("--> Code %u <--\n",
+			    nabu_get_uint16(nhacp_buf.reply.error.code));
+		}
 		break;
 
 	case NHACP_RESP_STORAGE_LOADED:
@@ -1352,10 +1360,29 @@ nhacp_parse_length(const char *cp)
 }
 
 static bool
+command_nhacp_start_0_0(int argc, char *argv[])
+{
+	printf("Sending: NABU_MSG_START_NHACP_0_0.\n");
+	nabu_send_byte(NABU_MSG_START_NHACP_0_0);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_start(int argc, char *argv[])
 {
+	nhacp_buf.start.type = NABU_MSG_START_NHACP;
+	nhacp_buf.start.magic[0] = 'A';
+	nhacp_buf.start.magic[1] = 'C';
+	nhacp_buf.start.magic[2] = 'P';
+	nabu_set_uint16(nhacp_buf.request.storage_open.flags, NHACP_VERS_0_1);
+
 	printf("Sending: NABU_MSG_START_NHACP.\n");
-	nabu_send_byte(NABU_MSG_START_NHACP);
+	nabu_send(&nhacp_buf.start, sizeof(nhacp_buf.start));
+
+	nhacp_decode_reply();
+	return false;
 
 	nhacp_decode_reply();
 	return false;
@@ -1508,6 +1535,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-fh-readseq",	.func = command_rn_fh_readseq },
 	{ .name = "rn-fh-seek",		.func = command_rn_fh_seek },
 
+	{ .name = "nhacp-start-0-0",	.func = command_nhacp_start_0_0 },
 	{ .name = "nhacp-start",	.func = command_nhacp_start },
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
 	{ .name = "nhacp-storage-get",	.func = command_nhacp_storage_get },

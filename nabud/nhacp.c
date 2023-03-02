@@ -28,6 +28,10 @@
  * Support for the NABU HCCA Application Communication Protocol.
  *
  *    https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md
+ *
+ * This implementation employs Postel's law in the following way:
+ * Protocol versioning is not strictly enforced -- so long as the
+ * messages are in the right format, we allow them.
  */
 
 #include <assert.h>
@@ -55,6 +59,7 @@
 
 struct nhacp_context {
 	struct stext_context stext;
+	uint16_t             nhacp_version;
 
 	union {
 		struct nhacp_request request;
@@ -62,15 +67,73 @@ struct nhacp_context {
 	};
 };
 
+#define	NABUD_NHACP_VERSION	NHACP_VERS_0_1
+
+/*
+ * Handle some NHACP protocol version differences.
+ */
+static bool
+nhacp_reqlen_ok(struct nhacp_context *ctx, uint16_t reqlen)
+{
+	switch (ctx->nhacp_version) {
+	case NHACP_VERS_0_0:
+		/*
+		 * No legitimate NHACP message can have a length with
+		 * the most significant bit set.  If we have one, we
+		 * assume the NABU has reset and is sending legacy
+		 * messages (see nabu_proto.h).
+		 */
+		if (reqlen & 0x8000) {
+			return false;
+		}
+		return true;
+
+	default:
+		/*
+		 * This is essentially a more strict version of the
+		 * 0.0 check, since it also ensures that the message
+		 * will arrive in the allotted time.
+		 */
+		if (reqlen > NHACP_MTU) {
+			return false;
+		}
+		return true;
+	}
+}
+
 /*
  * The messages that contain a variable-sized data payload need to
  * sanity check that payload's length against how much of the max
  * payload was consumed by the protocol message itself.
  */
-#define	MAX_STORAGE_GET_LENGTH	(NHACP_MAX_MESSAGELEN -			\
-				 sizeof(struct nhacp_response_data_buffer))
-#define	MAX_STORAGE_PUT_LENGTH	(NHACP_MAX_MESSAGELEN -			\
-				 sizeof(struct nhacp_request_storage_put))
+static uint16_t
+nhacp_max_payload(struct nhacp_context *ctx, uint8_t type)
+{
+	uint16_t max_payload = NHACP_MAX_PAYLOAD;
+
+	switch (type) {
+	case NHACP_REQ_STORAGE_GET:
+		if (ctx->nhacp_version == NHACP_VERS_0_0) {
+			/* Backwards compatibility with old limit. */
+			max_payload = NHACP_MTU_0_0 -
+			    sizeof(struct nhacp_response_data_buffer);
+		}
+		break;
+
+	case NHACP_REQ_STORAGE_PUT:
+		if (ctx->nhacp_version == NHACP_VERS_0_0) {
+			/* Backwards compatibility with old limit. */
+			max_payload = NHACP_MTU_0_0 -
+			    sizeof(struct nhacp_request_storage_put);
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	return max_payload;
+}
 
 /*
  * nhacp_send_reply --
@@ -85,51 +148,152 @@ nhacp_send_reply(struct nhacp_context *ctx, uint8_t type, uint16_t length)
 	    length + sizeof(ctx->reply.length));
 }
 
-/* Handy error strings. */
-static const char error_message_eio[] = "I/O ERROR";
-static const char error_message_einval[] = "BAD REQUEST";
-static const char error_message_ebadf[] = "INVALID FILE";
-static const char error_message_efbig[] = "FILE TOO BIG";
-static const char error_message_enomem[] = "OUT OF MEMORY";
-static const char error_message_enoent[] = "NO SUCH FILE";
-static const char error_message_emfile[] = "TOO MANY OPEN FILES";
-static const char error_message_ebusy[] = "FILE BUSY";
+#define	ERRMAP(ue)		\
+	{ .error_codes[0] = (ue), .error_codes[1] = NHACP_ ## ue }
+#define	ERRMAP2(ue, ne)		\
+	{ .error_codes[0] = (ue), .error_codes[1] = (ne) }
 
-static const char *
-nhacp_errno_to_message(int error)
+static const struct nhacp_error_map_entry {
+	int		error_codes[2];
+} nhacp_error_map[] = {
+	ERRMAP2(0, NHACP_Eundefined),
+	ERRMAP(ENOTSUP),
+	ERRMAP(EPERM),
+	ERRMAP(ENOENT),
+	ERRMAP(EIO),
+	ERRMAP(EBADF),
+	ERRMAP(ENOMEM),
+	ERRMAP(EACCES),
+	ERRMAP(EBUSY),
+	ERRMAP(EEXIST),
+	ERRMAP(EISDIR),
+	ERRMAP(ENFILE),
+	ERRMAP2(EMFILE, NHACP_ENFILE),
+	ERRMAP(EFBIG),
+	ERRMAP(ENOSPC),
+	ERRMAP2(ESPIPE, NHACP_ESEEK),
+
+	/* Default */
+	ERRMAP2(-1, NHACP_EIO),
+};
+
+#undef ERRMAP
+#undef ERRMAP2
+
+#define	ERRSTR(ne, s)	[(ne)] = s
+
+/*
+ * We use our own error string table -- we want to ensure that these
+ * can be displayed with a potentially limited character set.
+ */
+static const char * const nhacp_error_strings[] = {
+	ERRSTR(NHACP_ENOTSUP,	"OPERATION NOT SUPPORTED"),
+	ERRSTR(NHACP_EPERM,	"OPERATION NOT PERMITTED"),
+	ERRSTR(NHACP_ENOENT,	"NO SUCH FILE"),
+	ERRSTR(NHACP_EIO,	"IO ERROR"),
+	ERRSTR(NHACP_EBADF,	"INVALID FILE"),
+	ERRSTR(NHACP_ENOMEM,	"OUT OF MEMORY"),
+	ERRSTR(NHACP_EACCES,	"ACCESS DENIED"),
+	ERRSTR(NHACP_EBUSY,	"RESOURCE BUSY"),
+	ERRSTR(NHACP_EEXIST,	"FILE EXISTS"),
+	ERRSTR(NHACP_EISDIR,	"FILE IS A DIRECTORY"),
+	ERRSTR(NHACP_EINVAL,	"BAD REQUEST"),
+	ERRSTR(NHACP_ENFILE,	"TOO MANY OPEN FILES"),
+	ERRSTR(NHACP_EFBIG,	"FILE TOO BIG"),
+	ERRSTR(NHACP_ENOSPC,	"OUT OF SPACE"),
+	ERRSTR(NHACP_ESEEK,	"ILLEGAL SEEK"),
+};
+static const unsigned int nhacp_error_string_count =
+    sizeof(nhacp_error_strings) / sizeof(nhacp_error_strings[0]);
+
+#undef ERRSTR
+
+static const struct nhacp_error_map_entry *
+nhacp_error_map_find(int unix_err, uint8_t nhacp_err)
 {
-	switch (error) {
-	default:	/* FALLTHROUGH */
-	case EIO:	return error_message_eio;
-	case EINVAL:	return error_message_einval;
-	case EBADF:	return error_message_ebadf;
-	case EFBIG:	return error_message_efbig;
-	case ENOMEM:	return error_message_enomem;
-	case ENOENT:	return error_message_enoent;
-	case ENFILE:	/* FALLTHROUGH */
-	case EMFILE:	return error_message_emfile;
-	case EBUSY:	return error_message_ebusy;
+	const struct nhacp_error_map_entry *e;
+	const int idx = unix_err == -1;
+	const int code = unix_err == -1 ? nhacp_err : unix_err;
+
+	for (e = nhacp_error_map; e->error_codes[0] != -1; e++) {
+		if (e->error_codes[idx] == code) {
+			break;
+		}
 	}
+	return e;
+}
+
+/*
+ * nhacp_error_from_unix --
+ *	Map a Unix errno value to an NHACP error code.
+ */
+static uint8_t
+nhacp_error_from_unix(int unix_err)
+{
+	assert(unix_err >= 0);
+	return nhacp_error_map_find(unix_err, 0)->error_codes[1];
+}
+
+#if 0
+/*
+ * nhacp_error_to_unix --
+ *	Map an NHACP error code to a Unix errno value.
+ */
+static int
+nhacp_error_to_unix(uint8_t nhacp_err)
+{
+	return nhacp_error_map_find(-1, nhacp_err)->error_codes[0];
+}
+#endif
+
+/*
+ * nhacp_send_error_details --
+ *	Convenience function to send an NHACP error.
+ */
+static void
+nhacp_send_error_details(struct nhacp_context *ctx, uint16_t code,
+    size_t max_message_length)
+{
+	const char *error_message = NULL;
+	size_t message_length = 0;
+	char message_buffer[sizeof("UNKNOWN ERROR XXXXX")];
+
+	if (max_message_length != 0) {
+		if (code >= nhacp_error_string_count ||
+		    (error_message = nhacp_error_strings[code]) == NULL) {
+			snprintf(message_buffer, sizeof(message_buffer),
+			    "UNKNOWN ERROR %u", code);
+			error_message = message_buffer;
+		}
+		message_length = strlen(error_message);
+
+		assert(max_message_length < 256);
+		if (message_length > max_message_length) {
+			message_length = max_message_length;
+		}
+	}
+
+	nabu_set_uint16(ctx->reply.error.code, code);
+	ctx->reply.error.message_length = (uint8_t)message_length;
+	if (message_length != 0) {
+		memcpy(ctx->reply.error.message, error_message,
+		    message_length);
+	}
+
+	nhacp_send_reply(ctx, NHACP_RESP_ERROR,
+	    sizeof(ctx->reply.error) + message_length);
 }
 
 /*
  * nhacp_send_error --
- *	Convenience function to send an NHACP error.
+ *	Convenience wrapper around nhacp_send_error_details().
  */
 static void
-nhacp_send_error(struct nhacp_context *ctx, uint16_t code,
-    const char *error_message)
+nhacp_send_error(struct nhacp_context *ctx, uint16_t code)
 {
-	size_t message_length = strlen(error_message);
-	if (message_length > 255) {
-		message_length = 255;
-	}
-	nabu_set_uint16(ctx->reply.error.code, code);
-	ctx->reply.error.message_length = (uint8_t)message_length;
-	strncpy((char *)ctx->reply.error.message, error_message, 255);
-
-	nhacp_send_reply(ctx, NHACP_RESP_ERROR,
-	    sizeof(ctx->reply.error) + message_length);
+	/* Original NHACP draft always sent error details. */
+	nhacp_send_error_details(ctx, code,
+	    ctx->nhacp_version == NHACP_VERS_0_0 ? 255 : 0);
 }
 
 /*
@@ -184,7 +348,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	    FILEIO_O_CREAT | FILEIO_O_RDWR, &f);
 
 	if (error != 0) {
-		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
 		ctx->reply.storage_loaded.slot = stext_file_slot(f);
 		nabu_set_uint32(ctx->reply.storage_loaded.length,
@@ -207,7 +371,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 	if (f == NULL) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn), ctx->request.storage_get.slot);
-		nhacp_send_error(ctx, 0, error_message_ebadf);
+		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
 
@@ -218,15 +382,15 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
 	    offset, length);
 
-	if (length > MAX_STORAGE_GET_LENGTH) {
-		nhacp_send_error(ctx, 0, error_message_einval);
+	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_GET)) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
 		return;
 	}
 
 	int error = stext_file_pread(f, ctx->reply.data_buffer.data,
 	    offset, &length);
 	if (error != 0) {
-		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
 		nhacp_send_data_buffer(ctx, length);
 	}
@@ -245,7 +409,7 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 	if (f == NULL) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn), ctx->request.storage_put.slot);
-		nhacp_send_error(ctx, 0, error_message_ebadf);
+		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
 
@@ -256,15 +420,15 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
 	    offset, length);
 
-	if (length > MAX_STORAGE_PUT_LENGTH) {
-		nhacp_send_error(ctx, 0, error_message_einval);
+	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_PUT)) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
 		return;
 	}
 
 	int error = stext_file_pwrite(f, ctx->request.storage_put.data,
 	    offset, length);
 	if (error != 0) {
-		nhacp_send_error(ctx, 0, nhacp_errno_to_message(error));
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
 		nhacp_send_ok(ctx);
 	}
@@ -415,6 +579,55 @@ nhacp_request(struct nhacp_context *ctx)
 }
 
 /*
+ * nhacp_recv_start --
+ *	Receive and validate the versioned START-NHACP message.
+ */
+static bool
+nhacp_recv_start(struct nabu_connection *conn, uint16_t *versionp)
+{
+	struct nabu_msg_start_nhacp start_nhacp;
+
+	conn_start_watchdog(conn, 1);
+
+	/*
+	 * We've already received the first byte (the message type);
+	 * receive the remaining 5.
+	 */
+	if (! conn_recv(conn, &start_nhacp.magic, sizeof(start_nhacp) - 1)) {
+		if (conn_check_state(conn)) {
+			/* Error not already logged in this case. */
+			log_debug(LOG_SUBSYS_NHACP,
+			    "[%s] conn_recv() of START-NHACP message failed.",
+			    conn_name(conn));
+			return false;
+		}
+	}
+
+	if (! NHACP_MAGIC_IS_VALID(start_nhacp.magic)) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Invalid START-NHACP magic: 0x%02x 0x%02x 0x%02x",
+		    conn_name(conn), start_nhacp.magic[0],
+		    start_nhacp.magic[1], start_nhacp.magic[2]);
+		return false;
+	}
+
+	*versionp = nabu_get_uint16(start_nhacp.version);
+
+	/* We do enforce versioning here, however. */
+	switch (*versionp) {
+	case NHACP_VERS_0_0:
+	case NHACP_VERS_0_1:
+		return true;
+
+	default:
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unsupported NHACP version 0x%04x.",
+		    conn_name(conn), *versionp);
+		return false;
+	}
+}
+
+/*
  * nhacp_start --
  *	Enter NHACP mode on this connection.
  */
@@ -424,9 +637,29 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	struct nhacp_context *ctx;
 	extern char nabud_version[];
 	uint16_t reqlen;
+	uint16_t version;
 	ssize_t minlen;
 
-	if (msg != NABU_MSG_START_NHACP) {
+	switch (msg) {
+	case NABU_MSG_START_NHACP_0_0:		/* original draft */
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Got NABU_MSG_START_NHACP_0_0.", conn_name(conn));
+		version = NHACP_VERS_0_0;
+		break;
+
+	case NABU_MSG_START_NHACP:		/* versioned START-NHACP */
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Got NABU_MSG_START_NHACP.", conn_name(conn));
+		if (! nhacp_recv_start(conn, &version)) {
+			/*
+			 * Not a valid START-NHACP, or not a version
+			 * that we support.
+			 */
+			return false;
+		}
+		break;
+
+	default:
 		/* Not a NHACP start message. */
 		return false;
 	}
@@ -445,14 +678,15 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	 * Send a NHACP-STARTED response.  We know there's room at the end
 	 * for a NUL terminator.
 	 */
-						/* XXX proto version */
-	nabu_set_uint16(ctx->reply.nhacp_started.version, 0);
+	nabu_set_uint16(ctx->reply.nhacp_started.version, NABUD_NHACP_VERSION);
 	snprintf((char *)ctx->reply.nhacp_started.adapter_id, 256, "%s-%s",
 	    getprogname(), nabud_version);
 	ctx->reply.nhacp_started.adapter_id_length =
 	    (uint8_t)strlen((char *)ctx->reply.nhacp_started.adapter_id);
-	log_debug(LOG_SUBSYS_NHACP, "[%s] Sending server version: %s",
-	    conn_name(conn), (char *)ctx->reply.nhacp_started.adapter_id);
+	log_debug(LOG_SUBSYS_NHACP,
+	    "[%s] Sending proto version: 0x%04x server version: %s",
+	    conn_name(conn), NABUD_NHACP_VERSION,
+	    (char *)ctx->reply.nhacp_started.adapter_id);
 	nhacp_send_reply(ctx, NHACP_RESP_NHACP_STARTED,
 	    sizeof(ctx->reply.nhacp_started) +
 	    ctx->reply.nhacp_started.adapter_id_length);
@@ -461,7 +695,8 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	 * Now enter NHACP mode until we are asked to exit or until
 	 * we detect something is awry with the NABU.
 	 */
-	log_info("[%s] Entering NHACP mode.", conn_name(conn));
+	log_info("[%s] Entering NHACP-%d.%d mode.", conn_name(conn),
+	    NHACP_VERS_MAJOR(version), NHACP_VERS_MINOR(version));
 
 	for (;;) {
 		/* We want to block "forever" waiting for requests. */
@@ -498,16 +733,14 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		}
 		reqlen = nabu_get_uint16(ctx->request.length);
 
-		/*
-		 * No legitimate NHACP message can have a length with
-		 * the most significant bit set.  If we have one, we
-		 * assume the NABU has reset and is sending legacy
-		 * messages (see nabu_proto.h).
-		 *
-		 * XXX A zero-length message isn't legitimate, either.
-		 * XXX We'll treat it the same way.
-		 */
-		if ((reqlen & 0x8000) != 0 || reqlen == 0) {
+		if (reqlen == 0) {
+			log_debug(LOG_SUBSYS_NHACP,
+			    "[%s] Received 0-length request.",
+			    conn_name(conn));
+			continue;
+		}
+
+		if (! nhacp_reqlen_ok(ctx, reqlen)) {
 			log_error("[%s] Bogus request length: 0x%04x - "
 			    "exiting NHACP mode.", conn_name(conn), reqlen);
 			break;

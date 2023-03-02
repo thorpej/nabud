@@ -37,17 +37,55 @@
  */
 
 /*
- * By restricting the max message length to a singed 16-bit value, we
- * guarantee that the most significant bit of the length is never set,
- * thus easing crash recovery.
+ * NHACP protocol versions.
  */
-#define	NHACP_MAX_MESSAGELEN		0x7fff
+#define	NHACP_VERS_0_0		0x0000	/* original version */
+#define	NHACP_VERS_0_1		0x0001	/* NHACP 0.1 */
+
+#define	NHACP_VERS_MAJOR(x)	(((x) >> 8) & 0xff)
+#define	NHACP_VERS_MINOR(x)	( (x)       & 0xff)
+
+/*
+ * The NHACP MTU is chosen to allow a given message to fit within
+ * the allotted 1 second time limit, and also satisfies the constraint
+ * that the lengh field never have the MSB set, which aids in crash
+ * recovery.
+ */
+#define	NHACP_MTU			8256
+#define	NHACP_MAX_PAYLOAD		8192
+
+/*
+ * This was the max message size in the original NHACP draft.  It did
+ * not ensure that the entire message was transmitted within 1 second.
+ */
+#define	NHACP_MTU_0_0			0x7fff
+
+/*
+ * This is the largest of the two MTU values, for buffer allocation
+ * purposes.
+ */
+#define	NHACP_MAX_MESSAGELEN		NHACP_MTU_0_0
 
 /*
  * The appliation on the NABU tells the server to go into NHACP
  * mode by sending this message while in legacy mode.
  */
-#define	NABU_MSG_START_NHACP	0xaf
+#define	NABU_MSG_START_NHACP_0_0	0xaf
+#define	NABU_MSG_START_NHACP		0x8f
+
+/*
+ * This message is received outside of the standard NHACP message
+ * framing protocol.
+ */
+struct nabu_msg_start_nhacp {
+	uint8_t		type;
+	uint8_t		magic[3];	/* "ACP" */
+	uint8_t		version[2];	/* u16: protocol version */
+};
+
+#define	NHACP_MAGIC_IS_VALID(cp)	((cp)[0] == 'A' &&	\
+					 (cp)[1] == 'C' &&	\
+					 (cp)[2] == 'P')
 
 #define	NHACP_REQ_STORAGE_OPEN		0x01
 #define	NHACP_REQ_STORAGE_GET		0x02
@@ -148,5 +186,23 @@ struct nhacp_response {
 		} date_time;
 	};
 };
+
+/* ERROR codes */
+#define	NHACP_Eundefined	0	/* undefined error */
+#define	NHACP_ENOTSUP		1	/* Operation is not supported */
+#define	NHACP_EPERM		2	/* Operation is not permitted */
+#define	NHACP_ENOENT		3	/* Requested file does not exist */
+#define	NHACP_EIO		4	/* Input/output error */
+#define	NHACP_EBADF		5	/* Bad file descriptor */
+#define	NHACP_ENOMEM		6	/* Out of memory */
+#define	NHACP_EACCES		7	/* Access denied */
+#define	NHACP_EBUSY		8	/* File / resource is busy */
+#define	NHACP_EEXIST		9	/* File already exists */
+#define	NHACP_EISDIR		10	/* File is a directory */
+#define	NHACP_EINVAL		11	/* Invalid argument / request */
+#define	NHACP_ENFILE		12	/* Too many open files */
+#define	NHACP_EFBIG		13	/* File is too large */
+#define	NHACP_ENOSPC		14	/* Out of space */
+#define	NHACP_ESEEK		15	/* Seek on non-seekable file */
 
 #endif /* nhacp_proto_h_included */
