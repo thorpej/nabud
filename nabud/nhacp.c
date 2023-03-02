@@ -492,6 +492,18 @@ nhacp_req_storage_close(struct nhacp_context *ctx)
 	stext_file_close(f);
 }
 
+/*
+ * nhacp_req_get_error_details --
+ *	Handle the GET-ERROR-DETAILS request.
+ */
+static void
+nhacp_req_get_error_details(struct nhacp_context *ctx)
+{
+	nhacp_send_error_details(ctx,
+	    nabu_get_uint16(ctx->request.get_error_details.code),
+	    ctx->request.get_error_details.max_message_len);
+}
+
 #define	HANDLER_ENTRY(v, n)						\
 	[(v)] = {							\
 		.handler    = nhacp_req_ ## n ,				\
@@ -504,11 +516,12 @@ static const struct {
 	const char	*debug_desc;
 	ssize_t		min_reqlen;
 } nhacp_request_types[] = {
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_OPEN,  storage_open),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET,   storage_get),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT,   storage_put),
-	HANDLER_ENTRY(NHACP_REQ_GET_DATE_TIME, get_date_time),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_CLOSE, storage_close),
+	HANDLER_ENTRY(NHACP_REQ_STORAGE_OPEN,      storage_open),
+	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET,       storage_get),
+	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT,       storage_put),
+	HANDLER_ENTRY(NHACP_REQ_GET_DATE_TIME,     get_date_time),
+	HANDLER_ENTRY(NHACP_REQ_STORAGE_CLOSE,     storage_close),
+	HANDLER_ENTRY(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
 };
 static const unsigned int nhacp_request_type_count =
     sizeof(nhacp_request_types) / sizeof(nhacp_request_types[0]);

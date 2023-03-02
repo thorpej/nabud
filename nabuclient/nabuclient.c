@@ -1359,6 +1359,17 @@ nhacp_parse_length(const char *cp)
 	return stext_parse_length(cp, 0x7fff);
 }
 
+static uint16_t
+nhacp_parse_error_code(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > UINT16_MAX) {
+		printf("'%s' invalid error code\n", cp);
+		cli_throw();
+	}
+	return (uint16_t)val;
+}
+
 static bool
 command_nhacp_start_0_0(int argc, char *argv[])
 {
@@ -1492,6 +1503,27 @@ command_nhacp_storage_close(int argc, char *argv[])
 }
 
 static bool
+command_nhacp_get_error_details(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint16_t code = nhacp_parse_error_code(argv[1]);
+
+	nabu_set_uint16(nhacp_buf.request.get_error_details.code, code);
+	nhacp_buf.request.get_error_details.max_message_len = 255;
+
+	printf("Sending: NHACP_REQ_GET_ERROR_DETAILS.\n");
+	nhacp_send(NHACP_REQ_GET_ERROR_DETAILS,
+	    sizeof(nhacp_buf.request.get_error_details));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_end_protocol(int argc, char *argv[])
 {
 	printf("Sending: NHACP_REQ_END_PROTOCOL.\n");
@@ -1542,6 +1574,8 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-storage-put",	.func = command_nhacp_storage_put },
 	{ .name = "nhacp-get-date-time", .func = command_nhacp_get_date_time },
 	{ .name = "nhacp-storage-close", .func = command_nhacp_storage_close },
+	{ .name = "nhacp-get-error-details",
+				.func = command_nhacp_get_error_details },
 	{ .name = "nhacp-end-protocol",	.func = command_nhacp_end_protocol },
 
 	CMDTAB_EOL(cli_command_unknown)

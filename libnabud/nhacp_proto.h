@@ -92,6 +92,7 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_REQ_STORAGE_PUT		0x03
 #define	NHACP_REQ_GET_DATE_TIME		0x04
 #define	NHACP_REQ_STORAGE_CLOSE		0x05
+#define	NHACP_REQ_GET_ERROR_DETAILS	0x06
 #define	NHACP_REQ_END_PROTOCOL		0xef
 
 struct nhacp_request {
@@ -131,6 +132,11 @@ struct nhacp_request {
 			uint8_t		type;
 			uint8_t		slot;
 		} storage_close;
+		struct nhacp_request_get_error_details {
+			uint8_t		type;
+			uint8_t		code[2];	/* u16 */
+			uint8_t		max_message_len;
+		} get_error_details;
 		struct nhacp_request_end_protocol {
 			uint8_t		type;
 		} end_protocol;
