@@ -379,7 +379,7 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 	uint16_t length = nabu_get_uint16(ctx->request.storage_get.length);
 
 	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u offset %u length %u",
-	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
+	    conn_name(ctx->stext.conn), ctx->request.storage_get.slot,
 	    offset, length);
 
 	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_GET)) {
@@ -427,6 +427,135 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 
 	int error = stext_file_pwrite(f, ctx->request.storage_put.data,
 	    offset, length);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_ok(ctx);
+	}
+}
+
+/*
+ * nhacp_req_storage_get_block --
+ *	Handle the STORAGE-GET-BLOCK request.
+ */
+static void
+nhacp_req_storage_get_block(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+
+	f = stext_file_find(&ctx->stext, ctx->request.storage_get_block.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.storage_get_block.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	uint32_t blkno =
+	    nabu_get_uint32(ctx->request.storage_get_block.block_number);
+	uint16_t blklen =
+	    nabu_get_uint16(ctx->request.storage_get_block.block_length);
+
+	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u blkno %u blklen %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_get_block.slot,
+	    blkno, blklen);
+
+	/*
+	 * Make sure we won't overflow the 32-bit file offsets we use
+	 * in the storage extensions.
+	 */
+	uint64_t offset = (uint64_t)blkno * blklen;
+	if (offset > UINT32_MAX - blklen + 1) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] offset %llu too large",
+		    conn_name(ctx->stext.conn), (unsigned long long)offset);
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	if (blklen > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_GET_BLOCK)) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	const uint16_t save_blklen = blklen;
+
+	int error = stext_file_pread(f, ctx->reply.data_buffer.data,
+	    (uint32_t)offset, &blklen);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else if (blklen != save_blklen) {
+		/* Partial reads not allowed for block I/O. */
+		nhacp_send_error(ctx, NHACP_EINVAL);
+	} else {
+		nhacp_send_data_buffer(ctx, blklen);
+	}
+}
+
+/*
+ * nhacp_req_storage_put_block --
+ *	Handle the STORAGE-PUT-BLOCK request.
+ */
+static void
+nhacp_req_storage_put_block(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+
+	f = stext_file_find(&ctx->stext, ctx->request.storage_put_block.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.storage_put_block.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	uint32_t blkno =
+	    nabu_get_uint32(ctx->request.storage_put_block.block_number);
+	uint16_t blklen =
+	    nabu_get_uint16(ctx->request.storage_put_block.block_length);
+
+	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u blkno %u blklen %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_put_block.slot,
+	    blkno, blklen);
+
+	/*
+	 * Make sure we won't overflow the 32-bit file offsets we use
+	 * in the storage extensions.
+	 */
+	uint64_t offset = (uint64_t)blkno * blklen;
+	if (offset > UINT32_MAX - blklen + 1) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] offset %llu too large",
+		    conn_name(ctx->stext.conn), (unsigned long long)offset);
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	if (blklen > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_PUT_BLOCK)) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	/* Enforce no-extending-writes for block I/O. */
+	struct fileio_attrs attrs;
+	int error = stext_file_getattr(f, &attrs);
+	if (error != 0) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] stext_file_getattr() failed: %s",
+		     conn_name(ctx->stext.conn), strerror(error));
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+		return;
+	}
+	if (offset + blklen > attrs.size) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Request would extend file (size = %lld)",
+		    conn_name(ctx->stext.conn), (long long)attrs.size);
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	error = stext_file_pwrite(f, ctx->request.storage_put_block.data,
+	    (uint32_t)offset, blklen);
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
@@ -522,6 +651,8 @@ static const struct {
 	HANDLER_ENTRY(NHACP_REQ_GET_DATE_TIME,     get_date_time),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_CLOSE,     storage_close),
 	HANDLER_ENTRY(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
+	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET_BLOCK, storage_get_block),
+	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT_BLOCK, storage_put_block),
 };
 static const unsigned int nhacp_request_type_count =
     sizeof(nhacp_request_types) / sizeof(nhacp_request_types[0]);
@@ -686,6 +817,7 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		    conn_name(conn));
 		return true;
 	}
+	ctx->nhacp_version = version;
 
 	/*
 	 * Send a NHACP-STARTED response.  We know there's room at the end
@@ -709,7 +841,8 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	 * we detect something is awry with the NABU.
 	 */
 	log_info("[%s] Entering NHACP-%d.%d mode.", conn_name(conn),
-	    NHACP_VERS_MAJOR(version), NHACP_VERS_MINOR(version));
+	    NHACP_VERS_MAJOR(ctx->nhacp_version),
+	    NHACP_VERS_MINOR(ctx->nhacp_version));
 
 	for (;;) {
 		/* We want to block "forever" waiting for requests. */

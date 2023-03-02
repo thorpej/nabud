@@ -1387,7 +1387,7 @@ command_nhacp_start(int argc, char *argv[])
 	nhacp_buf.start.magic[0] = 'A';
 	nhacp_buf.start.magic[1] = 'C';
 	nhacp_buf.start.magic[2] = 'P';
-	nabu_set_uint16(nhacp_buf.request.storage_open.flags, NHACP_VERS_0_1);
+	nabu_set_uint16(nhacp_buf.start.version, NHACP_VERS_0_1);
 
 	printf("Sending: NABU_MSG_START_NHACP.\n");
 	nabu_send(&nhacp_buf.start, sizeof(nhacp_buf.start));
@@ -1457,6 +1457,32 @@ command_nhacp_storage_get(int argc, char *argv[])
 }
 
 static bool
+command_nhacp_storage_get_block(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t blkno = stext_parse_offset(argv[2]);
+	uint16_t blklen = nhacp_parse_length(argv[3]);
+
+	nhacp_buf.request.storage_get_block.slot = slot;
+	nabu_set_uint32(nhacp_buf.request.storage_get_block.block_number,
+	    blkno);
+	nabu_set_uint16(nhacp_buf.request.storage_get_block.block_length,
+	    blklen);
+
+	printf("Sending: NHACP_REQ_STORAGE_GET_BLOCK.\n");
+	nhacp_send(NHACP_REQ_STORAGE_GET_BLOCK,
+	    sizeof(nhacp_buf.request.storage_get_block));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_storage_put(int argc, char *argv[])
 {
 	if (argc < 4) {
@@ -1476,6 +1502,34 @@ command_nhacp_storage_put(int argc, char *argv[])
 	printf("Sending: NHACP_REQ_STORAGE_PUT.\n");
 	nhacp_send(NHACP_REQ_STORAGE_PUT,
 	    sizeof(nhacp_buf.request.storage_put) + length);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_storage_put_block(int argc, char *argv[])
+{
+	if (argc < 5) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t blkno = stext_parse_offset(argv[2]);
+	uint16_t blklen = nhacp_parse_length(argv[3]);
+	uint8_t val = stext_parse_slot(argv[4]);	/* good enough */
+
+	nhacp_buf.request.storage_put_block.slot = slot;
+	nabu_set_uint32(nhacp_buf.request.storage_put_block.block_number,
+	    blkno);
+	nabu_set_uint16(nhacp_buf.request.storage_put_block.block_length,
+	    blklen);
+	memset(nhacp_buf.request.storage_put_block.data, val, blklen);
+
+	printf("Sending: NHACP_REQ_STORAGE_PUT_BLOCK.\n");
+	nhacp_send(NHACP_REQ_STORAGE_PUT_BLOCK,
+	    sizeof(nhacp_buf.request.storage_put_block) + blklen);
 
 	nhacp_decode_reply();
 	return false;
@@ -1572,6 +1626,10 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-storage-open",	.func = command_nhacp_storage_open },
 	{ .name = "nhacp-storage-get",	.func = command_nhacp_storage_get },
 	{ .name = "nhacp-storage-put",	.func = command_nhacp_storage_put },
+	{ .name = "nhacp-storage-get-block",
+				.func = command_nhacp_storage_get_block },
+	{ .name = "nhacp-storage-put-block",
+				.func = command_nhacp_storage_put_block },
 	{ .name = "nhacp-get-date-time", .func = command_nhacp_get_date_time },
 	{ .name = "nhacp-storage-close", .func = command_nhacp_storage_close },
 	{ .name = "nhacp-get-error-details",
