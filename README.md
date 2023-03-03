@@ -400,6 +400,11 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.3
+* Support for the NHACP protocol version 0.1 draft.  Compatibility with
+  the original ("0.0") NHACP is maintained.  WARNING: NHACP-0.1 SUPPORT
+  IS SUBJECT TO CHANGE AS THE DRAFT EVOLVES.
+
 ### nabud-1.2.1
 * Experimental support for Cygwin (64-bit).
 * Support command history / editing in nabuctl in Docker builds,
