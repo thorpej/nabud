@@ -97,6 +97,14 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_REQ_STORAGE_PUT_BLOCK	0x08
 #define	NHACP_REQ_END_PROTOCOL		0xef
 
+/* STORAGE-OPEN flags */
+#define	NHACP_O_RDWR		0x0000	/* open for reading + writing */
+#define	NHACP_O_RDONLY		0x0001	/* open only for reading */
+#define	NHACP_O_CREAT		0x0002	/* create file if it does not exist */
+#define	NHACP_O_EXCL		0x0004	/* fail create if file already exists */
+
+#define	NHACP_O_ACCMASK		(NHACP_O_RDWR | NHACP_O_RDONLY)
+
 struct nhacp_request {
 	uint8_t		length[2];	/* u16: length of what follows */
 	union {

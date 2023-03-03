@@ -322,6 +322,36 @@ nhacp_send_data_buffer(struct nhacp_context *ctx, uint16_t length)
  * Request handling
  *****************************************************************************/
 
+static int
+nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
+{
+
+	switch (nhacp_o_flags & NHACP_O_ACCMASK) {
+	case NHACP_O_RDWR:
+		*fileio_o_flagsp = FILEIO_O_RDWR;
+		break;
+
+	case NHACP_O_RDONLY:
+		*fileio_o_flagsp = FILEIO_O_RDONLY;
+		break;
+
+	default:
+		/*
+		 * Not actually possible because NHACP_O_RDWR == 0.
+		 * Compiler should DCE this into a puff of greasy smoke.
+		 */
+		return EINVAL;
+	}
+	if (nhacp_o_flags & NHACP_O_CREAT) {
+		*fileio_o_flagsp |= FILEIO_O_CREAT;
+	}
+	if (nhacp_o_flags & NHACP_O_EXCL) {
+		*fileio_o_flagsp |= FILEIO_O_EXCL;
+	}
+
+	return 0;
+}
+
 /*
  * nhacp_req_storage_open --
  *	Handle the STORAGE-OPEN request.
@@ -331,6 +361,8 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 {
 	struct fileio_attrs attrs;
 	struct stext_file *f;
+	int fileio_o_flags;
+	uint16_t nhacp_o_flags;
 	int error;
 
 	/*
@@ -342,10 +374,26 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	ctx->request.storage_open.url_string[
 	    ctx->request.storage_open.url_length] = '\0';
 
+	/*
+	 * NHACP-0.0 did not define any open flags, even though it
+	 * had a slot for them.
+	 */
+	if (ctx->nhacp_version == NHACP_VERS_0_0) {
+		nhacp_o_flags = NHACP_O_RDWR | NHACP_O_CREAT;
+	} else {
+		nhacp_o_flags =
+		    nabu_get_uint16(ctx->request.storage_open.flags);
+	}
+
+	error = nhacp_o_flags_to_fileio(nhacp_o_flags, &fileio_o_flags);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+		return;
+	}
+
 	error = stext_file_open(&ctx->stext,
 	    (const char *)ctx->request.storage_open.url_string,
-	    ctx->request.storage_open.req_slot, &attrs,
-	    FILEIO_O_CREAT | FILEIO_O_RDWR, &f);
+	    ctx->request.storage_open.req_slot, &attrs, fileio_o_flags, &f);
 
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
