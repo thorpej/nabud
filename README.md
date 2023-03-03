@@ -400,6 +400,14 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.2.1
+* Experimental support for Cygwin (64-bit).
+* Support command history / editing in nabuctl in Docker builds,
+  plus some additional Docker fixes.  From Christopher Masto.
+* Added a FlowControl property to Connection objects.  This allows users
+  who have modified their NABU HCCA port to support RTS/CTS flow control
+  to enable it.
+
 ### nabud-1.2
 * Added command history to nabuctl on systems that have the BSD
   _libedit_ library and on other systems that have a compatible
