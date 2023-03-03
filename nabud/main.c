@@ -244,7 +244,7 @@ static void
 config_load_connection(mj_t *atom)
 {
 	mj_t *type_atom, *port_atom, *channel_atom, *file_root_atom,
-	    *baud_atom;
+	    *baud_atom, *flow_control_atom;
 	char *type = NULL, *channel = NULL, *baud = NULL;
 	struct conn_add_args args = { };
 	long val;
@@ -291,6 +291,12 @@ config_load_connection(mj_t *atom)
 		val = 0;
 	}
 	args.baud = (unsigned int)val;
+
+	/* FlowControl is optional. */
+	flow_control_atom = mj_get_atom(atom, "FlowControl");
+	if (VALID_ATOM(flow_control_atom, MJ_TRUE)) {
+		args.flow_control = true;
+	}
 
 	/*
 	 * StorageArea is optional, and we also check for the old

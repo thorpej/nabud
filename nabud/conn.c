@@ -209,7 +209,8 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
  *	Set the specified parameters on the serial port.
  */
 static bool
-conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits)
+conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits,
+    bool flow_control)
 {
 	struct termios t;
 
@@ -229,6 +230,12 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits)
 		t.c_cflag |= CSTOPB;
 	} else {
 		t.c_cflag &= ~CSTOPB;
+	}
+
+	if (flow_control) {
+		t.c_cflag |= CRTSCTS;
+	} else {
+		t.c_cflag &= ~CRTSCTS;
 	}
 
 	if (cfsetspeed(&t, baud) < 0) {
@@ -285,7 +292,7 @@ conn_add_serial(const struct conn_add_args *args)
 	if (args->baud != 0) {
 		if (! conn_serial_setparam(args->port, fd,
 					   (baud = (speed_t)args->baud),
-					   stop_bits)) {
+					   stop_bits, args->flow_control)) {
 			log_error("[%s] Unable to set configured baud rate.",
 			    args->port);
 			goto bad;
@@ -298,7 +305,7 @@ conn_add_serial(const struct conn_add_args *args)
 		 */
 		if (! conn_serial_setparam(args->port, fd,
 					   (baud = NABU_NATIVE_BPS),
-					   stop_bits)) {
+					   stop_bits, args->flow_control)) {
 			log_error("[%s] Failed to set NABU-native baud rate; "
 			    "falling back...", args->port);
 			/*
@@ -307,7 +314,8 @@ conn_add_serial(const struct conn_add_args *args)
 			 */
 			if (! conn_serial_setparam(args->port, fd,
 						   (baud = NABU_FALLBACK_BPS),
-						   (stop_bits = 2))) {
+						   (stop_bits = 2),
+						   args->flow_control)) {
 				log_error("[%s] Failed to set fallback "
 				    "baud rate.", args->port);
 				goto bad;
