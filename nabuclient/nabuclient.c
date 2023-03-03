@@ -1210,6 +1210,7 @@ static union {
 	struct nhacp_response reply;
 } nhacp_buf;
 static uint16_t nhacp_length;
+static uint16_t nhacp_version;
 
 static void
 nhacp_send(uint8_t op, uint16_t length)
@@ -1373,6 +1374,8 @@ nhacp_parse_error_code(const char *cp)
 static bool
 command_nhacp_start_0_0(int argc, char *argv[])
 {
+	nhacp_version = NHACP_VERS_0_0;
+
 	printf("Sending: NABU_MSG_START_NHACP_0_0.\n");
 	nabu_send_byte(NABU_MSG_START_NHACP_0_0);
 
@@ -1387,7 +1390,8 @@ command_nhacp_start(int argc, char *argv[])
 	nhacp_buf.start.magic[0] = 'A';
 	nhacp_buf.start.magic[1] = 'C';
 	nhacp_buf.start.magic[2] = 'P';
-	nabu_set_uint16(nhacp_buf.start.version, NHACP_VERS_0_1);
+	nabu_set_uint16(nhacp_buf.start.version,
+	    (nhacp_version = NHACP_VERS_0_1));
 
 	printf("Sending: NABU_MSG_START_NHACP.\n");
 	nabu_send(&nhacp_buf.start, sizeof(nhacp_buf.start));
