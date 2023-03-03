@@ -1424,9 +1424,45 @@ command_nhacp_storage_open(int argc, char *argv[])
 	uint8_t req_slot = stext_parse_slot(argv[1]);
 
 	nhacp_buf.request.storage_open.req_slot = req_slot;
-	nabu_set_uint16(nhacp_buf.request.storage_open.flags, 0);
 	nhacp_buf.request.storage_open.url_length = (uint8_t)strlen(argv[2]);
 	strcpy((char *)nhacp_buf.request.storage_open.url_string, argv[2]);
+
+	bool have_accmode = false;
+	uint16_t oflags = 0;
+	for (int i = 3; i < argc; i++) {
+		if (strcmp(argv[i], "rw") == 0 ||
+		    strcmp(argv[i], "rdwr") == 0) {
+			if (have_accmode) {
+				printf("Already have access mode.\n");
+				cli_throw();
+			}
+			have_accmode = true;
+			oflags |= NHACP_O_RDWR;
+			continue;
+		}
+		if (strcmp(argv[i], "ro") == 0 ||
+		    strcmp(argv[i], "rdonly") == 0) {
+			if (have_accmode) {
+				printf("Already have access mode.\n");
+				cli_throw();
+			}
+			have_accmode = true;
+			oflags |= NHACP_O_RDONLY;
+			continue;
+		}
+		if (strcmp(argv[i], "creat") == 0 ||
+		    strcmp(argv[i], "create") == 0) {
+			oflags |= NHACP_O_CREAT;
+			continue;
+		}
+		if (strcmp(argv[i], "excl") == 0) {
+			oflags |= NHACP_O_EXCL;
+			continue;
+		}
+		printf("Unknown open flag: %s\n", argv[i]);
+		cli_throw();
+	}
+	nabu_set_uint16(nhacp_buf.request.storage_open.flags, oflags);
 
 	printf("Sending: NHACP_REQ_STORAGE_OPEN.\n");
 	nhacp_send(NHACP_REQ_STORAGE_OPEN,
