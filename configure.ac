@@ -223,7 +223,7 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
-# Check for O_TEXT and O_BINARY in <sys/fcntl.h>.
+# Check for several O_* open flags in <sys/fcntl.h>.
 #
 AC_MSG_CHECKING([for O_TEXT in <sys/fcntl.h>])
 AC_COMPILE_IFELSE([
@@ -245,6 +245,17 @@ AC_COMPILE_IFELSE([
 		int dummy = O_BINARY;
 	]])],[
 		AC_DEFINE(HAVE_O_BINARY, 1, [Define if your OS has O_BINARY in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+AC_MSG_CHECKING([for O_NOCTTY in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_NOCTTY;
+	]])],[
+		AC_DEFINE(HAVE_O_NOCTTY, 1, [Define if your OS has O_NOCTTY in <sys/fcntl.h>])
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 

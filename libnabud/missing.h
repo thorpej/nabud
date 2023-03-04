@@ -42,6 +42,10 @@
 #define	O_BINARY	0		/* this is a Windows thing */
 #endif /* ! HAVE_O_BINARY */
 
+#ifndef HAVE_O_NOCTTY
+#define	O_NOCTTY	0
+#endif
+
 #ifndef HAVE_GETPROGNAME
 const char *	getprogname(void);
 void		setprogname(const char *);
