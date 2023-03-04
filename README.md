@@ -409,6 +409,9 @@ And you can select a file to loaded when the NABU boots and requests image
   to enable it.
 * nabuctl now displays the serial connection properties (baud rate,
   stop bits, and flow control) when viewing connection details.
+* nabuctl now displays the file that the NABU will receive as the default
+  boot image (image 000001) even if this is not specified in the config
+  file or selected with nabuctl.  Suggested by jefferystone on Discord.
 
 ### nabud-1.2
 * Added command history to nabuctl on systems that have the BSD
