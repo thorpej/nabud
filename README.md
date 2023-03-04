@@ -407,6 +407,8 @@ And you can select a file to loaded when the NABU boots and requests image
 * Added a FlowControl property to Connection objects.  This allows users
   who have modified their NABU HCCA port to support RTS/CTS flow control
   to enable it.
+* nabuctl now displays the serial connection properties (baud rate,
+  stop bits, and flow control) when viewing connection details.
 
 ### nabud-1.2
 * Added command history to nabuctl on systems that have the BSD
