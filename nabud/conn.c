@@ -159,6 +159,14 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 	}
 
 	conn->type = type;
+
+	/* Not exactly "common", but hey, we allocate the conn here. */
+	if (conn->type == CONN_TYPE_SERIAL) {
+		conn->baud = args->baud;
+		conn->stop_bits = args->stop_bits;
+		conn->flow_control = args->flow_control;
+	}
+
 	conn->file_root = args->file_root;
 	pthread_mutex_init(&conn->mutex, NULL);
 
@@ -209,16 +217,14 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
  *	Set the specified parameters on the serial port.
  */
 static bool
-conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits,
-    bool flow_control)
+conn_serial_setparam(int fd, const struct conn_add_args *args)
 {
 	struct termios t;
-	const char *flowstr = "";
 
-	assert(stop_bits == 1 || stop_bits == 2);
+	assert(args->stop_bits == 1 || args->stop_bits == 2);
 
 	if (tcgetattr(fd, &t) < 0) {
-		log_error("[%s] tcgetattr() failed: %s", port,
+		log_error("[%s] tcgetattr() failed: %s", args->port,
 		    strerror(errno));
 		goto failed;
 	}
@@ -227,28 +233,28 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits,
 	t.c_cflag &= ~(CSIZE | PARENB | PARODD);
 	t.c_cflag |= CLOCAL | CS8;
 
-	if (stop_bits == 2) {
+	if (args->stop_bits == 2) {
 		t.c_cflag |= CSTOPB;
 	} else {
 		t.c_cflag &= ~CSTOPB;
 	}
 
-	if (flow_control) {
+	if (args->flow_control) {
 		t.c_cflag |= CRTSCTS;
-		flowstr = "+RTS/CTS";
 	} else {
 		t.c_cflag &= ~CRTSCTS;
 	}
 
-	if (cfsetspeed(&t, baud) < 0) {
-		log_error("[%s] cfsetspeed(%d) failed: %s", port, (int)baud,
-		    strerror(errno));
+	if (cfsetspeed(&t, (speed_t)args->baud) < 0) {
+		log_error("[%s] cfsetspeed(%u) failed: %s", args->port,
+		    args->baud, strerror(errno));
 		goto failed;
 	}
 
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
-		log_error("[%s] Failed to set 8N%d-%d%s: %s", port,
-		    stop_bits, (int)baud, flowstr, strerror(errno));
+		log_error("[%s] Failed to set 8N%u-%u%s: %s", args->port,
+		    args->stop_bits, args->baud,
+		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
 		goto failed;
 	}
 
@@ -262,11 +268,8 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits,
  *	Add a serial connection.
  */
 void
-conn_add_serial(const struct conn_add_args *args)
+conn_add_serial(struct conn_add_args *args)
 {
-	struct termios t;
-	speed_t baud;
-	int stop_bits;
 	int fd;
 
 	log_info("Creating Serial connection on %s.", args->port);
@@ -277,24 +280,16 @@ conn_add_serial(const struct conn_add_args *args)
 		return;
 	}
 
-	if (tcgetattr(fd, &t) < 0) {
-		log_error("tcgetattr() failed on %s: %s", args->port,
-		    strerror(errno));
-		goto bad;
-	}
-
 	/*
 	 * The native protocol is 8N1 @ 111860 baud, but it's much
 	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
 	 * can get out of sync when receiving a stream of bytes in
 	 * a packet.
 	 */
-	stop_bits = 2;	/* Eventually, we'll be able to configure this. */
+	args->stop_bits = 2;	/* Configure this, eventually. */
 
 	if (args->baud != 0) {
-		if (! conn_serial_setparam(args->port, fd,
-					   (baud = (speed_t)args->baud),
-					   stop_bits, args->flow_control)) {
+		if (! conn_serial_setparam(fd, args)) {
 			log_error("[%s] Unable to set configured baud rate.",
 			    args->port);
 			goto bad;
@@ -305,27 +300,25 @@ conn_add_serial(const struct conn_add_args *args)
 		 * and if that fails, fall back to a more "standard"
 		 * 115.2K.
 		 */
-		if (! conn_serial_setparam(args->port, fd,
-					   (baud = NABU_NATIVE_BPS),
-					   stop_bits, args->flow_control)) {
+		args->baud = NABU_NATIVE_BPS;
+		if (! conn_serial_setparam(fd, args)) {
 			log_error("[%s] Failed to set NABU-native baud rate; "
 			    "falling back...", args->port);
 			/*
 			 * If we're falling back, definitely make sure
 			 * we're using 2 stop bits.
 			 */
-			if (! conn_serial_setparam(args->port, fd,
-						   (baud = NABU_FALLBACK_BPS),
-						   (stop_bits = 2),
-						   args->flow_control)) {
+			args->baud = NABU_FALLBACK_BPS;
+			args->stop_bits = 2;
+			if (! conn_serial_setparam(fd, args)) {
 				log_error("[%s] Failed to set fallback "
 				    "baud rate.", args->port);
 				goto bad;
 			}
 		}
 	}
-	log_info("[%s] Using 8N%d-%d%s.", args->port, stop_bits, (int)baud,
-	    args->flow_control ? "+RTS/CTS" : "");
+	log_info("[%s] Using 8N%u-%u%s.", args->port, args->stop_bits,
+	    args->baud, args->flow_control ? "+RTS/CTS" : "");
 
 	conn_create_common(args->port, fd, args, CONN_TYPE_SERIAL,
 	    conn_thread);
