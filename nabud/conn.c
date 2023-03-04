@@ -213,6 +213,7 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits,
     bool flow_control)
 {
 	struct termios t;
+	const char *flowstr = "";
 
 	assert(stop_bits == 1 || stop_bits == 2);
 
@@ -234,6 +235,7 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits,
 
 	if (flow_control) {
 		t.c_cflag |= CRTSCTS;
+		flowstr = "+RTS/CTS";
 	} else {
 		t.c_cflag &= ~CRTSCTS;
 	}
@@ -245,8 +247,8 @@ conn_serial_setparam(const char *port, int fd, speed_t baud, int stop_bits,
 	}
 
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
-		log_error("[%s] Failed to set 8N%d-%d: %s", port,
-		    stop_bits, (int)baud, strerror(errno));
+		log_error("[%s] Failed to set 8N%d-%d%s: %s", port,
+		    stop_bits, (int)baud, flowstr, strerror(errno));
 		goto failed;
 	}
 
@@ -322,7 +324,8 @@ conn_add_serial(const struct conn_add_args *args)
 			}
 		}
 	}
-	log_info("[%s] Using 8N%d-%d.", args->port, stop_bits, (int)baud);
+	log_info("[%s] Using 8N%d-%d%s.", args->port, stop_bits, (int)baud,
+	    args->flow_control ? "+RTS/CTS" : "");
 
 	conn_create_common(args->port, fd, args, CONN_TYPE_SERIAL,
 	    conn_thread);
