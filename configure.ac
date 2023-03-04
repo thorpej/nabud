@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 #
 
-m4_define([nabud_VERSION], [1.2])
+m4_define([nabud_VERSION], [1.2.1])
 
 AC_INIT([nabud],
 	m4_defn([nabud_VERSION]),
@@ -75,6 +75,11 @@ case "$CANONICAL_TARGET" in
 		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 		EXTRAS_OS="linux"
 		EXTRAS_SUBDIRS="extras/$EXTRAS_OS/systemd"
+		;;
+
+	*-*-cygwin*)
+		# Enable _GNU_SOURCE for things like asprintf(3).
+		CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 		;;
 esac
 
@@ -158,6 +163,21 @@ m4_include([m4/ax_pthread.m4])
 AX_PTHREAD([],
 	[AC_MSG_ERROR([Missing POSIX threads])])
 
+# Check for struct sockaddr_in::sin_len.
+#
+AC_MSG_CHECKING(for sin_len member in struct sockaddr_in)
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/socket.h>
+		#include <netinet/in.h>
+	]],[[
+		struct sockaddr_in dummy;
+		dummy.sin_len = 0;
+	]])],[
+		AC_DEFINE(HAVE_SOCKADDR_IN_SIN_LEN, 1, [Define if the struct sockaddr_in has a member sin_len on your OS])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for struct sockaddr_un::sun_len.
 #
 AC_MSG_CHECKING(for sun_len member in struct sockaddr_un)
@@ -203,10 +223,46 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for several O_* open flags in <sys/fcntl.h>.
+#
+AC_MSG_CHECKING([for O_TEXT in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_TEXT;
+	]])],[
+		AC_DEFINE(HAVE_O_TEXT, 1, [Define if your OS has O_TEXT in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+AC_MSG_CHECKING([for O_BINARY in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_BINARY;
+	]])],[
+		AC_DEFINE(HAVE_O_BINARY, 1, [Define if your OS has O_BINARY in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+AC_MSG_CHECKING([for O_NOCTTY in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_NOCTTY;
+	]])],[
+		AC_DEFINE(HAVE_O_NOCTTY, 1, [Define if your OS has O_NOCTTY in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for struct stat::st_birthtime.  This extension is available
 # on macOS and some of the BSDs.
 #
-AC_MSG_CHECKING(for st_birthtime member in struct stat)
+AC_MSG_CHECKING([for st_birthtime member in struct stat])
 AC_COMPILE_IFELSE([
 	AC_LANG_PROGRAM([[
 		#include <sys/types.h>
@@ -241,6 +297,7 @@ if test x$LIBEDIT_LIB != x; then
 		CPPFLAGS="$LIBEDIT_INCLUDES $CPPFLAGS"
 		AC_COMPILE_IFELSE([
 			AC_LANG_PROGRAM([[
+				#include <stdio.h>
 				#include <readline/readline.h>
 			]],[[
 				int dummy = 0;

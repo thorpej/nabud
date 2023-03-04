@@ -19,6 +19,15 @@
 /* Define to 1 if you have OpenSSL. */
 #undef HAVE_OPENSSL
 
+/* Define if your OS has O_BINARY in <sys/fcntl.h> */
+#undef HAVE_O_BINARY
+
+/* Define if your OS has O_NOCTTY in <sys/fcntl.h> */
+#undef HAVE_O_NOCTTY
+
+/* Define if your OS has O_TEXT in <sys/fcntl.h> */
+#undef HAVE_O_TEXT
+
 /* Define if you have POSIX threads libraries and header files. */
 #undef HAVE_PTHREAD
 
@@ -27,6 +36,9 @@
 
 /* Define to 1 if you have <Security/SecureTransport.h> */
 #undef HAVE_SECURETRANSPORT
+
+/* Define if the struct sockaddr_in has a member sin_len on your OS */
+#undef HAVE_SOCKADDR_IN_SIN_LEN
 
 /* Define if the struct sockaddr_un has a member sun_len on your OS */
 #undef HAVE_SOCKADDR_UN_SUN_LEN

@@ -361,6 +361,19 @@ to the NABU native baud rate of 111860, and will fall back to 115200
 if the native baud rate is not supported by the serial interface.
 This option is really only useful if you have modified your NABU's HCCA
 port to use a different baud rate clock.
+.It FlowControl
+An optional boolean value
+.Po
+.Dq true
+or
+.Dq false
+.Pc
+that specifies if RTS/CTS flow control is to be used for this connection.
+Flow control is only applicable to serial connections.
+The default is
+.Dq false .
+This option is really only useful if you have modified your NABU's HCCA
+port to support RTS/CTS flow control.
 .It Channel
 An optional number between 1 and 255 that specifies the connection's
 default channel.

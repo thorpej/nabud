@@ -56,6 +56,25 @@
 #include "control.h"
 #include "image.h"
 
+#define	FNAME_BUFSIZE	256
+
+/*
+ * default_000001_file --
+ *	Formats the name of the default boot file (what is vended
+ *	when the NABU requests image 000001) for the specified channel.
+ */
+static void
+default_000001_file(struct image_channel *chan, const char *qual,
+    char *buf, size_t buflen)
+{
+	if (chan->default_file) {
+		snprintf(buf, buflen, "%s (%s)", chan->default_file, qual);
+	} else {
+		snprintf(buf, buflen, "000001.%s (%s)",
+		    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu", qual);
+	}
+}
+
 /*
  * control_serialize_channel --
  *	Serialize a channel object.
@@ -81,6 +100,11 @@ control_serialize_channel(struct image_channel *chan, void *ctx)
 	if (chan->default_file != NULL) {
 		rv = rv && atom_list_append_string(list,
 		    NABUCTL_CHAN_DEFAULT_FILE, chan->default_file);
+	} else {
+		char fname[FNAME_BUFSIZE];
+		default_000001_file(chan, "default", fname, sizeof(fname));
+		rv = rv && atom_list_append_string(list,
+		    NABUCTL_CHAN_DEFAULT_FILE, fname);
 	}
 
 	rv = rv && atom_list_append_number(list, NABUCTL_CHAN_NUMBER,
@@ -125,23 +149,29 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	}
 	rv = rv && atom_list_append_string(list, NABUCTL_CONN_TYPE, cp);
 
+	if (conn->type == CONN_TYPE_SERIAL) {
+		rv = rv && atom_list_append_number(list,
+		    NABUCTL_CONN_BAUD, conn->baud);
+		rv = rv && atom_list_append_number(list,
+		    NABUCTL_CONN_STOP_BITS, conn->stop_bits);
+		rv = rv && atom_list_append_bool(list,
+		    NABUCTL_CONN_FLOW_CONTROL, conn->flow_control);
+	}
+
 	rv = rv && atom_list_append_string(list, NABUCTL_CONN_NAME,
 	    conn_name(conn));
 
 	struct image_channel *chan;
-	char selected_file[256];	/* reasonable limit */
+	char selected_file[FNAME_BUFSIZE] = { 0 };
 
 	pthread_mutex_lock(&conn->mutex);
 	chan = conn->l_channel;
 	if (conn->l_selected_file != NULL) {
-		size_t copylen = strlen(conn->l_selected_file);
-		if (copylen >= sizeof(selected_file)) {
-			copylen = sizeof(selected_file) - 1;
-		}
 		strncpy(selected_file, conn->l_selected_file,
 		    sizeof(selected_file) - 1);
 	} else {
-		selected_file[0] = '\0';
+		default_000001_file(chan, "from channel", selected_file,
+		    sizeof(selected_file));
 	}
 	pthread_mutex_unlock(&conn->mutex);
 
@@ -682,13 +712,13 @@ control_init(const char *path)
 	}
 	nabuctl_sock_path = path;
 
-	if (strlen(path) > sizeof(sun.sun_path)) {
+	if (strlen(path) > sizeof(sun.sun_path) - 1) {
 		log_error("Path to control socket is too long: %s", path);
 		return;
 	}
 
 	memset(&sun, 0, sizeof(sun));
-	strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+	strncpy(sun.sun_path, path, sizeof(sun.sun_path) - 1);
 #ifdef HAVE_SOCKADDR_UN_SUN_LEN
 	sun.sun_len = SUN_LEN(&sun);
 #endif

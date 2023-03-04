@@ -51,12 +51,6 @@
 #include <openssl/err.h>
 #endif
 
-#if !defined(__sun) && !defined(__hpux) && !defined(__INTERIX) && \
-    !defined(__digital__) && !defined(__linux) && !defined(__MINT__) && \
-    !defined(__sgi)
-#define HAVE_SA_LEN
-#endif
-
 /* Connection */
 typedef struct fetchconn conn_t;
 

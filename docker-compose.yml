@@ -3,5 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    init: true
     ports:
       - 5816:5816

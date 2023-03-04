@@ -11,6 +11,8 @@ RUN set -eux; \
     gcc \
     libc-dev \
     openssl-dev \
+    readline-dev \
+    libedit-dev \
     make
 
 # Copy all source files
@@ -21,6 +23,11 @@ RUN set -eux; \
     make
 
 FROM base as runner
+
+RUN set -eux; \
+    apk add --no-cache \
+    readline \
+    libedit
 
 ARG UID=901
 ARG GID=901
@@ -42,4 +49,5 @@ VOLUME $LIBDIR
 
 EXPOSE 5816/tcp
 
-CMD ["/sbin/nabud", "-f", "-u", "nabu"]
+ENTRYPOINT ["/sbin/nabud"]
+CMD ["-f", "-u", "nabu"]

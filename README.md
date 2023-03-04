@@ -88,6 +88,13 @@ exercise for the reader.  For macOS, you will need to install the
 and then launch Xcode to perform the "first launch" task that takes care of
 setting up the command-line tools that nabud uses to build.
 
+### Building on Cygwin
+
+Building on Cygwin is a little more complicated.  In addition to the basic
+toolchain (gcc-core, binutils, make), you need to ensure you've installed the
+libssl-devel and libreadline-devel packages (make sure they match the
+versions of the run-time packages that are installed).
+
 ## Configuring and running nabud
 
 nabud understands the following command line options:
@@ -392,6 +399,19 @@ And you can select a file to loaded when the NABU boots and requests image
     nabuctl> 
 
 ## Changes
+
+### nabud-1.2.1
+* Experimental support for Cygwin (64-bit).
+* Support command history / editing in nabuctl in Docker builds,
+  plus some additional Docker fixes.  From Christopher Masto.
+* Added a FlowControl property to Connection objects.  This allows users
+  who have modified their NABU HCCA port to support RTS/CTS flow control
+  to enable it.
+* nabuctl now displays the serial connection properties (baud rate,
+  stop bits, and flow control) when viewing connection details.
+* nabuctl now displays the file that the NABU will receive as the default
+  boot image (image 000001) even if this is not specified in the config
+  file or selected with nabuctl.  Suggested by jefferystone on Discord.
 
 ### nabud-1.2
 * Added command history to nabuctl on systems that have the BSD

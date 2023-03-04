@@ -612,6 +612,14 @@ struct connection_desc {
 	unsigned int	channel;
 	unsigned int	number;
 	bool		retronet_enabled;
+
+	/* We only display these if we received them. */
+	unsigned int	baud;
+	bool		baud_valid;
+	unsigned int	stop_bits;
+	bool		stop_bits_valid;
+	bool		flow_control;
+	bool		flow_control_valid;
 };
 static TAILQ_HEAD(, connection_desc) connection_list =
     TAILQ_HEAD_INITIALIZER(connection_list);
@@ -754,6 +762,30 @@ connection_deserialize(struct atom_list *reply_list, struct atom *atom)
 			log_debug(LOG_SUBSYS_CONTROL,
 			    "Got NABUCTL_CONN_FILE_ROOT=%s",
 			    conn->file_root);
+			break;
+
+		case NABUCTL_CONN_BAUD:
+			conn->baud = (unsigned int)atom_number_value(atom);
+			conn->baud_valid = true;
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_BAUD=%u",
+			    conn->baud);
+			break;
+
+		case NABUCTL_CONN_STOP_BITS:
+			conn->stop_bits = (unsigned int)atom_number_value(atom);
+			conn->stop_bits_valid = true;
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_STOP_BITS=%u",
+			    conn->stop_bits);
+			break;
+
+		case NABUCTL_CONN_FLOW_CONTROL:
+			conn->flow_control = atom_bool_value(atom);
+			conn->flow_control_valid = true;
+			log_debug(LOG_SUBSYS_CONTROL,
+			    "Got NABUCTL_CONN_FLOW_CONTROL=%d",
+			    conn->flow_control);
 			break;
 
 		case NABUCTL_DONE:	/* done with this object */
@@ -1117,6 +1149,15 @@ show_one_connection(struct connection_desc *conn)
 	printf("Connection %u:\n", conn->number);
 	printf("         Name: %s\n", conn->name);
 	printf("         Type: %s\n", conn->type);
+	if (conn->baud_valid) {
+		printf("    Baud Rate: %u\n", conn->baud);
+	}
+	if (conn->stop_bits_valid) {
+		printf("    Stop Bits: %u\n", conn->stop_bits);
+	}
+	if (conn->flow_control_valid) {
+		printf(" Flow Control: %s\n", enabledstr(conn->flow_control));
+	}
 	printf("        State: %s\n", conn->state);
 	if (conn->channel != 0) {
 		printf("      Channel: %u\n", conn->channel);
@@ -1474,7 +1515,7 @@ main(int argc, char *argv[])
 		    path);
 	}
 	memset(&sun, 0, sizeof(sun));
-	strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+	strncpy(sun.sun_path, path, sizeof(sun.sun_path) - 1);
 #ifdef HAVE_SOCKADDR_UN_SUN_LEN
 	sun.sun_len = SUN_LEN(&sun);
 #endif

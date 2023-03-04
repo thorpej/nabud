@@ -62,12 +62,13 @@ const char *	fileio_location(struct fileio *);
 #define	FILEIO_O_CREAT		0x0010
 #define	FILEIO_O_EXCL		0x0020
 #define	FILEIO_O_DIROK		0x0040
+#define	FILEIO_O_TEXT		0x0080	/* open as text; maybe CRLF xlation */
 #define	FILEIO_O_LOCAL_ROOT	0x0100	/* require a local root */
 
 void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 			  size_t, size_t *filesizep);
 
-void	*fileio_load_file_from_location(const char *, size_t, size_t,
+void	*fileio_load_file_from_location(const char *, int, size_t, size_t,
 					struct fileio_attrs *, size_t *);
 
 char	*fileio_resolve_path(const char *, const char *, int);

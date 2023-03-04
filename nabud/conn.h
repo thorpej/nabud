@@ -55,6 +55,11 @@ struct nabu_connection {
 	/* Type of this connection. */
 	conn_type	type;
 
+	/* Serial connection properties -- tracked for display purposes. */
+	unsigned int	baud;
+	unsigned int	stop_bits;
+	bool		flow_control;
+
 	/*
 	 * The packet being sent is buffered here.  We double the
 	 * size in case every byte needs to be escaped.
@@ -102,11 +107,13 @@ struct conn_add_args {
 	char		*selected_file;
 	unsigned int	channel;
 	unsigned int	baud;
+	unsigned int	stop_bits;
+	bool		flow_control;
 };
 
 extern unsigned int conn_count;
 
-void	conn_add_serial(const struct conn_add_args *);
+void	conn_add_serial(struct conn_add_args *);
 void	conn_add_tcp(const struct conn_add_args *);
 void	conn_destroy(struct nabu_connection *);
 
