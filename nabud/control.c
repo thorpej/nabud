@@ -56,6 +56,20 @@
 #include "control.h"
 #include "image.h"
 
+#define	FNAME_BUFSIZE	256
+
+/*
+ * default_000001_file --
+ *	Formats the name of the default boot file (what is vended
+ *	when the NABU requests image 000001) for the specified channel.
+ */
+static void
+default_000001_file(struct image_channel *chan, char *buf, size_t buflen)
+{
+	snprintf(buf, buflen, "000001.%s (default)",
+	    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu");
+}
+
 /*
  * control_serialize_channel --
  *	Serialize a channel object.
@@ -81,6 +95,11 @@ control_serialize_channel(struct image_channel *chan, void *ctx)
 	if (chan->default_file != NULL) {
 		rv = rv && atom_list_append_string(list,
 		    NABUCTL_CHAN_DEFAULT_FILE, chan->default_file);
+	} else {
+		char fname[FNAME_BUFSIZE];
+		default_000001_file(chan, fname, sizeof(fname));
+		rv = rv && atom_list_append_string(list,
+		    NABUCTL_CHAN_DEFAULT_FILE, fname);
 	}
 
 	rv = rv && atom_list_append_number(list, NABUCTL_CHAN_NUMBER,
@@ -138,7 +157,7 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	    conn_name(conn));
 
 	struct image_channel *chan;
-	char selected_file[256] = { 0 };	/* reasonable limit */
+	char selected_file[FNAME_BUFSIZE] = { 0 };
 
 	pthread_mutex_lock(&conn->mutex);
 	chan = conn->l_channel;
@@ -149,6 +168,8 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 		}
 		strncpy(selected_file, conn->l_selected_file,
 		    sizeof(selected_file) - 1);
+	} else {
+		default_000001_file(chan, selected_file, sizeof(selected_file));
 	}
 	pthread_mutex_unlock(&conn->mutex);
 
