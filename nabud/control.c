@@ -64,10 +64,15 @@
  *	when the NABU requests image 000001) for the specified channel.
  */
 static void
-default_000001_file(struct image_channel *chan, char *buf, size_t buflen)
+default_000001_file(struct image_channel *chan, const char *qual,
+    char *buf, size_t buflen)
 {
-	snprintf(buf, buflen, "000001.%s (default)",
-	    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu");
+	if (chan->default_file) {
+		snprintf(buf, buflen, "%s (%s)", chan->default_file, qual);
+	} else {
+		snprintf(buf, buflen, "000001.%s (%s)",
+		    chan->type == IMAGE_CHANNEL_PAK ? "pak" : "nabu", qual);
+	}
 }
 
 /*
@@ -97,7 +102,7 @@ control_serialize_channel(struct image_channel *chan, void *ctx)
 		    NABUCTL_CHAN_DEFAULT_FILE, chan->default_file);
 	} else {
 		char fname[FNAME_BUFSIZE];
-		default_000001_file(chan, fname, sizeof(fname));
+		default_000001_file(chan, "default", fname, sizeof(fname));
 		rv = rv && atom_list_append_string(list,
 		    NABUCTL_CHAN_DEFAULT_FILE, fname);
 	}
@@ -162,14 +167,11 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	pthread_mutex_lock(&conn->mutex);
 	chan = conn->l_channel;
 	if (conn->l_selected_file != NULL) {
-		size_t copylen = strlen(conn->l_selected_file);
-		if (copylen >= sizeof(selected_file)) {
-			copylen = sizeof(selected_file) - 1;
-		}
 		strncpy(selected_file, conn->l_selected_file,
 		    sizeof(selected_file) - 1);
 	} else {
-		default_000001_file(chan, selected_file, sizeof(selected_file));
+		default_000001_file(chan, "from channel", selected_file,
+		    sizeof(selected_file));
 	}
 	pthread_mutex_unlock(&conn->mutex);
 
