@@ -44,6 +44,7 @@
 
 #include "fileio.h"
 #include "log.h"
+#include "missing.h"
 
 #include "libfetch/fetch.h"
 
@@ -342,13 +343,9 @@ fileio_local_io_open(struct fileio *f, const char *location,
 		open_flags |= O_EXCL;
 	}
 	if (f->flags & FILEIO_O_TEXT) {
-#ifdef HAVE_O_TEXT
 		open_flags |= O_TEXT;
-#endif
 	} else {
-#ifdef HAVE_O_BINARY
 		open_flags |= O_BINARY;
-#endif
 	}
 
 	f->local.fd = open(f->location, open_flags, 0666);

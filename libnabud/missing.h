@@ -31,6 +31,17 @@
 #include "config.h"
 #endif
 
+/*
+ * Elide some open(2) flags that might not exist on some systems.
+ */
+#ifndef HAVE_O_TEXT
+#define	O_TEXT		0		/* this is a Windows thing */
+#endif /* ! HAVE_O_TEXT */
+
+#ifndef HAVE_O_BINARY
+#define	O_BINARY	0		/* this is a Windows thing */
+#endif /* ! HAVE_O_BINARY */
+
 #ifndef HAVE_GETPROGNAME
 const char *	getprogname(void);
 void		setprogname(const char *);
