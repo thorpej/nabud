@@ -125,6 +125,15 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	}
 	rv = rv && atom_list_append_string(list, NABUCTL_CONN_TYPE, cp);
 
+	if (conn->type == CONN_TYPE_SERIAL) {
+		rv = rv && atom_list_append_number(list,
+		    NABUCTL_CONN_BAUD, conn->baud);
+		rv = rv && atom_list_append_number(list,
+		    NABUCTL_CONN_STOP_BITS, conn->stop_bits);
+		rv = rv && atom_list_append_bool(list,
+		    NABUCTL_CONN_FLOW_CONTROL, conn->flow_control);
+	}
+
 	rv = rv && atom_list_append_string(list, NABUCTL_CONN_NAME,
 	    conn_name(conn));
 
