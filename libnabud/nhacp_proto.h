@@ -233,5 +233,6 @@ struct nhacp_response {
 #define	NHACP_EFBIG		13	/* File is too large */
 #define	NHACP_ENOSPC		14	/* Out of space */
 #define	NHACP_ESEEK		15	/* Seek on non-seekable file */
+#define	NHACP_ENOTDIR		16	/* File is not a directory */
 
 #endif /* nhacp_proto_h_included */
