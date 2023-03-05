@@ -219,7 +219,6 @@ static int
 rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
-	struct fileio *f;
 	char *fname;
 	uint8_t fnamelen;
 
@@ -244,19 +243,14 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 	 * to convey that information.
 	 */
 	log_debug(LOG_SUBSYS_RETRONET,
-	    "[%s] Opening '%s' in order to get attributes.",
+	    "[%s] Getting attributes for '%s'.",
 	    conn_name(ctx->stext.conn), fname);
-	f = fileio_open(fname,
-	    FILEIO_O_RDONLY | FILEIO_O_DIROK | FILEIO_O_LOCAL_ROOT,
-	    conn->file_root, attrs);
-	if (f == NULL) {
-		log_info("[%s] Opening '%s' failed: %s",
+	if (! fileio_getattr_location(fname, FILEIO_O_LOCAL_ROOT,
+				      conn->file_root, attrs)) {
+		log_info("[%s] Get attributes for '%s' failed: %s",
 		    conn_name(ctx->stext.conn), fname, strerror(errno));
 		return errno;
 	}
-
-	/* Now have the attrs; close the file. */
-	fileio_close(f);
 
 	return 0;
 }
@@ -1206,7 +1200,7 @@ rn_req_file_list(struct retronet_context *ctx)
 			    conn_name(conn));
 			goto out;
 		}
-		if (! fileio_getattr_path(g.gl_pathv[i], &attrs)) {
+		if (! fileio_getattr_location(g.gl_pathv[i], 0, NULL, &attrs)) {
 			log_error("[%s] Unable to get attrs for '%s': %s",
 			    conn_name(conn), g.gl_pathv[i], strerror(errno));
 			free(e);

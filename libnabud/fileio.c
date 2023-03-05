@@ -58,6 +58,8 @@ struct fileio_ops {
 			    const char *);
 	bool		(*io_ok)(struct fileio *, bool);
 	bool		(*io_getattr)(struct fileio *, struct fileio_attrs *);
+	bool		(*io_getattr_location)(const char *, int, const char *,
+			    struct fileio_attrs *);
 	void		(*io_close)(struct fileio *);
 
 	off_t		(*io_seek)(struct fileio *, off_t, int);
@@ -420,6 +422,34 @@ fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 	return true;
 }
 
+static bool
+fileio_local_io_getattr_location(const char *location, int flags,
+    const char *local_root, struct fileio_attrs *attrs)
+{
+	struct stat sb;
+	char *path = NULL;
+	bool rv = false;
+	int error;
+
+	error = fileio_local_resolve_path(location, local_root, flags,
+	    &path);
+	if (error == 0) {
+		if (stat(path, &sb) == 0) {
+			fileio_stat_to_attrs(path, &sb, attrs);
+			rv = true;
+		} else {
+			error = errno;
+		}
+	}
+	if (path != NULL) {
+		free(path);
+	}
+	if (! rv) {
+		errno = error;
+	}
+	return rv;
+}
+
 static void
 fileio_local_io_close(struct fileio *f)
 {
@@ -491,16 +521,17 @@ fileio_local_io_pwrite(struct fileio *f, const void *buf, size_t len,
 }
 
 static const struct fileio_ops fileio_local_ops = {
-	.io_open	=	fileio_local_io_open,
-	.io_ok		=	fileio_local_io_ok,
-	.io_getattr	=	fileio_local_io_getattr,
-	.io_close	=	fileio_local_io_close,
-	.io_seek	=	fileio_local_io_seek,
-	.io_truncate	=	fileio_local_io_truncate,
-	.io_read	=	fileio_local_io_read,
-	.io_write	=	fileio_local_io_write,
-	.io_pread	=	fileio_local_io_pread,
-	.io_pwrite	=	fileio_local_io_pwrite,
+	.io_open		=	fileio_local_io_open,
+	.io_ok			=	fileio_local_io_ok,
+	.io_getattr		=	fileio_local_io_getattr,
+	.io_getattr_location	=	fileio_local_io_getattr_location,
+	.io_close		=	fileio_local_io_close,
+	.io_seek		=	fileio_local_io_seek,
+	.io_truncate		=	fileio_local_io_truncate,
+	.io_read		=	fileio_local_io_read,
+	.io_write		=	fileio_local_io_write,
+	.io_pread		=	fileio_local_io_pread,
+	.io_pwrite		=	fileio_local_io_pwrite,
 };
 
 /*
@@ -730,19 +761,37 @@ fileio_getattr(struct fileio *f, struct fileio_attrs *attrs)
 }
 
 /*
- * fileio_getattr_path --
- *	Do a fileio_getattr(), but on a path instead of a fileio.
+ * fileio_getattr_location --
+ *	Do a fileio_getattr(), but on a location instead of a fileio.
  */
 bool
-fileio_getattr_path(const char *path, struct fileio_attrs *attrs)
+fileio_getattr_location(const char *location, int flags,
+    const char *local_root, struct fileio_attrs *attrs)
 {
-	struct stat sb;
+	const struct fileio_scheme_ops *fso;
 
-	if (stat(path, &sb) < 0) {
-		return false;
+	fso = fileio_ops_for_location(location, strlen(location));
+
+	/* Sanitize the flags; only care about local root here. */
+	flags &= FILEIO_O_LOCAL_ROOT;
+
+	/*
+	 * If the scheme supports a getattr-by-location directly, then do
+	 * that.  Otherwise, we call back to opening the file to get the
+	 * attrs and immediately closing it.
+	 */
+	if (fso->ops->io_getattr_location != NULL) {
+		return (*fso->ops->io_getattr_location)(location, flags,
+		    local_root, attrs);
 	}
 
-	fileio_stat_to_attrs(path, &sb, attrs);
+	struct fileio *f = fileio_open(location,
+	    FILEIO_O_RDONLY | FILEIO_O_DIROK | flags, local_root, attrs);
+	if (f == NULL) {
+		return false;
+	}
+	fileio_close(f);
+
 	return true;
 }
 
