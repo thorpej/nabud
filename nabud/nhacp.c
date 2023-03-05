@@ -348,6 +348,7 @@ nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
 	if (nhacp_o_flags & NHACP_O_EXCL) {
 		*fileio_o_flagsp |= FILEIO_O_EXCL;
 	}
+	*fileio_o_flagsp |= FILEIO_O_REGULAR;
 
 	return 0;
 }

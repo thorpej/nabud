@@ -293,14 +293,14 @@ rn_req_file_open(struct retronet_context *ctx)
 	    FILEIO_O_RDWR : FILEIO_O_RDONLY;
 
 	error = stext_file_open(&ctx->stext, fname, reqslot, &attrs,
-	    FILEIO_O_CREAT | fileio_flags, &f);
+	    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
 	if (error == EBUSY) {
 		/*
 		 * The RetroNet API says to treat a busy requested
 		 * slot as "ok, then just allocate one.".  &shrug;
 		 */
 		error = stext_file_open(&ctx->stext, fname, 0xff, &attrs,
-		    FILEIO_O_CREAT | fileio_flags, &f);
+		    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
 	}
 
 	/*
@@ -946,7 +946,7 @@ rn_req_file_copy(struct retronet_context *ctx)
 	struct fileio *src_f = NULL, *dst_f = NULL;
 
 	src_f = fileio_open(src_fname,
-	    FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT,
+	    FILEIO_O_RDONLY | FILEIO_O_REGULAR | FILEIO_O_LOCAL_ROOT,
 	    conn->file_root, NULL);
 	if (src_f == NULL) {
 		log_debug(LOG_SUBSYS_RETRONET,
@@ -960,7 +960,8 @@ rn_req_file_copy(struct retronet_context *ctx)
 	 * already resolved the path.
 	 */
 	dst_f = fileio_open(dst_path,
-	    FILEIO_O_RDWR | FILEIO_O_CREAT | dst_oflags, NULL, NULL);
+	    FILEIO_O_RDWR | FILEIO_O_CREAT | FILEIO_O_REGULAR | dst_oflags,
+	    NULL, NULL);
 	if (dst_f == NULL) {
 		log_debug(LOG_SUBSYS_RETRONET,
 		    "[%s] Unable to open dst '%s': %s",

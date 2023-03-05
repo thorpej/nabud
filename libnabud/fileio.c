@@ -970,7 +970,8 @@ fileio_load_file_from_location(const char *location, int oflags, size_t extra,
 
 	assert((oflags & ~FILEIO_O_TEXT) == 0);
 
-	f = fileio_open(location, FILEIO_O_RDONLY | oflags, NULL, attrs);
+	f = fileio_open(location, FILEIO_O_RDONLY | FILEIO_O_REGULAR | oflags,
+	    NULL, attrs);
 	if (f == NULL) {
 		log_error("Unable to open %s", location);
 		return NULL;
