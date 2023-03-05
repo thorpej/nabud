@@ -22,8 +22,14 @@
 /* Define if your OS has O_BINARY in <sys/fcntl.h> */
 #undef HAVE_O_BINARY
 
+/* Define if your OS has O_DIRECTORY in <sys/fcntl.h> */
+#undef HAVE_O_DIRECTORY
+
 /* Define if your OS has O_NOCTTY in <sys/fcntl.h> */
 #undef HAVE_O_NOCTTY
+
+/* Define if your OS has O_REGULAR in <sys/fcntl.h> */
+#undef HAVE_O_REGULAR
 
 /* Define if your OS has O_TEXT in <sys/fcntl.h> */
 #undef HAVE_O_TEXT

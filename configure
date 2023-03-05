@@ -14440,6 +14440,72 @@ else $as_nop
 printf "%s\n" "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for O_DIRECTORY in <sys/fcntl.h>" >&5
+printf %s "checking for O_DIRECTORY in <sys/fcntl.h>... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+
+int
+main (void)
+{
+
+		int dummy = O_DIRECTORY;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+
+
+printf "%s\n" "#define HAVE_O_DIRECTORY 1" >>confdefs.h
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else $as_nop
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for O_REGULAR in <sys/fcntl.h>" >&5
+printf %s "checking for O_REGULAR in <sys/fcntl.h>... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+
+int
+main (void)
+{
+
+		int dummy = O_REGULAR;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+
+
+printf "%s\n" "#define HAVE_O_REGULAR 1" >>confdefs.h
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else $as_nop
+
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 
 # Check for struct stat::st_birthtime.  This extension is available
 # on macOS and some of the BSDs.

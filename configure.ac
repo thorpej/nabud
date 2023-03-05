@@ -258,6 +258,28 @@ AC_COMPILE_IFELSE([
 		AC_DEFINE(HAVE_O_NOCTTY, 1, [Define if your OS has O_NOCTTY in <sys/fcntl.h>])
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
+AC_MSG_CHECKING([for O_DIRECTORY in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_DIRECTORY;
+	]])],[
+		AC_DEFINE(HAVE_O_DIRECTORY, 1, [Define if your OS has O_DIRECTORY in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+AC_MSG_CHECKING([for O_REGULAR in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_REGULAR;
+	]])],[
+		AC_DEFINE(HAVE_O_REGULAR, 1, [Define if your OS has O_REGULAR in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
 
 # Check for struct stat::st_birthtime.  This extension is available
 # on macOS and some of the BSDs.
