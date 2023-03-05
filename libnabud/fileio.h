@@ -60,11 +60,12 @@ const char *	fileio_location(struct fileio *);
 
 #define	FILEIO_O_RDONLY		0x0000
 #define	FILEIO_O_RDWR		0x0001
+#define	FILEIO_O_LOCAL_ROOT	0x0002	/* require a local root */
 #define	FILEIO_O_CREAT		0x0010
 #define	FILEIO_O_EXCL		0x0020
-#define	FILEIO_O_DIROK		0x0040
-#define	FILEIO_O_TEXT		0x0080	/* open as text; maybe CRLF xlation */
-#define	FILEIO_O_LOCAL_ROOT	0x0100	/* require a local root */
+#define	FILEIO_O_REGULAR	0x0040
+#define	FILEIO_O_DIRECTORY	0x0080
+#define	FILEIO_O_TEXT		0x0100	/* open as text; maybe CRLF xlation */
 
 void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 			  size_t, size_t *filesizep);

@@ -356,24 +356,26 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	}
 
 	/*
-	 * Only regular files, unless the caller says they're OK
-	 * opening a directory (probably for a getattr call later).
+	 * If the caller has specified directory-only or regular-only,
+	 * then enforce that.
 	 */
 	struct stat sb;
 	if (fstat(f->local.fd, &sb) < 0) {
 		goto bad;
 	}
-	if (S_ISDIR(sb.st_mode)) {
-		if (f->flags & FILEIO_O_DIROK) {
-			f->local.is_directory = true;
-		} else {
+	if ((f->flags & FILEIO_O_REGULAR) && !S_ISREG(sb.st_mode)) {
+		if (S_ISDIR(sb.st_mode)) {
 			errno = EISDIR;
-			goto bad;
+		} else {
+			errno = EPERM;
 		}
-	} else if (!S_ISREG(sb.st_mode)) {
-		errno = EPERM;
 		goto bad;
 	}
+	if ((f->flags & FILEIO_O_DIRECTORY) && !S_ISDIR(sb.st_mode)) {
+		errno = ENOTDIR;
+		goto bad;
+	}
+	f->local.is_directory = !!S_ISDIR(sb.st_mode);
 
 	return true;
  bad:
@@ -785,8 +787,8 @@ fileio_getattr_location(const char *location, int flags,
 		    local_root, attrs);
 	}
 
-	struct fileio *f = fileio_open(location,
-	    FILEIO_O_RDONLY | FILEIO_O_DIROK | flags, local_root, attrs);
+	struct fileio *f = fileio_open(location, FILEIO_O_RDONLY | flags,
+	    local_root, attrs);
 	if (f == NULL) {
 		return false;
 	}
