@@ -328,15 +328,6 @@ fileio_local_io_open(struct fileio *f, const char *location,
 {
 	int error;
 
-	error = fileio_local_resolve_path(location, local_root, f->flags,
-	    &f->location);
-	if (error != 0) {
-		errno = error;
-		return false;
-	}
-
-	/* If open fails, caller will free f->location. */
-
 	int open_flags = (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY;
 	if (f->flags & FILEIO_O_CREAT) {
 		open_flags |= O_CREAT;
@@ -349,32 +340,65 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	} else {
 		open_flags |= O_BINARY;
 	}
+	if ((f->flags & (FILEIO_O_REGULAR | FILEIO_O_DIRECTORY)) ==
+	    (FILEIO_O_REGULAR | FILEIO_O_DIRECTORY)) {
+		/*
+		 * You cannot simultaneously require both a regular file
+		 * and a directory.
+		 */
+		errno = EINVAL;
+		return false;
+	}
+#ifdef HAVE_O_REGULAR
+	if (f->flags & FILEIO_O_REGULAR) {
+		open_flags |= O_REGULAR;
+	}
+#endif /* HAVE_O_REGULAR */
+#ifdef HAVE_O_DIRECTORY
+	if (f->flags & FILEIO_O_DIRECTORY) {
+		open_flags |= O_DIRECTORY;
+	}
+#endif /* HAVE_O_DIRECTORY */
+
+	error = fileio_local_resolve_path(location, local_root, f->flags,
+	    &f->location);
+	if (error != 0) {
+		errno = error;
+		return false;
+	}
+
+	/* If open fails, caller will free f->location. */
 
 	f->local.fd = open(f->location, open_flags, 0666);
 	if (f->local.fd < 0) {
 		return false;
 	}
 
-	/*
-	 * If the caller has specified directory-only or regular-only,
-	 * then enforce that.
-	 */
 	struct stat sb;
 	if (fstat(f->local.fd, &sb) < 0) {
 		goto bad;
 	}
+
+	/*
+	 * If the caller has specified directory-only or regular-only,
+	 * then enforce that.
+	 *
+	 * If the system we're running on has both O_REGULAR and
+	 * O_DIRECTORY, then this has been done for us already.
+	 */
+#ifndef HAVE_O_REGULAR
 	if ((f->flags & FILEIO_O_REGULAR) && !S_ISREG(sb.st_mode)) {
-		if (S_ISDIR(sb.st_mode)) {
-			errno = EISDIR;
-		} else {
-			errno = EPERM;
-		}
+		errno = EFTYPE;	 /* this is what the NetBSD kernel returns */
 		goto bad;
 	}
+#endif /* HAVE_O_REGULAR */
+#ifndef HAVE_O_DIRECTORY
 	if ((f->flags & FILEIO_O_DIRECTORY) && !S_ISDIR(sb.st_mode)) {
 		errno = ENOTDIR;
 		goto bad;
 	}
+#endif /* HAVE_O_DIRECTORY */
+
 	f->local.is_directory = !!S_ISDIR(sb.st_mode);
 
 	return true;
