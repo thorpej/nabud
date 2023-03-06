@@ -6,6 +6,9 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define if your OS has EFTYPE in <errno.h> */
+#undef HAVE_EFTYPE
+
 /* Define to 1 if you have the `getprogname' function. */
 #undef HAVE_GETPROGNAME
 

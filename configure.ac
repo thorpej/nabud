@@ -281,6 +281,19 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for some specific errno values that aren't universal.
+#
+AC_MSG_CHECKING([for EFTYPE in <errno.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <errno.h>
+	]],[[
+		int dummy = EFTYPE;
+	]])],[
+		AC_DEFINE(HAVE_EFTYPE, 1, [Define if your OS has EFTYPE in <errno.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for struct stat::st_birthtime.  This extension is available
 # on macOS and some of the BSDs.
 #
