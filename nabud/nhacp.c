@@ -34,6 +34,8 @@
  * messages are in the right format, we allow them.
  */
 
+#include "config.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
@@ -173,7 +175,9 @@ static const struct nhacp_error_map_entry {
 	ERRMAP(EFBIG),
 	ERRMAP(ENOSPC),
 	ERRMAP2(ESPIPE, NHACP_ESEEK),
+#ifdef HAVE_EFTYPE
 	ERRMAP2(EFTYPE, NHACP_EPERM),
+#endif /* HAVE_EFTYPE */
 
 	/* Default */
 	ERRMAP2(-1, NHACP_EIO),
