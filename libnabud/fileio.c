@@ -371,6 +371,16 @@ fileio_local_io_open(struct fileio *f, const char *location,
 
 	f->local.fd = open(f->location, open_flags, 0666);
 	if (f->local.fd < 0) {
+#ifdef HAVE_EFTYPE
+		/*
+		 * The NetBSD kernel returns EFTYPE of you specify
+		 * O_REGULAR and the file is not a regular file.
+		 * EPERM maps better to our intended message here.
+		 */
+		if (errno == EFTYPE) {
+			errno = EPERM;
+		}
+#endif /* HAVE_EFTYPE */
 		return false;
 	}
 
@@ -388,7 +398,7 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	 */
 #ifndef HAVE_O_REGULAR
 	if ((f->flags & FILEIO_O_REGULAR) && !S_ISREG(sb.st_mode)) {
-		errno = EFTYPE;	 /* this is what the NetBSD kernel returns */
+		errno = EPERM;
 		goto bad;
 	}
 #endif /* HAVE_O_REGULAR */
