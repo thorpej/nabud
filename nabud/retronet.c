@@ -851,7 +851,7 @@ rn_req_file_delete(struct retronet_context *ctx)
 }
 
 static bool
-rn_file_copy_mode_getargs(struct retronet_context *ctx,
+rn_file_copy_move_getargs(struct retronet_context *ctx,
     const char **src_fnamep, const char **dst_fnamep, uint8_t *flagsp)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
@@ -912,7 +912,7 @@ rn_req_file_copy(struct retronet_context *ctx)
 	uint8_t flags;
 
 	/* FILE-COPY and FILE-MOVE have the same args "structure". */
-	if (! rn_file_copy_mode_getargs(ctx, &src_fname, &dst_fname, &flags)) {
+	if (! rn_file_copy_move_getargs(ctx, &src_fname, &dst_fname, &flags)) {
 		log_error("[%s] Failed to get arguments.",
 		    conn_name(conn));
 		return;
@@ -1008,7 +1008,7 @@ rn_req_file_move(struct retronet_context *ctx)
 	uint8_t flags;
 
 	/* FILE-COPY and FILE-MOVE have the same args "structure". */
-	if (! rn_file_copy_mode_getargs(ctx, &src_fname, &dst_fname, &flags)) {
+	if (! rn_file_copy_move_getargs(ctx, &src_fname, &dst_fname, &flags)) {
 		log_error("[%s] Failed to get arguments.",
 		    conn_name(conn));
 		return;
@@ -1131,7 +1131,7 @@ rn_req_file_list(struct retronet_context *ctx)
 	 * to FILE-LIST line up exactly with "src", "dst", and "flags"
 	 * for FILE-MOVE and FILE-COPY.
 	 */
-	if (! rn_file_copy_mode_getargs(ctx, &where, &pattern, &flags)) {
+	if (! rn_file_copy_move_getargs(ctx, &where, &pattern, &flags)) {
 		log_error("[%s] Failed to get arguments.",
 		    conn_name(conn));
 		return;
