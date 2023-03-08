@@ -234,14 +234,6 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 		return error;
 	}
 
-	/*
-	 * Open the file so we can get the size.  Yes, open.
-	 * This is necessary for remote files on the other
-	 * end of an HTTP connection, for example.
-	 *
-	 * It's OK to open a directory here, because we want to be able
-	 * to convey that information.
-	 */
 	log_debug(LOG_SUBSYS_RETRONET,
 	    "[%s] Getting attributes for '%s'.",
 	    conn_name(ctx->stext.conn), fname);
