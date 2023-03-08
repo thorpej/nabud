@@ -81,6 +81,7 @@ struct nabu_msg_start_nhacp {
 	uint8_t		type;
 	uint8_t		magic[3];	/* "ACP" */
 	uint8_t		version[2];	/* u16: protocol version */
+	uint8_t		options[2];	/* u16: protocol options */
 };
 
 #define	NHACP_MAGIC_IS_VALID(cp)	((cp)[0] == 'A' &&	\

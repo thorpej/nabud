@@ -62,6 +62,7 @@
 struct nhacp_context {
 	struct stext_context stext;
 	uint16_t             nhacp_version;
+	uint16_t             nhacp_options;
 
 	union {
 		struct nhacp_request request;
@@ -69,7 +70,11 @@ struct nhacp_context {
 	};
 };
 
+/* We support up to version 0.1 of the NHACP protocol. */
 #define	NABUD_NHACP_VERSION	NHACP_VERS_0_1
+
+/* There are no NHACP protocol options currently defined. */
+#define	NABUD_NHACP_OPTIONS	0x0000
 
 /*
  * Handle some NHACP protocol version differences.
@@ -782,7 +787,8 @@ nhacp_request(struct nhacp_context *ctx)
  *	Receive and validate the versioned START-NHACP message.
  */
 static bool
-nhacp_recv_start(struct nabu_connection *conn, uint16_t *versionp)
+nhacp_recv_start(struct nabu_connection *conn, uint16_t *versionp,
+    uint16_t *optionsp)
 {
 	struct nabu_msg_start_nhacp start_nhacp;
 
@@ -790,7 +796,7 @@ nhacp_recv_start(struct nabu_connection *conn, uint16_t *versionp)
 
 	/*
 	 * We've already received the first byte (the message type);
-	 * receive the remaining 5.
+	 * receive the remaining bytes.
 	 */
 	if (! conn_recv(conn, &start_nhacp.magic, sizeof(start_nhacp) - 1)) {
 		if (conn_check_state(conn)) {
@@ -811,12 +817,17 @@ nhacp_recv_start(struct nabu_connection *conn, uint16_t *versionp)
 	}
 
 	*versionp = nabu_get_uint16(start_nhacp.version);
+	*optionsp = nabu_get_uint16(start_nhacp.options);
+
+	log_debug(LOG_SUBSYS_NHACP,
+	    "[%s] Client request NHACP version 0x%04x options 0x%04x.",
+	    conn_name(conn), *versionp, *optionsp);
 
 	/* We do enforce versioning here, however. */
 	switch (*versionp) {
 	case NHACP_VERS_0_0:
 	case NHACP_VERS_0_1:
-		return true;
+		break;
 
 	default:
 		log_debug(LOG_SUBSYS_NHACP,
@@ -824,6 +835,14 @@ nhacp_recv_start(struct nabu_connection *conn, uint16_t *versionp)
 		    conn_name(conn), *versionp);
 		return false;
 	}
+
+	if (*optionsp & ~NABUD_NHACP_OPTIONS) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unsupported NHACP options 0x%04x.",
+		    conn_name(conn), *optionsp & ~NABUD_NHACP_OPTIONS);
+		return false;
+	}
+	return true;
 }
 
 /*
@@ -836,7 +855,7 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	struct nhacp_context *ctx;
 	extern char nabud_version[];
 	uint16_t reqlen;
-	uint16_t version;
+	uint16_t version, options;
 	ssize_t minlen;
 
 	switch (msg) {
@@ -849,7 +868,7 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	case NABU_MSG_START_NHACP:		/* versioned START-NHACP */
 		log_debug(LOG_SUBSYS_NHACP,
 		    "[%s] Got NABU_MSG_START_NHACP.", conn_name(conn));
-		if (! nhacp_recv_start(conn, &version)) {
+		if (! nhacp_recv_start(conn, &version, &options)) {
 			/*
 			 * Not a valid START-NHACP, or not a version
 			 * that we support.
@@ -873,6 +892,7 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		return true;
 	}
 	ctx->nhacp_version = version;
+	ctx->nhacp_options = options;
 
 	/*
 	 * Send a NHACP-STARTED response.  We know there's room at the end
