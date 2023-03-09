@@ -33,9 +33,11 @@ struct nabu_connection;
 struct stext_context {
 	struct nabu_connection *conn;
 	LIST_HEAD(, stext_file) files;
+	size_t file_private_size;
 };
 
-void	stext_context_init(struct stext_context *, struct nabu_connection *);
+void	stext_context_init(struct stext_context *, struct nabu_connection *,
+	    size_t);
 void	stext_context_fini(struct stext_context *);
 
 struct stext_file *stext_file_find(struct stext_context *, uint8_t);
@@ -43,6 +45,7 @@ struct stext_file *stext_file_find(struct stext_context *, uint8_t);
 int	stext_file_open(struct stext_context *, const char *, uint8_t,
 	    struct fileio_attrs *, int, struct stext_file **);
 uint8_t	stext_file_slot(struct stext_file *);
+void	*stext_file_private(struct stext_file *);
 void	stext_file_close(struct stext_file *);
 int	stext_file_read(struct stext_file *, void *, uint16_t *);
 int	stext_file_write(struct stext_file *, const void *, uint16_t);

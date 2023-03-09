@@ -70,6 +70,9 @@ struct stext_file {
 			char		*location;
 		} shadow;
 	};
+
+	/* Pointer at the end to ensure private data alignment */
+	struct stext_context *context;
 };
 
 struct stext_fileops {
@@ -86,6 +89,18 @@ struct stext_fileops {
 	const char * (*file_location)(struct stext_file *);
 	void	(*file_close)(struct stext_file *);
 };
+
+static struct stext_file *
+stext_file_alloc(struct stext_context *ctx)
+{
+	struct stext_file *f;
+
+	f = calloc(1, sizeof(*f) + ctx->file_private_size);
+	if (f != NULL) {
+		f->context = ctx;
+	}
+	return f;
+}
 
 /*
  * stext_file_insert --
@@ -183,10 +198,12 @@ stext_file_find(struct stext_context *ctx, uint8_t slot)
  *	Initlaize a storage extension context.
  */
 void
-stext_context_init(struct stext_context *ctx, struct nabu_connection *conn)
+stext_context_init(struct stext_context *ctx, struct nabu_connection *conn,
+    size_t file_private_size)
 {
 	LIST_INIT(&ctx->files);
 	ctx->conn = conn;
+	ctx->file_private_size = file_private_size;
 }
 
 /*
@@ -547,7 +564,7 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 
 	*outfp = NULL;
 
-	f = calloc(1, sizeof(*f));
+	f = stext_file_alloc(ctx);
 	if (f == NULL) {
 		log_error("[%s] Unable to allocate file object for '%s'",
 		    conn_name(ctx->conn), filename);
@@ -666,6 +683,20 @@ stext_file_slot(struct stext_file *f)
 {
 	assert(f->linked == true);
 	return f->slot;
+}
+
+/*
+ * stext_file_private --
+ *	Return the private data for a file.
+ */
+void *
+stext_file_private(struct stext_file *f)
+{
+	assert(f->context != NULL);
+	if (f->context->file_private_size != 0) {
+		return f + 1;
+	}
+	return NULL;
 }
 
 /*

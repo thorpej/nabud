@@ -728,7 +728,7 @@ nhacp_context_alloc(struct nabu_connection *conn)
 {
 	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
 	if (ctx != NULL) {
-		stext_context_init(&ctx->stext, conn);
+		stext_context_init(&ctx->stext, conn, 0);
 	}
 	return ctx;
 }
