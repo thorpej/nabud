@@ -96,6 +96,11 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_REQ_GET_ERROR_DETAILS	0x06
 #define	NHACP_REQ_STORAGE_GET_BLOCK	0x07
 #define	NHACP_REQ_STORAGE_PUT_BLOCK	0x08
+/*	NHACP_REQ_FILE_READ		0x09	*/
+/*	NHACP_REQ_FILE_WRITE		0x0a	*/
+/*	NHACP_REQ_FILE_SEEK		0x0b	*/
+#define	NHACP_REQ_LIST_DIR		0x0c
+#define	NHACP_REQ_GET_DIR_ENTRY		0x0d
 #define	NHACP_REQ_END_PROTOCOL		0xef
 
 /* STORAGE-OPEN flags */
@@ -103,6 +108,7 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_O_RDONLY		0x0001	/* open only for reading */
 #define	NHACP_O_CREAT		0x0002	/* create file if it does not exist */
 #define	NHACP_O_EXCL		0x0004	/* fail create if file already exists */
+#define	NHACP_O_DIRECTORY	0x0008	/* 1=must be dir, 0=must be reg */
 
 #define	NHACP_O_ACCMASK		(NHACP_O_RDWR | NHACP_O_RDONLY)
 
@@ -161,6 +167,17 @@ struct nhacp_request {
 			uint8_t		block_length[2];/* u16 */
 			uint8_t		data[];
 		} storage_put_block;
+		struct nhacp_request_list_dir {
+			uint8_t		type;
+			uint8_t		slot;
+			uint8_t		pattern_length;
+			uint8_t		pattern[];
+		} list_dir;
+		struct nhacp_request_get_dir_entry {
+			uint8_t		type;
+			uint8_t		slot;
+			uint8_t		max_name_length;
+		} get_dir_entry;
 		struct nhacp_request_end_protocol {
 			uint8_t		type;
 		} end_protocol;
@@ -173,6 +190,7 @@ struct nhacp_request {
 #define	NHACP_RESP_STORAGE_LOADED	0x83
 #define	NHACP_RESP_DATA_BUFFER		0x84
 #define	NHACP_RESP_DATE_TIME		0x85
+#define	NHACP_RESP_DIR_ENTRY		0x86
 
 struct nhacp_response {
 	uint8_t		length[2];	/* u16: length of what follows */
@@ -214,6 +232,15 @@ struct nhacp_response {
 			uint8_t		yyyymmdd[8];	/* char string */
 			uint8_t		hhmmss[6];	/* char string */
 		} date_time;
+		struct nhacp_response_dir_entry {
+			uint8_t		type;
+			uint8_t		mtime_yyyymmdd[8]; /* char string */
+			uint8_t		mtime_hhmmss[6];   /* char string */
+			uint8_t		attr_flags[2];	/* u16 */
+			uint8_t		file_size[4];	/* u32 */
+			uint8_t		name_length;
+			uint8_t		name[];
+		} dir_entry;
 	};
 };
 
@@ -235,5 +262,11 @@ struct nhacp_response {
 #define	NHACP_ENOSPC		14	/* Out of space */
 #define	NHACP_ESEEK		15	/* Seek on non-seekable file */
 #define	NHACP_ENOTDIR		16	/* File is not a directory */
+
+/* attribute flags */
+#define	NHACP_AF_RD		0x0001	/* file is readable */
+#define	NHACP_AF_WR		0x0002	/* file is writable */
+#define	NHACP_AF_DIR		0x0004	/* file is a directory */
+#define	NHACP_AF_SPEC		0x0008	/* file is a "special" file */
 
 #endif /* nhacp_proto_h_included */
