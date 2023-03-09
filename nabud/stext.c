@@ -98,7 +98,8 @@ stext_file_alloc(struct stext_context *ctx)
 	f = calloc(1, sizeof(*f) + ctx->file_private_size);
 	if (f != NULL) {
 		f->context = ctx;
-		if (ctx->file_private_init != NULL) {
+		if (ctx->file_private_size != 0 &&
+		    ctx->file_private_init != NULL) {
 			(*ctx->file_private_init)(stext_file_private(f));
 		}
 	}
