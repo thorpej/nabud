@@ -34,10 +34,12 @@ struct stext_context {
 	struct nabu_connection *conn;
 	LIST_HEAD(, stext_file) files;
 	size_t file_private_size;
+	void (*file_private_init)(void *);
+	void (*file_private_fini)(void *);
 };
 
 void	stext_context_init(struct stext_context *, struct nabu_connection *,
-	    size_t);
+	    size_t, void (*)(void *), void (*)(void *));
 void	stext_context_fini(struct stext_context *);
 
 struct stext_file *stext_file_find(struct stext_context *, uint8_t);

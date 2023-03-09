@@ -98,8 +98,20 @@ stext_file_alloc(struct stext_context *ctx)
 	f = calloc(1, sizeof(*f) + ctx->file_private_size);
 	if (f != NULL) {
 		f->context = ctx;
+		if (ctx->file_private_init != NULL) {
+			(*ctx->file_private_init)(stext_file_private(f));
+		}
 	}
 	return f;
+}
+
+static void
+stext_file_free(struct stext_file *f)
+{
+	if (f->context->file_private_fini != NULL) {
+		(*f->context->file_private_fini)(stext_file_private(f));
+	}
+	free(f);
 }
 
 /*
@@ -199,11 +211,14 @@ stext_file_find(struct stext_context *ctx, uint8_t slot)
  */
 void
 stext_context_init(struct stext_context *ctx, struct nabu_connection *conn,
-    size_t file_private_size)
+    size_t file_private_size,
+    void (*file_private_init)(void *), void (*file_private_fini)(void *))
 {
 	LIST_INIT(&ctx->files);
 	ctx->conn = conn;
 	ctx->file_private_size = file_private_size;
+	ctx->file_private_init = file_private_init;
+	ctx->file_private_fini = file_private_fini;
 }
 
 /*
@@ -712,7 +727,7 @@ stext_file_close(struct stext_file *f)
 	if (f->linked) {
 		LIST_REMOVE(f, link);
 	}
-	free(f);
+	stext_file_free(f);
 }
 
 /*
