@@ -613,14 +613,6 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		goto out;
 	}
 
-	/* Opening directories is not allowed. */
-	if (attrs->is_directory) {
-		log_error("[%s] '%s': Opening directories is not permitted.",
-		    conn_name(ctx->conn), fileio_location(fileio));
-		error = EINVAL;
-		goto out;
-	}
-
 	/*
 	 * If the underlying file object is not seekable, then we need
 	 * to allocate a shadow file, because the wire protocol only has
