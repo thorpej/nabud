@@ -38,6 +38,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <glob.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -70,11 +71,87 @@ struct nhacp_context {
 	};
 };
 
+struct nhacp_file_list_entry {
+	STAILQ_ENTRY(nhacp_file_list_entry) link;
+	struct nhacp_response_dir_entry *dir_entry;
+};
+
+struct nhacp_file_private {
+	STAILQ_HEAD(, nhacp_file_list_entry) file_list;
+	bool is_directory;
+	bool is_writable;
+};
+
 /* We support up to version 0.1 of the NHACP protocol. */
 #define	NABUD_NHACP_VERSION	NHACP_VERS_0_1
 
 /* There are no NHACP protocol options currently defined. */
 #define	NABUD_NHACP_OPTIONS	0x0000
+
+/*
+ * File private data routines.
+ */
+static struct nhacp_file_list_entry *
+nhacp_file_list_entry_alloc(size_t namelen)
+{
+	struct nhacp_response_dir_entry *de = calloc(1, sizeof(*de) + namelen);
+	if (de == NULL) {
+		return NULL;
+	}
+
+	struct nhacp_file_list_entry *e = calloc(1, sizeof(*e));
+	if (e == NULL) {
+		free(de);
+		return NULL;
+	}
+
+	e->dir_entry = de;
+	return e;
+}
+
+static void
+nhacp_file_list_entry_free(struct nhacp_file_list_entry *e)
+{
+	if (e->dir_entry != NULL) {
+		free(e->dir_entry);
+	}
+	free(e);
+}
+
+static void
+nhacp_file_free_file_list(struct nhacp_file_private *fp)
+{
+	struct nhacp_file_list_entry *e;
+
+	while ((e = STAILQ_FIRST(&fp->file_list)) != NULL) {
+		STAILQ_REMOVE_HEAD(&fp->file_list, link);
+		nhacp_file_list_entry_free(e);
+	}
+}
+
+static void
+nhacp_file_private_init(void *v)
+{
+	struct nhacp_file_private *fp = v;
+
+	STAILQ_INIT(&fp->file_list);
+}
+
+static void
+nhacp_file_private_fini(void *v)
+{
+	struct nhacp_file_private *fp = v;
+
+	nhacp_file_free_file_list(fp);
+}
+
+static bool
+nhacp_file_is_directory(struct stext_file *f)
+{
+	struct nhacp_file_private *fp = stext_file_private(f);
+
+	return fp->is_directory;
+}
 
 /*
  * Handle some NHACP protocol version differences.
@@ -140,6 +217,56 @@ nhacp_max_payload(struct nhacp_context *ctx, uint8_t type)
 	}
 
 	return max_payload;
+}
+
+/*
+ * nhacp_time_from_unix --
+ *	Convert an absolute Unix time to local NHACP DATE-TIME.
+ */
+static void
+nhacp_time_from_unix(time_t t, struct nhacp_date_time *dt)
+{
+	struct tm tm_store, *tm;
+	char buf[sizeof(*dt) + 1];
+
+	if (t == (time_t)-1) {
+		memset(&tm_store, 0, sizeof(tm_store));
+		tm = &tm_store;
+	} else {
+		tm = localtime_r(&t, &tm_store);
+	}
+
+	/*
+	 * The fields of the DATE-TIME response are adjacent to each
+	 * other with no intervening NUL provision, so we can just do
+	 * this with a single strftime() that emits:
+	 *
+	 *	YYYYMMDDHHMMSS\0
+	 */
+	strftime(buf, sizeof(buf), "%Y%m%d%H%M%S", tm);
+	memcpy(dt, buf, sizeof(*dt));
+}
+
+/*
+ * nhacp_file_attrs_from_fileio --
+ *	Convert fileio_attrs to nhacp_file_attrs.
+ */
+static void
+nhacp_file_attrs_from_fileio(const struct fileio_attrs *fa,
+    struct nhacp_file_attrs *na)
+{
+	uint32_t size = fa->size > UINT32_MAX ? UINT32_MAX : (uint32_t)fa->size;
+	uint16_t flags = NHACP_AF_RD;	/* assume readability */
+
+	if (fa->is_directory) {
+		flags |= NHACP_AF_DIR;
+	}
+	if (fa->is_writable) {
+		flags |= NHACP_AF_WR;
+	}
+	nhacp_time_from_unix(fa->mtime, &na->mtime);
+	nabu_set_uint16(na->flags, flags);
+	nabu_set_uint32(na->file_size, size);
 }
 
 /*
@@ -359,7 +486,11 @@ nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
 	if (nhacp_o_flags & NHACP_O_EXCL) {
 		*fileio_o_flagsp |= FILEIO_O_EXCL;
 	}
-	*fileio_o_flagsp |= FILEIO_O_REGULAR;
+	if (nhacp_o_flags & NHACP_O_DIRECTORY) {
+		*fileio_o_flagsp |= FILEIO_O_DIRECTORY;
+	} else {
+		*fileio_o_flagsp |= FILEIO_O_REGULAR;
+	}
 
 	return 0;
 }
@@ -410,6 +541,14 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
+		assert(f != NULL);
+
+		struct nhacp_file_private *fp = stext_file_private(f);
+		assert(fp != NULL);
+
+		fp->is_directory = attrs.is_directory;
+		fp->is_writable = attrs.is_writable;
+
 		ctx->reply.storage_loaded.slot = stext_file_slot(f);
 		nabu_set_uint32(ctx->reply.storage_loaded.length,
 		    (uint32_t)attrs.size);
@@ -432,6 +571,11 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn), ctx->request.storage_get.slot);
 		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
 		return;
 	}
 
@@ -473,6 +617,11 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 		return;
 	}
 
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
+		return;
+	}
+
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_put.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_put.length);
 
@@ -509,6 +658,11 @@ nhacp_req_storage_get_block(struct nhacp_context *ctx)
 		    conn_name(ctx->stext.conn),
 		    ctx->request.storage_get_block.slot);
 		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
 		return;
 	}
 
@@ -567,6 +721,11 @@ nhacp_req_storage_put_block(struct nhacp_context *ctx)
 		    conn_name(ctx->stext.conn),
 		    ctx->request.storage_put_block.slot);
 		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
 		return;
 	}
 
@@ -630,32 +789,13 @@ nhacp_req_storage_put_block(struct nhacp_context *ctx)
 static void
 nhacp_req_get_date_time(struct nhacp_context *ctx)
 {
-	struct tm tm_store, *tm;
 	time_t now = time(NULL);
 
 	if (now == (time_t)-1) {
 		log_error("[%s] unable to get current time: %s",
 		    conn_name(ctx->stext.conn), strerror(errno));
-		memset(&tm_store, 0, sizeof(tm_store));
-		tm = &tm_store;
-	} else {
-		tm = localtime_r(&now, &tm_store);
 	}
-
-	/*
-	 * The date and time portions of the DATE-TIME response
-	 * are adjacent to each other with no intervening NUL
-	 * provision, and we know there is room at the end of
-	 * the response for a NUL terminator, so we can do this
-	 * with a single strftime() that emits:
-	 *
-	 *	YYYYMMDDHHMMSS\0
-	 */
-	strftime((char *)ctx->reply.date_time.yyyymmdd,
-	    sizeof(ctx->reply.date_time.yyyymmdd) +
-	    sizeof(ctx->reply.date_time.hhmmss) + 1,
-	    "%Y%m%d%H%M%S", tm);
-
+	nhacp_time_from_unix(now, &ctx->reply.date_time.date_time);
 	nhacp_send_reply(ctx, NHACP_RESP_DATE_TIME,
 	    sizeof(ctx->reply.date_time));
 }
@@ -693,6 +833,172 @@ nhacp_req_get_error_details(struct nhacp_context *ctx)
 	    ctx->request.get_error_details.max_message_len);
 }
 
+/*
+ * nhacp_req_list_dir --
+ *	Handle the LIST-DIR request.
+ */
+static void
+nhacp_req_list_dir(struct nhacp_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+	uint16_t nhacp_err = NHACP_EIO;
+	char *path;
+	glob_t g;
+
+	f = stext_file_find(&ctx->stext, ctx->request.list_dir.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.list_dir.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	struct nhacp_file_private *fp = stext_file_private(f);
+
+	if (! fp->is_directory) {
+		nhacp_send_error(ctx, NHACP_ENOTDIR);
+		return;
+	}
+
+	const char *location = stext_file_location(f);
+	if (! fileio_location_is_local(location, strlen(location))) {
+		nhacp_send_error(ctx, NHACP_EIO);
+		return;
+	}
+
+	/* Clear out any previous file list. */
+	nhacp_file_free_file_list(fp);
+
+	ctx->request.list_dir.pattern[
+	    ctx->request.list_dir.pattern_length] = '\0';
+
+	/* Sanitize the pattern. */
+	if (strchr((char *)ctx->request.list_dir.pattern, '/') != NULL) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Pattern '%s' contains path separator.",
+		    conn_name(conn), (char *)ctx->request.list_dir.pattern);
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	memset(&g, 0, sizeof(g));
+
+	if (asprintf(&path, "%s/%s", location,
+		     (char *)ctx->request.list_dir.pattern) < 0) {
+		log_error("[%s] Unable to allocate memory for glob pattern.",
+		    conn_name(conn));
+		nhacp_send_error(ctx, NHACP_ENOMEM);
+		return;
+	}
+
+	log_debug(LOG_SUBSYS_NHACP, "[%s] Pattern for glob: %s",
+	    conn_name(conn), path);
+
+	int globret = glob(path, 0, NULL, &g);
+	if (globret != 0) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] glob() returned %d.",
+		    conn_name(conn), globret);
+		nhacp_err = NHACP_EIO;
+		goto bad;
+	}
+	log_debug(LOG_SUBSYS_NHACP, "[%s] glob() returned %zd matches.",
+	    conn_name(conn), (size_t)g.gl_pathc);
+
+	for (int i = 0; i < g.gl_pathc; i++) {
+		struct fileio_attrs attrs;
+		struct nhacp_file_list_entry *e;
+		const char *fname;
+		size_t fnamelen;
+
+		if (! fileio_getattr_location(g.gl_pathv[i], 0, NULL, &attrs)) {
+			log_error("[%s] Unable to get attrs for '%s': %s",
+			    conn_name(conn), g.gl_pathv[i], strerror(errno));
+			continue;
+		}
+
+		fname = strrchr(g.gl_pathv[i], '/');
+		if (fname != NULL) {
+			fname++;
+		} else {
+			fname = g.gl_pathv[i];
+		}
+		fnamelen = strlen(fname);
+		if (fnamelen > 255) {
+			fnamelen = 255;
+		}
+
+		e = nhacp_file_list_entry_alloc(fnamelen);
+		if (e == NULL) {
+			log_error("[%s] Failed to allocate file list entry.",
+			    conn_name(conn));
+			nhacp_err = NHACP_ENOMEM;
+			goto bad;
+		}
+
+		nhacp_file_attrs_from_fileio(&attrs, &e->dir_entry->attrs);
+		e->dir_entry->name_length = (uint8_t)fnamelen;
+		memcpy(e->dir_entry->name, fname, fnamelen);
+		STAILQ_INSERT_TAIL(&fp->file_list, e, link);
+	}
+
+	nhacp_send_ok(ctx);
+ out:
+	globfree(&g);
+	return;
+
+ bad:
+	nhacp_send_error(ctx, nhacp_err);
+	goto out;
+}
+
+/*
+ * nhacp_req_get_dir_entry --
+ *	Handle the GET-DIR-ENTRY request.
+ */
+static void
+nhacp_req_get_dir_entry(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+
+	f = stext_file_find(&ctx->stext, ctx->request.list_dir.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.list_dir.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	struct nhacp_file_private *fp = stext_file_private(f);
+
+	if (! fp->is_directory) {
+		nhacp_send_error(ctx, NHACP_ENOTDIR);
+		return;
+	}
+
+	struct nhacp_file_list_entry *e = STAILQ_FIRST(&fp->file_list);
+	if (e == NULL) {
+		nhacp_send_ok(ctx);
+		return;
+	}
+
+	/*
+	 * The directory entry is all ready to go; just truncate the
+	 * name to whatever the client is willing to accept.
+	 */
+	STAILQ_REMOVE_HEAD(&fp->file_list, link);
+	if (e->dir_entry->name_length >
+	    ctx->request.get_dir_entry.max_name_length) {
+		e->dir_entry->name_length =
+		    ctx->request.get_dir_entry.max_name_length;
+	}
+	memcpy(&ctx->reply.dir_entry, e->dir_entry,
+	    sizeof(e->dir_entry) + e->dir_entry->name_length);
+	nhacp_send_reply(ctx, NHACP_RESP_DIR_ENTRY,
+	    sizeof(e->dir_entry) + e->dir_entry->name_length);
+	nhacp_file_list_entry_free(e);
+}
+
 #define	HANDLER_ENTRY(v, n)						\
 	[(v)] = {							\
 		.handler    = nhacp_req_ ## n ,				\
@@ -713,6 +1019,8 @@ static const struct {
 	HANDLER_ENTRY(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET_BLOCK, storage_get_block),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT_BLOCK, storage_put_block),
+	HANDLER_ENTRY(NHACP_REQ_LIST_DIR,          list_dir),
+	HANDLER_ENTRY(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
 };
 static const unsigned int nhacp_request_type_count =
     sizeof(nhacp_request_types) / sizeof(nhacp_request_types[0]);
@@ -728,7 +1036,9 @@ nhacp_context_alloc(struct nabu_connection *conn)
 {
 	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
 	if (ctx != NULL) {
-		stext_context_init(&ctx->stext, conn, 0, NULL, NULL);
+		stext_context_init(&ctx->stext, conn,
+		    sizeof(struct nhacp_file_private),
+		    nhacp_file_private_init, nhacp_file_private_fini);
 	}
 	return ctx;
 }
