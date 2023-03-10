@@ -1274,6 +1274,22 @@ nhacp_decode_date_time(const char *label, const struct nhacp_date_time *dt)
 }
 
 static void
+nhacp_decode_file_attrs(const struct nhacp_file_attrs *attrs)
+{
+	uint32_t file_size = nabu_get_uint32(attrs->file_size);
+	uint16_t flags = nabu_get_uint16(attrs->flags);
+
+	printf("--> Flags: 0x%04x%s%s%s%s\n",
+	    flags,
+	    (flags & NHACP_AF_RD)   ? " RD"   : "",
+	    (flags & NHACP_AF_WR)   ? " WR"   : "",
+	    (flags & NHACP_AF_DIR)  ? " DIR"  : "",
+	    (flags & NHACP_AF_SPEC) ? " SPEC" : "");
+	printf("--> Size: %u\n", file_size);
+	nhacp_decode_date_time("Modified:", &attrs->mtime);
+}
+
+static void
 nhacp_decode_reply(void)
 {
 	uint16_t length;
@@ -1353,6 +1369,19 @@ nhacp_decode_reply(void)
 		    sizeof(nhacp_buf.reply.date_time.date_time));
 		nhacp_decode_date_time("DATE-TIME",
 		    &nhacp_buf.reply.date_time.date_time);
+		break;
+
+	case NHACP_RESP_DIR_ENTRY:
+		printf("Got: NHACP_RESP_DIR_ENTRY.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.dir_entry)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		nhacp_buf.reply.dir_entry.name[
+		    nhacp_buf.reply.dir_entry.name_length] = '\0';
+		printf("--> File name: '%s' <--\n",
+		    (char *)nhacp_buf.reply.dir_entry.name);
+		nhacp_decode_file_attrs(&nhacp_buf.reply.dir_entry.attrs);
 		break;
 
 	default:
@@ -1465,6 +1494,10 @@ command_nhacp_storage_open(int argc, char *argv[])
 		}
 		if (strcmp(argv[i], "excl") == 0) {
 			oflags |= NHACP_O_EXCL;
+			continue;
+		}
+		if (strcmp(argv[i], "dir") == 0) {
+			oflags |= NHACP_O_DIRECTORY;
 			continue;
 		}
 		printf("Unknown open flag: %s\n", argv[i]);
@@ -1626,6 +1659,52 @@ command_nhacp_get_error_details(int argc, char *argv[])
 }
 
 static bool
+command_nhacp_list_dir(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	const char *pattern = argv[2];
+
+	nhacp_buf.request.list_dir.slot = slot;
+	nhacp_buf.request.list_dir.pattern_length = (uint8_t)strlen(pattern);
+	memcpy(nhacp_buf.request.list_dir.pattern, pattern,
+	    nhacp_buf.request.list_dir.pattern_length);
+
+	printf("Sending: NHACP_REQ_LIST_DIR.\n");
+	nhacp_send(NHACP_REQ_LIST_DIR,
+	    sizeof(nhacp_buf.request.list_dir) +
+	    nhacp_buf.request.list_dir.pattern_length);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_get_dir_entry(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	nhacp_buf.request.get_dir_entry.slot = slot;
+	nhacp_buf.request.get_dir_entry.max_name_length = 255;
+
+	printf("Sending: NHACP_REQ_GET_DIR_ENTRY.\n");
+	nhacp_send(NHACP_REQ_GET_DIR_ENTRY,
+	    sizeof(nhacp_buf.request.get_dir_entry));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_end_protocol(int argc, char *argv[])
 {
 	printf("Sending: NHACP_REQ_END_PROTOCOL.\n");
@@ -1682,6 +1761,8 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-storage-close", .func = command_nhacp_storage_close },
 	{ .name = "nhacp-get-error-details",
 				.func = command_nhacp_get_error_details },
+	{ .name = "nhacp-list-dir",	.func = command_nhacp_list_dir },
+	{ .name = "nhacp-get-dir-entry",.func = command_nhacp_get_dir_entry },
 	{ .name = "nhacp-end-protocol",	.func = command_nhacp_end_protocol },
 
 	CMDTAB_EOL(cli_command_unknown)
