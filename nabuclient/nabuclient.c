@@ -1237,6 +1237,43 @@ nhacp_recv(void)
 }
 
 static void
+nhacp_decode_date_time(const char *label, const struct nhacp_date_time *dt)
+{
+	if (isascii(dt->yyyymmdd[0]) &&
+	    isascii(dt->yyyymmdd[1]) &&
+	    isascii(dt->yyyymmdd[2]) &&
+	    isascii(dt->yyyymmdd[3]) &&
+	    isascii(dt->yyyymmdd[4]) &&
+	    isascii(dt->yyyymmdd[5]) &&
+	    isascii(dt->yyyymmdd[6]) &&
+	    isascii(dt->yyyymmdd[7]) &&
+	    isascii(dt->hhmmss[0]) &&
+	    isascii(dt->hhmmss[1]) &&
+	    isascii(dt->hhmmss[2]) &&
+	    isascii(dt->hhmmss[3]) &&
+	    isascii(dt->hhmmss[4]) &&
+	    isascii(dt->hhmmss[5])) {
+		printf("--> %s %c%c%c%c-%c%c-%c%c %c%c:%c%c:%c%c <--\n", label,
+		    dt->yyyymmdd[0],
+		    dt->yyyymmdd[1],
+		    dt->yyyymmdd[2],
+		    dt->yyyymmdd[3],
+		    dt->yyyymmdd[4],
+		    dt->yyyymmdd[5],
+		    dt->yyyymmdd[6],
+		    dt->yyyymmdd[7],
+		    dt->hhmmss[0],
+		    dt->hhmmss[1],
+		    dt->hhmmss[2],
+		    dt->hhmmss[3],
+		    dt->hhmmss[4],
+		    dt->hhmmss[5]);
+	} else {
+		printf("--> BAD %s DATA <--\n", label);
+	}
+}
+
+static void
 nhacp_decode_reply(void)
 {
 	uint16_t length;
@@ -1312,39 +1349,10 @@ nhacp_decode_reply(void)
 			printf("*** RUNT ***\n");
 			cli_throw();
 		}
-		print_reply(nhacp_buf.reply.date_time.yyyymmdd,
-		    sizeof(nhacp_buf.reply.date_time.yyyymmdd) +
-		    sizeof(nhacp_buf.reply.date_time.hhmmss));
-		if (isascii(nhacp_buf.reply.date_time.yyyymmdd[0]) &&
-		    isascii(nhacp_buf.reply.date_time.yyyymmdd[1]) &&
-		    isascii(nhacp_buf.reply.date_time.yyyymmdd[2]) &&
-		    isascii(nhacp_buf.reply.date_time.yyyymmdd[3]) &&
-		    isascii(nhacp_buf.reply.date_time.yyyymmdd[4]) &&
-		    isascii(nhacp_buf.reply.date_time.yyyymmdd[5]) &&
-		    isascii(nhacp_buf.reply.date_time.yyyymmdd[6]) &&
-		    isascii(nhacp_buf.reply.date_time.yyyymmdd[7]) &&
-		    isascii(nhacp_buf.reply.date_time.hhmmss[0]) &&
-		    isascii(nhacp_buf.reply.date_time.hhmmss[1]) &&
-		    isascii(nhacp_buf.reply.date_time.hhmmss[2]) &&
-		    isascii(nhacp_buf.reply.date_time.hhmmss[3]) &&
-		    isascii(nhacp_buf.reply.date_time.hhmmss[4]) &&
-		    isascii(nhacp_buf.reply.date_time.hhmmss[5])) {
-			printf("--> %c%c%c%c-%c%c-%c%c %c%c:%c%c:%c%c <--\n",
-			    nhacp_buf.reply.date_time.yyyymmdd[0],
-			    nhacp_buf.reply.date_time.yyyymmdd[1],
-			    nhacp_buf.reply.date_time.yyyymmdd[2],
-			    nhacp_buf.reply.date_time.yyyymmdd[3],
-			    nhacp_buf.reply.date_time.yyyymmdd[4],
-			    nhacp_buf.reply.date_time.yyyymmdd[5],
-			    nhacp_buf.reply.date_time.yyyymmdd[6],
-			    nhacp_buf.reply.date_time.yyyymmdd[7],
-			    nhacp_buf.reply.date_time.hhmmss[0],
-			    nhacp_buf.reply.date_time.hhmmss[1],
-			    nhacp_buf.reply.date_time.hhmmss[2],
-			    nhacp_buf.reply.date_time.hhmmss[3],
-			    nhacp_buf.reply.date_time.hhmmss[4],
-			    nhacp_buf.reply.date_time.hhmmss[5]);
-		}
+		print_reply(&nhacp_buf.reply.date_time.date_time,
+		    sizeof(nhacp_buf.reply.date_time.date_time));
+		nhacp_decode_date_time("DATE-TIME",
+		    &nhacp_buf.reply.date_time.date_time);
 		break;
 
 	default:

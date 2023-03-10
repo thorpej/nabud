@@ -112,6 +112,27 @@ struct nabu_msg_start_nhacp {
 
 #define	NHACP_O_ACCMASK		(NHACP_O_RDWR | NHACP_O_RDONLY)
 
+/*
+ * NHACP complex types, shared by multiple request/response messages.
+ */
+
+struct nhacp_date_time {
+	uint8_t		yyyymmdd[8];	/* char string */
+	uint8_t		hhmmss[6];	/* char string */
+};
+
+struct nhacp_file_attrs {
+	struct nhacp_date_time mtime;
+	uint8_t		flags[2];	/* u16 */
+	uint8_t		file_size[4];	/* u32 */
+};
+
+/* attribute flags */
+#define	NHACP_AF_RD		0x0001	/* file is readable */
+#define	NHACP_AF_WR		0x0002	/* file is writable */
+#define	NHACP_AF_DIR		0x0004	/* file is a directory */
+#define	NHACP_AF_SPEC		0x0008	/* file is a "special" file */
+
 struct nhacp_request {
 	uint8_t		length[2];	/* u16: length of what follows */
 	union {
@@ -229,15 +250,11 @@ struct nhacp_response {
 		} data_buffer;
 		struct nhacp_response_date_time {
 			uint8_t		type;
-			uint8_t		yyyymmdd[8];	/* char string */
-			uint8_t		hhmmss[6];	/* char string */
+			struct nhacp_date_time date_time;
 		} date_time;
 		struct nhacp_response_dir_entry {
 			uint8_t		type;
-			uint8_t		mtime_yyyymmdd[8]; /* char string */
-			uint8_t		mtime_hhmmss[6];   /* char string */
-			uint8_t		attr_flags[2];	/* u16 */
-			uint8_t		file_size[4];	/* u32 */
+			struct nhacp_file_attrs attrs;
 			uint8_t		name_length;
 			uint8_t		name[];
 		} dir_entry;
@@ -262,11 +279,5 @@ struct nhacp_response {
 #define	NHACP_ENOSPC		14	/* Out of space */
 #define	NHACP_ESEEK		15	/* Seek on non-seekable file */
 #define	NHACP_ENOTDIR		16	/* File is not a directory */
-
-/* attribute flags */
-#define	NHACP_AF_RD		0x0001	/* file is readable */
-#define	NHACP_AF_WR		0x0002	/* file is writable */
-#define	NHACP_AF_DIR		0x0004	/* file is a directory */
-#define	NHACP_AF_SPEC		0x0008	/* file is a "special" file */
 
 #endif /* nhacp_proto_h_included */
