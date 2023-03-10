@@ -993,9 +993,9 @@ nhacp_req_get_dir_entry(struct nhacp_context *ctx)
 		    ctx->request.get_dir_entry.max_name_length;
 	}
 	memcpy(&ctx->reply.dir_entry, e->dir_entry,
-	    sizeof(e->dir_entry) + e->dir_entry->name_length);
+	    sizeof(ctx->reply.dir_entry) + e->dir_entry->name_length);
 	nhacp_send_reply(ctx, NHACP_RESP_DIR_ENTRY,
-	    sizeof(e->dir_entry) + e->dir_entry->name_length);
+	    sizeof(ctx->reply.dir_entry) + e->dir_entry->name_length);
 	nhacp_file_list_entry_free(e);
 }
 
