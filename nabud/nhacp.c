@@ -457,6 +457,18 @@ nhacp_send_data_buffer(struct nhacp_context *ctx, uint16_t length)
 	    sizeof(ctx->reply.data_buffer) + length);
 }
 
+/*
+ * nhacp_send_uint32 --
+ *	Convenience function to send a UINT32-VALUE response.
+ */
+static void
+nhacp_send_uint32(struct nhacp_context *ctx, uint32_t val)
+{
+	nabu_set_uint32(ctx->reply.uint32_value.value, val);
+	nhacp_send_reply(ctx, NHACP_RESP_UINT32_VALUE,
+	    sizeof(ctx->reply.uint32_value));
+}
+
 /*****************************************************************************
  * Request handling
  *****************************************************************************/
@@ -835,6 +847,149 @@ nhacp_req_get_error_details(struct nhacp_context *ctx)
 }
 
 /*
+ * nhacp_req_file_read --
+ *	Handle the FILE-READ request.
+ */
+static void
+nhacp_req_file_read(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+
+	f = stext_file_find(&ctx->stext, ctx->request.file_read.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_read.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
+		return;
+	}
+
+	uint16_t flags = nabu_get_uint16(ctx->request.file_read.flags);
+	uint16_t length = nabu_get_uint16(ctx->request.file_read.length);
+
+	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u flags 0x%04x length %u",
+	    conn_name(ctx->stext.conn), ctx->request.file_read.slot,
+	    flags, length);
+
+	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_GET)) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	if (flags != 0) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	int error = stext_file_read(f, ctx->reply.data_buffer.data, &length);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_data_buffer(ctx, length);
+	}
+}
+
+/*
+ * nhacp_req_file_write --
+ *	Handle the FILE-WRITE request.
+ */
+static void
+nhacp_req_file_write(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+
+	f = stext_file_find(&ctx->stext, ctx->request.storage_put.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_write.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
+		return;
+	}
+
+	uint16_t flags = nabu_get_uint16(ctx->request.file_write.flags);
+	uint16_t length = nabu_get_uint16(ctx->request.file_write.length);
+
+	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u flags 0x%04x length %u",
+	    conn_name(ctx->stext.conn), ctx->request.file_write.slot,
+	    flags, length);
+
+	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_PUT)) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	if (flags != 0) {
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	int error = stext_file_write(f, ctx->request.file_write.data, length);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_ok(ctx);
+	}
+}
+
+/*
+ * nhacp_req_file_seek --
+ *	Handle the FILE-SEEK request.
+ */
+static void
+nhacp_req_file_seek(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+
+	f = stext_file_find(&ctx->stext, ctx->request.storage_put.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_seek.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
+		return;
+	}
+
+	int32_t offset =
+	    (int32_t)nabu_get_uint32(ctx->request.file_seek.offset);
+	int whence;
+
+	switch (ctx->request.file_seek.whence) {
+	case NHACP_SEEK_SET:	whence = SEEK_SET;	break;
+	case NHACP_SEEK_CUR:	whence = SEEK_CUR;	break;
+	case NHACP_SEEK_END:	whence = SEEK_END;	break;
+	default:
+		log_info("[%s] Bad whence value from client: %u",
+		    conn_name(ctx->stext.conn), ctx->request.file_seek.whence);
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		return;
+	}
+
+	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u whence %d offset %d",
+	    conn_name(ctx->stext.conn), ctx->request.file_write.slot,
+	    ctx->request.file_seek.whence, offset);
+
+	int error = stext_file_seek(f, &offset, whence);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_uint32(ctx, offset);
+	}
+}
+
+/*
  * nhacp_req_list_dir --
  *	Handle the LIST-DIR request.
  */
@@ -1020,6 +1175,9 @@ static const struct {
 	HANDLER_ENTRY(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET_BLOCK, storage_get_block),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT_BLOCK, storage_put_block),
+	HANDLER_ENTRY(NHACP_REQ_FILE_READ,         file_read),
+	HANDLER_ENTRY(NHACP_REQ_FILE_WRITE,        file_write),
+	HANDLER_ENTRY(NHACP_REQ_FILE_SEEK,         file_seek),
 	HANDLER_ENTRY(NHACP_REQ_LIST_DIR,          list_dir),
 	HANDLER_ENTRY(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
 };
