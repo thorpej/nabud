@@ -96,9 +96,9 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_REQ_GET_ERROR_DETAILS	0x06
 #define	NHACP_REQ_STORAGE_GET_BLOCK	0x07
 #define	NHACP_REQ_STORAGE_PUT_BLOCK	0x08
-/*	NHACP_REQ_FILE_READ		0x09	*/
-/*	NHACP_REQ_FILE_WRITE		0x0a	*/
-/*	NHACP_REQ_FILE_SEEK		0x0b	*/
+#define	NHACP_REQ_FILE_READ		0x09
+#define	NHACP_REQ_FILE_WRITE		0x0a
+#define	NHACP_REQ_FILE_SEEK		0x0b
 #define	NHACP_REQ_LIST_DIR		0x0c
 #define	NHACP_REQ_GET_DIR_ENTRY		0x0d
 #define	NHACP_REQ_END_PROTOCOL		0xef
@@ -188,6 +188,23 @@ struct nhacp_request {
 			uint8_t		block_length[2];/* u16 */
 			uint8_t		data[];
 		} storage_put_block;
+		struct nhacp_request_file_read {
+			uint8_t		type;
+			uint8_t		slot;
+			uint8_t		length[2];	/* u16 */
+		} file_read;
+		struct nhacp_request_file_write {
+			uint8_t		type;
+			uint8_t		slot;
+			uint8_t		length[2];	/* u16 */
+			uint8_t		data[];
+		} file_write;
+		struct nhacp_request_file_seek {
+			uint8_t		type;
+			uint8_t		slot;
+			uint8_t		offset[4];	/* s32 */
+			uint8_t		whence;
+		} file_seek;
 		struct nhacp_request_list_dir {
 			uint8_t		type;
 			uint8_t		slot;
@@ -212,6 +229,9 @@ struct nhacp_request {
 #define	NHACP_RESP_DATA_BUFFER		0x84
 #define	NHACP_RESP_DATE_TIME		0x85
 #define	NHACP_RESP_DIR_ENTRY		0x86
+#define	NHACP_RESP_UINT8_VALUE		0x87
+#define	NHACP_RESP_UINT16_VALUE		0x88
+#define	NHACP_RESP_UINT32_VALUE		0x89
 
 struct nhacp_response {
 	uint8_t		length[2];	/* u16: length of what follows */
@@ -258,6 +278,18 @@ struct nhacp_response {
 			uint8_t		name_length;
 			uint8_t		name[];
 		} dir_entry;
+		struct nhacp_response_uint8_value {
+			uint8_t		type;
+			uint8_t		value;
+		} uint8_value;
+		struct nhacp_response_uint16_value {
+			uint8_t		type;
+			uint8_t		value[2];	/* u16 */
+		} uint16_value;
+		struct nhacp_response_uint32_value {
+			uint8_t		type;
+			uint8_t		value[4];	/* u32 */
+		} uint32_value;
 	};
 };
 

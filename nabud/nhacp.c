@@ -340,6 +340,7 @@ static const char * const nhacp_error_strings[] = {
 	ERRSTR(NHACP_EFBIG,	"FILE TOO BIG"),
 	ERRSTR(NHACP_ENOSPC,	"OUT OF SPACE"),
 	ERRSTR(NHACP_ESEEK,	"ILLEGAL SEEK"),
+	ERRSTR(NHACP_ENOTDIR,	"FILE IS NOT A DIRECTORY"),
 };
 static const unsigned int nhacp_error_string_count =
     sizeof(nhacp_error_strings) / sizeof(nhacp_error_strings[0]);
