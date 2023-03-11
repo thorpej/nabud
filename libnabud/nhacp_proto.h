@@ -191,11 +191,13 @@ struct nhacp_request {
 		struct nhacp_request_file_read {
 			uint8_t		type;
 			uint8_t		slot;
+			uint8_t		flags[2];	/* u16 */
 			uint8_t		length[2];	/* u16 */
 		} file_read;
 		struct nhacp_request_file_write {
 			uint8_t		type;
 			uint8_t		slot;
+			uint8_t		flags[2];	/* u16 */
 			uint8_t		length[2];	/* u16 */
 			uint8_t		data[];
 		} file_write;
@@ -311,5 +313,10 @@ struct nhacp_response {
 #define	NHACP_ENOSPC		14	/* Out of space */
 #define	NHACP_ESEEK		15	/* Seek on non-seekable file */
 #define	NHACP_ENOTDIR		16	/* File is not a directory */
+
+/* FILE-SEEK whence values */
+#define	NHACP_SEEK_SET		0
+#define	NHACP_SEEK_CUR		1
+#define	NHACP_SEEK_END		2
 
 #endif /* nhacp_proto_h_included */
