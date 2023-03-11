@@ -1626,11 +1626,11 @@ command_nhacp_storage_close(int argc, char *argv[])
 
 	uint8_t slot = stext_parse_slot(argv[1]);
 
-	nhacp_buf.request.storage_close.slot = slot;
+	nhacp_buf.request.file_close.slot = slot;
 
-	printf("Sending: NHACP_REQ_STORAGE_CLOSE.\n");
-	nhacp_send(NHACP_REQ_STORAGE_CLOSE,
-	    sizeof(nhacp_buf.request.storage_close));
+	printf("Sending: NHACP_REQ_FILE_CLOSE.\n");
+	nhacp_send(NHACP_REQ_FILE_CLOSE,
+	    sizeof(nhacp_buf.request.file_close));
 
 	/* There is no reply to this request. */
 

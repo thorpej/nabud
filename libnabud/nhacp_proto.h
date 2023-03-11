@@ -92,7 +92,7 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_REQ_STORAGE_GET		0x02
 #define	NHACP_REQ_STORAGE_PUT		0x03
 #define	NHACP_REQ_GET_DATE_TIME		0x04
-#define	NHACP_REQ_STORAGE_CLOSE		0x05
+#define	NHACP_REQ_FILE_CLOSE		0x05
 #define	NHACP_REQ_GET_ERROR_DETAILS	0x06
 #define	NHACP_REQ_STORAGE_GET_BLOCK	0x07
 #define	NHACP_REQ_STORAGE_PUT_BLOCK	0x08
@@ -166,10 +166,10 @@ struct nhacp_request {
 		struct nhacp_request_get_date_time {
 			uint8_t		type;
 		} get_date_time;
-		struct nhacp_request_storage_close {
+		struct nhacp_request_file_close {
 			uint8_t		type;
 			uint8_t		slot;
-		} storage_close;
+		} file_close;
 		struct nhacp_request_get_error_details {
 			uint8_t		type;
 			uint8_t		code[2];	/* u16 */

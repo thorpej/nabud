@@ -801,19 +801,19 @@ nhacp_req_get_date_time(struct nhacp_context *ctx)
 }
 
 /*
- * nhacp_req_storage_close --
- *	Handle the STORAGE-CLOSE request.
+ * nhacp_req_file_close --
+ *	Handle the FILE-CLOSE request.
  */
 static void
-nhacp_req_storage_close(struct nhacp_context *ctx)
+nhacp_req_file_close(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.storage_close.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_close.slot);
 	if (f == NULL) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.storage_close.slot);
+		    ctx->request.file_close.slot);
 		return;
 	}
 	log_debug(LOG_SUBSYS_NHACP, "[%s] Closing file at slot %u.",
@@ -1015,7 +1015,7 @@ static const struct {
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET,       storage_get),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT,       storage_put),
 	HANDLER_ENTRY(NHACP_REQ_GET_DATE_TIME,     get_date_time),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_CLOSE,     storage_close),
+	HANDLER_ENTRY(NHACP_REQ_FILE_CLOSE,        file_close),
 	HANDLER_ENTRY(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET_BLOCK, storage_get_block),
 	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT_BLOCK, storage_put_block),
