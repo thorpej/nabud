@@ -59,6 +59,7 @@
 #define	NABU_PROTO_INLINES
 
 #include "libnabud/cli.h"
+#include "libnabud/crc16_genibus.h"
 #include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
 #include "libnabud/nhacp_proto.h"
@@ -170,9 +171,8 @@ nabu_recv_packet_data(size_t *lenp, uint16_t crc)
 	}
 
 	recv_crc = nabu_get_crc(&pktbuf[pktidx - NABU_FOOTERSIZE]);
-	comp_crc = nabu_crc_final(nabu_crc_update(pktbuf,
-						  pktidx - NABU_FOOTERSIZE,
-						  crc));
+	comp_crc = crc16_genibus_fini(crc16_genibus_update(pktbuf,
+	    pktidx - NABU_FOOTERSIZE, crc));
 	printf("Received: %zu byte payload (R-CRC=$%04X C-CRC=$%04X -> %s).\n",
 	    pktidx - NABU_FOOTERSIZE,
 	    recv_crc, comp_crc, recv_crc == comp_crc ? "OK" : "BAD");
@@ -438,7 +438,8 @@ send_packet_request(uint16_t segment, uint32_t image,
 	nabu_recv(pkthdr, sizeof(*pkthdr));
 	print_pkthdr(pkthdr);
 
-	uint16_t hdr_crc = nabu_crc_update(pkthdr, sizeof(*pkthdr), 0xffff);
+	uint16_t hdr_crc = crc16_genibus_update(pkthdr, sizeof(*pkthdr),
+	    crc16_genibus_init());
 
 	printf("Expecting: Payload.\n");
 	return nabu_recv_packet_data(payload_lenp, hdr_crc);
