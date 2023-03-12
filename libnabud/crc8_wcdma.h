@@ -30,8 +30,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-uint8_t	crc8_wcdma_init(void);
-uint8_t	crc8_wcdma_update(const void *, size_t, uint8_t);
-uint8_t	crc8_wcdma_fini(uint8_t);
+uint8_t		crc8_wcdma_init(void);
+uint8_t		crc8_wcdma_update(const void *, size_t, uint8_t);
+uint8_t		crc8_wcdma_fini(uint8_t);
 
 #endif /* crc8_wcdma_h_included */
