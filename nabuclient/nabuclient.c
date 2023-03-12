@@ -60,6 +60,7 @@
 
 #include "libnabud/cli.h"
 #include "libnabud/crc16_genibus.h"
+#include "libnabud/crc8_wcdma.h"
 #include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
 #include "libnabud/nhacp_proto.h"
@@ -1212,12 +1213,34 @@ static union {
 } nhacp_buf;
 static uint16_t nhacp_length;
 static uint16_t nhacp_version;
+static uint16_t nhacp_options;
+static bool nhacp_crc_rxonly;
 
 static void
 nhacp_send(uint8_t op, uint16_t length)
 {
+	uint8_t *crc_ptr = NULL;
+	uint8_t crc = 0;
+
+	if (nhacp_options & NHACP_OPTION_CRC8) {
+		crc_ptr = (uint8_t *)&nhacp_buf.request.max_request + length;
+		length++;
+	}
+
 	nhacp_buf.request.generic.type = op;
 	nabu_set_uint16(nhacp_buf.request.length, length);
+
+	if (nhacp_options & NHACP_OPTION_CRC8) {
+		if (! nhacp_crc_rxonly) {
+			crc = crc8_wcdma_init();
+			crc = crc8_wcdma_update(&nhacp_buf.request,
+			    (uintptr_t)crc_ptr - (uintptr_t)&nhacp_buf.request,
+			    crc);
+			crc = crc8_wcdma_fini(crc);
+		}
+		*crc_ptr = crc;
+	}
+
 	nabu_send(&nhacp_buf.request,
 	    length + sizeof(nhacp_buf.request.length));
 }
@@ -1296,6 +1319,20 @@ nhacp_decode_reply(void)
 	uint16_t length;
 
 	nhacp_recv();
+
+	if (nhacp_options & NHACP_OPTION_CRC8) {
+		/* Server MUST always include CRC. */
+		uint8_t crc = crc8_wcdma_init();
+		crc = crc8_wcdma_update(&nhacp_buf.reply,
+		    nhacp_length + sizeof(nhacp_buf.reply.length), crc);
+		crc = crc8_wcdma_fini(crc);
+
+		if (crc == 0) {
+			printf("--> CRC-8 OK <--\n");
+		} else {
+			printf("*** --> CRC-8 FAILURE <-- ***\n");
+		}
+	}
 
 	switch (nhacp_buf.reply.generic.type) {
 	case NHACP_RESP_NHACP_STARTED:
@@ -1431,11 +1468,26 @@ command_nhacp_start(int argc, char *argv[])
 	nabu_set_uint16(nhacp_buf.start.version,
 	    (nhacp_version = NHACP_VERS_0_1));
 
+	nhacp_options = 0;
+	nhacp_crc_rxonly = false;
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "crc8-rx") == 0) {
+			nhacp_options |= NHACP_OPTION_CRC8;
+			nhacp_crc_rxonly = true;
+			continue;
+		}
+		if (strcmp(argv[i], "crc8") == 0) {
+			nhacp_options |= NHACP_OPTION_CRC8;
+			nhacp_crc_rxonly = false;
+			continue;
+		}
+		printf("Unknown start option: %s\n", argv[i]);
+		cli_throw();
+	}
+	nabu_set_uint16(nhacp_buf.start.options, nhacp_options);
+
 	printf("Sending: NABU_MSG_START_NHACP.\n");
 	nabu_send(&nhacp_buf.start, sizeof(nhacp_buf.start));
-
-	nhacp_decode_reply();
-	return false;
 
 	nhacp_decode_reply();
 	return false;
