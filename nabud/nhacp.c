@@ -1312,8 +1312,15 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 			    "[%s] Client omitted CRC-8 on this request.",
 			    conn_name(ctx->stext.conn));
 		} else {
+			/*
+			 * The length doesn't include the size of the
+			 * length field, but the CRC computation does.
+			 */
+			size_t crc_checklen =
+			    length + sizeof(ctx->request.length);
 			uint8_t crc = crc8_wcdma_init();
-			crc = crc8_wcdma_update(&ctx->request, length, crc);
+			crc = crc8_wcdma_update(&ctx->request,
+			    crc_checklen, crc);
 			crc = crc8_wcdma_fini(crc);
 
 			if (crc != 0) {
@@ -1323,12 +1330,15 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 				 */
 				crc = crc8_wcdma_init();
 				crc = crc8_wcdma_update(&ctx->request,
-				    length - 1, crc);
+				    crc_checklen - 1, crc);
 				crc = crc8_wcdma_fini(crc);
 				log_error("[%s] CRC-8 failure; "
 				    "computed 0x%02x != received 0x%02x",
 				    conn_name(ctx->stext.conn), crc, *crc_ptr);
 				return false;
+			} else {
+				log_debug(LOG_SUBSYS_NHACP, "[%s] CRC-8 OK.",
+				    conn_name(ctx->stext.conn));
 			}
 		}
 	}
