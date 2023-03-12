@@ -66,7 +66,13 @@ static const uint8_t crctab[] = {
 };
 
 uint8_t
-crc8_wcdma(const void *buf, size_t len, uint8_t crc)
+crc8_wcdma_init(void)
+{
+	return 0;
+}
+
+uint8_t
+crc8_wcdma_update(const void *buf, size_t len, uint8_t crc)
 {
 	const uint8_t *cp = buf;
 
@@ -74,5 +80,11 @@ crc8_wcdma(const void *buf, size_t len, uint8_t crc)
 		crc = crctab[crc ^ *cp++];
 	}
 
+	return crc;
+}
+
+uint8_t
+crc8_wcdma_fini(uint8_t crc)
+{
 	return crc;
 }
