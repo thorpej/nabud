@@ -310,6 +310,20 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for _Static_assert() in the compiler.
+#
+AC_MSG_CHECKING([for _Static_assert() support in the compiler])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <assert.h>
+		#include <stddef.h>
+	]],[[
+		_Static_assert(sizeof(char) == 1, "My whole life has been a lie.");
+	]])],[
+		AC_DEFINE(HAVE_STATIC_ASSERT, 1, [Define if your compiler supports _Static_assert()])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for the BSD libedit and a readline() function in libedit.
 #
 AC_CHECK_LIB(edit, readline, [LIBEDIT_LIB="-ledit"])
