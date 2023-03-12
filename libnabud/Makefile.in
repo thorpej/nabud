@@ -106,9 +106,10 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libnabud_la_LIBADD =
 am_libnabud_la_OBJECTS = libnabud_la-atom.lo libnabud_la-cli.lo \
-	libnabud_la-conn_io.lo libnabud_la-crc8_wcdma.lo \
-	libnabud_la-fileio.lo libnabud_la-getprogname.lo \
-	libnabud_la-listing.lo libnabud_la-log.lo
+	libnabud_la-conn_io.lo libnabud_la-crc16_genibus.lo \
+	libnabud_la-crc8_wcdma.lo libnabud_la-fileio.lo \
+	libnabud_la-getprogname.lo libnabud_la-listing.lo \
+	libnabud_la-log.lo
 libnabud_la_OBJECTS = $(am_libnabud_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -132,6 +133,7 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/libnabud_la-atom.Plo \
 	./$(DEPDIR)/libnabud_la-cli.Plo \
 	./$(DEPDIR)/libnabud_la-conn_io.Plo \
+	./$(DEPDIR)/libnabud_la-crc16_genibus.Plo \
 	./$(DEPDIR)/libnabud_la-crc8_wcdma.Plo \
 	./$(DEPDIR)/libnabud_la-fileio.Plo \
 	./$(DEPDIR)/libnabud_la-getprogname.Plo \
@@ -331,8 +333,8 @@ top_srcdir = @top_srcdir@
 AM_CFLAGS = $(PTHREAD_CFLAGS) $(WARNCFLAGS)
 noinst_LTLIBRARIES = libnabud.la
 libnabud_la_CPPFLAGS = $(CLI_INCLUDES)
-libnabud_la_SOURCES = atom.c cli.c conn_io.c crc8_wcdma.c fileio.c \
-			  getprogname.c listing.c log.c
+libnabud_la_SOURCES = atom.c cli.c conn_io.c crc16_genibus.c crc8_wcdma.c \
+			  fileio.c getprogname.c listing.c log.c
 
 all: all-am
 
@@ -391,6 +393,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-atom.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-cli.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-conn_io.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-crc16_genibus.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-crc8_wcdma.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-fileio.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-getprogname.Plo@am__quote@ # am--include-marker
@@ -444,6 +447,13 @@ libnabud_la-conn_io.lo: conn_io.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='conn_io.c' object='libnabud_la-conn_io.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnabud_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnabud_la-conn_io.lo `test -f 'conn_io.c' || echo '$(srcdir)/'`conn_io.c
+
+libnabud_la-crc16_genibus.lo: crc16_genibus.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnabud_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libnabud_la-crc16_genibus.lo -MD -MP -MF $(DEPDIR)/libnabud_la-crc16_genibus.Tpo -c -o libnabud_la-crc16_genibus.lo `test -f 'crc16_genibus.c' || echo '$(srcdir)/'`crc16_genibus.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libnabud_la-crc16_genibus.Tpo $(DEPDIR)/libnabud_la-crc16_genibus.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='crc16_genibus.c' object='libnabud_la-crc16_genibus.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnabud_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnabud_la-crc16_genibus.lo `test -f 'crc16_genibus.c' || echo '$(srcdir)/'`crc16_genibus.c
 
 libnabud_la-crc8_wcdma.lo: crc8_wcdma.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnabud_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libnabud_la-crc8_wcdma.lo -MD -MP -MF $(DEPDIR)/libnabud_la-crc8_wcdma.Tpo -c -o libnabud_la-crc8_wcdma.lo `test -f 'crc8_wcdma.c' || echo '$(srcdir)/'`crc8_wcdma.c
@@ -613,6 +623,7 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/libnabud_la-atom.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-cli.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-conn_io.Plo
+	-rm -f ./$(DEPDIR)/libnabud_la-crc16_genibus.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-crc8_wcdma.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-fileio.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-getprogname.Plo
@@ -666,6 +677,7 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/libnabud_la-atom.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-cli.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-conn_io.Plo
+	-rm -f ./$(DEPDIR)/libnabud_la-crc16_genibus.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-crc8_wcdma.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-fileio.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-getprogname.Plo
