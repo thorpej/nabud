@@ -49,6 +49,7 @@
 
 #define	NABU_PROTO_INLINES
 
+#include "libnabud/crc8_wcdma.h"
 #include "libnabud/fileio.h"
 #include "libnabud/log.h"
 #include "libnabud/missing.h"
@@ -71,6 +72,15 @@ struct nhacp_context {
 	};
 };
 
+static inline size_t
+nhacp_crc_len(const struct nhacp_context *ctx)
+{
+	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
+		return 1;
+	}
+	return 0;
+}
+
 struct nhacp_file_list_entry {
 	STAILQ_ENTRY(nhacp_file_list_entry) link;
 	struct nhacp_response_dir_entry *dir_entry;
@@ -85,8 +95,8 @@ struct nhacp_file_private {
 /* We support up to version 0.1 of the NHACP protocol. */
 #define	NABUD_NHACP_VERSION	NHACP_VERS_0_1
 
-/* There are no NHACP protocol options currently defined. */
-#define	NABUD_NHACP_OPTIONS	0x0000
+/* We support these NHACP options. */
+#define	NABUD_NHACP_OPTIONS	NHACP_OPTION_CRC8
 
 /*
  * File private data routines.
@@ -270,14 +280,68 @@ nhacp_file_attrs_from_fileio(const struct fileio_attrs *fa,
 }
 
 /*
+ * nhacp_crc_ptr --
+ *	Return a pointer to where the CRC is located in the
+ *	current message, or NULL if there is no CRC.  The
+ *	length field in the NHACP frame MUST already include
+ *	the CRC, if CRC is being used.
+ *
+ *	N.B. this works for both requests *and* replies due to
+ *	how we share buffer space between them.
+ *	XXX Should add a _Static_assert() to enforce this.
+ */
+static uint8_t *
+nhacp_crc_ptr(struct nhacp_context *ctx)
+{
+	size_t crclen = nhacp_crc_len(ctx);
+
+	if (crclen == 0) {
+		return NULL;
+	}
+
+	uint16_t length = nabu_get_uint16(ctx->reply.length);
+
+	/*
+	 * The CRC is located immediately after the request / reply
+	 * payload.  The length field includes the CRC.
+	 */
+	return &ctx->reply.max_response.payload[length -
+	    offsetof(struct nhacp_response_max, payload) - crclen];
+}
+
+/*
  * nhacp_send_reply --
  *	Convenience function to send an NHACP reply.
  */
 static void
 nhacp_send_reply(struct nhacp_context *ctx, uint8_t type, uint16_t length)
 {
+	size_t crclen = nhacp_crc_len(ctx);
+
+	length += crclen;
+	assert(length <= NHACP_MAX_MESSAGELEN);
+
 	nabu_set_uint16(ctx->reply.length, length);
 	ctx->reply.generic.type = type;
+
+	/*
+	 * The packet data is now fully constructed; we can compute
+	 * the CRC, if enabled.
+	 */
+	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
+		assert(crclen == 1);
+
+		uint8_t *crc_ptr = nhacp_crc_ptr(ctx);
+		assert(crc_ptr != NULL);
+
+		uint8_t crc = crc8_wcdma_init();
+		crc = crc8_wcdma_update(&ctx->reply,
+		    (uintptr_t)crc_ptr - (uintptr_t)&ctx->reply, crc);
+		crc = crc8_wcdma_fini(crc);
+
+		*crc_ptr = crc;
+	}
+
 	conn_send(ctx->stext.conn, &ctx->reply,
 	    length + sizeof(ctx->reply.length));
 }
@@ -1216,27 +1280,60 @@ nhacp_context_free(struct nhacp_context *ctx)
 /*
  * nhacp_request_check --
  *	Validates the incoming request.
- *
- *	Returns:	-1	request type unknown
- *			0	everything is OK
- *			other	the expected minimum size
  */
-static ssize_t
-nhacp_request_check(uint8_t req, uint16_t length)
+static bool
+nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 {
+	struct nabu_connection *conn = ctx->stext.conn;
+	uint8_t req = ctx->request.generic.type;
+
 	/* Max message length has already been checked. */
 	assert(length <= NHACP_MAX_MESSAGELEN);
 
-	if (req < nhacp_request_type_count) {
-		if (nhacp_request_types[req].handler == NULL) {
-			return -1;
-		}
-		if (length >= nhacp_request_types[req].min_reqlen) {
-			return 0;
-		}
-		return nhacp_request_types[req].min_reqlen;
+	if (req >= nhacp_request_type_count ||
+	    nhacp_request_types[req].handler == NULL) {
+		log_error("[%s] Unknown NHACP request: 0x%02x",
+		    conn_name(conn), ctx->request.generic.type);
+		return false;
 	}
-	return -1;
+
+	if (length < nhacp_request_types[req].min_reqlen) {
+		log_error("[%s] Runt NHACP request: %u < %zd",
+		    conn_name(conn), length,
+		    nhacp_request_types[req].min_reqlen);
+		return false;
+	}
+
+	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
+		uint8_t *crc_ptr = nhacp_crc_ptr(ctx);
+
+		if (*crc_ptr == 0) {
+			log_debug(LOG_SUBSYS_NHACP,
+			    "[%s] Client omitted CRC-8 on this request.",
+			    conn_name(ctx->stext.conn));
+		} else {
+			uint8_t crc = crc8_wcdma_init();
+			crc = crc8_wcdma_update(&ctx->request, length, crc);
+			crc = crc8_wcdma_fini(crc);
+
+			if (crc != 0) {
+				/*
+				 * Compute it again without the CRC byte
+				 * so we can report computed vs. expected.
+				 */
+				crc = crc8_wcdma_init();
+				crc = crc8_wcdma_update(&ctx->request,
+				    length - 1, crc);
+				crc = crc8_wcdma_fini(crc);
+				log_error("[%s] CRC-8 failure; "
+				    "computed 0x%02x != received 0x%02x",
+				    conn_name(ctx->stext.conn), crc, *crc_ptr);
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 /*
@@ -1324,8 +1421,7 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	struct nhacp_context *ctx;
 	extern char nabud_version[];
 	uint16_t reqlen;
-	uint16_t version, options;
-	ssize_t minlen;
+	uint16_t version, options = 0;
 
 	switch (msg) {
 	case NABU_MSG_START_NHACP_0_0:		/* original draft */
@@ -1387,6 +1483,10 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	log_info("[%s] Entering NHACP-%d.%d mode.", conn_name(conn),
 	    NHACP_VERS_MAJOR(ctx->nhacp_version),
 	    NHACP_VERS_MINOR(ctx->nhacp_version));
+	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
+		log_info("[%s] CRC-8/WCDMA FCS option enabled.",
+		    conn_name(conn));
+	}
 
 	for (;;) {
 		/* We want to block "forever" waiting for requests. */
@@ -1453,19 +1553,13 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		}
 
 		/*
-		 * Check that the client sent the bare-minimum for the
-		 * request to be valid.
+		 * Check that the client has sent a valid request.
 		 */
-		minlen = nhacp_request_check(ctx->request.generic.type, reqlen);
-		if (minlen == -1) {
-			log_error("[%s] Unknown NHACP request: 0x%02x",
-			    conn_name(conn), ctx->request.generic.type);
-			/* Just skip it. */
-			continue;
-		} else if (minlen != 0) {
-			log_error("[%s] Runt NHACP request: %u < %zd",
-			    conn_name(conn), reqlen, minlen);
-			/* Just skip it. */
+		if (! nhacp_request_check(ctx, reqlen)) {
+			/*
+			 * Error already logged.  Just skip the
+			 * packet and continue.
+			 */
 			continue;
 		}
 
