@@ -288,12 +288,28 @@ nhacp_file_attrs_from_fileio(const struct fileio_attrs *fa,
  *
  *	N.B. this works for both requests *and* replies due to
  *	how we share buffer space between them.
- *	XXX Should add a _Static_assert() to enforce this.
  */
 static uint8_t *
 nhacp_crc_ptr(struct nhacp_context *ctx)
 {
 	size_t crclen = nhacp_crc_len(ctx);
+
+#ifdef HAVE_STATIC_ASSERT
+	_Static_assert(
+	    offsetof(struct nhacp_context, request) ==
+	    offsetof(struct nhacp_context, reply),
+	    "Request and response do not align.");
+
+	_Static_assert(
+	    offsetof(struct nhacp_request, max_request) ==
+	    offsetof(struct nhacp_response, max_response),
+	    "Max request and max response to not align.");
+
+	_Static_assert(
+	    offsetof(struct nhacp_request_max, payload) ==
+	    offsetof(struct nhacp_response_max, payload),
+	    "Request and response payloads to not align.");
+#endif /* HAVE_STATIC_ASSERT */
 
 	if (crclen == 0) {
 		return NULL;
