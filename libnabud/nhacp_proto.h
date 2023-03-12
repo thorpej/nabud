@@ -88,6 +88,8 @@ struct nabu_msg_start_nhacp {
 					 (cp)[1] == 'C' &&	\
 					 (cp)[2] == 'P')
 
+#define	NHACP_OPTION_CRC8		0x0001	/* Use CRC-8/WCDMA FCS */
+
 #define	NHACP_REQ_STORAGE_OPEN		0x01
 #define	NHACP_REQ_STORAGE_GET		0x02
 #define	NHACP_REQ_STORAGE_PUT		0x03
