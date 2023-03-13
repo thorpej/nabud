@@ -791,12 +791,15 @@ nhacp_req_storage_get_block(struct nhacp_context *ctx)
 	    (uint32_t)offset, &blklen);
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
-	} else if (blklen != save_blklen) {
-		/* Partial reads not allowed for block I/O. */
-		nhacp_send_error(ctx, NHACP_EINVAL);
-	} else {
-		nhacp_send_data_buffer(ctx, blklen);
+		return;
 	}
+	if (blklen != save_blklen) {
+		/* Partial read across EOF - zero-pad the result. */
+		assert(save_blklen > blklen);
+		memset(&ctx->reply.data_buffer.data[blklen], 0,
+		    save_blklen - blklen);
+	}
+	nhacp_send_data_buffer(ctx, save_blklen);
 }
 
 /*
@@ -848,25 +851,7 @@ nhacp_req_storage_put_block(struct nhacp_context *ctx)
 		return;
 	}
 
-	/* Enforce no-extending-writes for block I/O. */
-	struct fileio_attrs attrs;
-	int error = stext_file_getattr(f, &attrs);
-	if (error != 0) {
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] stext_file_getattr() failed: %s",
-		     conn_name(ctx->stext.conn), strerror(error));
-		nhacp_send_error(ctx, nhacp_error_from_unix(error));
-		return;
-	}
-	if (offset + blklen > attrs.size) {
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] Request would extend file (size = %lld)",
-		    conn_name(ctx->stext.conn), (long long)attrs.size);
-		nhacp_send_error(ctx, NHACP_EINVAL);
-		return;
-	}
-
-	error = stext_file_pwrite(f, ctx->request.storage_put_block.data,
+	int error = stext_file_pwrite(f, ctx->request.storage_put_block.data,
 	    (uint32_t)offset, blklen);
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
