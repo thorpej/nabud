@@ -1547,9 +1547,20 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 			break;
 		}
 
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Receiving %u byte request.",
+		    conn_name(conn), reqlen);
+
 		/* Ok, receive the message. */
 		if (! conn_recv(conn, &ctx->request.max_request, reqlen)) {
-			goto recv_failure;
+			if (! conn_check_state(conn)) {
+				/* Error already logged. */
+				break;
+			}
+			log_debug(LOG_SUBSYS_NHACP,
+			    "[%s] conn_recv() %u bytes failed, "
+			    "continuing event loop.", conn_name(conn), reqlen);
+			continue;
 		}
 
 		/*
