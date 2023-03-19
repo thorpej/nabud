@@ -1485,6 +1485,7 @@ static const unsigned int retronet_request_type_count =
 static struct retronet_context *
 retronet_context_alloc(struct nabu_connection *conn)
 {
+	assert(conn->retronet == NULL);
 	struct retronet_context *ctx = calloc(1, sizeof(*ctx));
 	if (ctx != NULL) {
 		stext_context_init(&ctx->stext, conn, 0, NULL, NULL);
