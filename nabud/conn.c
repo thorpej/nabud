@@ -54,6 +54,7 @@
 #include "conn.h"
 #include "image.h"
 #include "retronet.h"
+#include "nhacp.h"
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t conn_list_enum_cv = PTHREAD_COND_INITIALIZER;
@@ -469,7 +470,7 @@ conn_destroy(struct nabu_connection *conn)
 	conn_remove(conn);
 
 	image_release(conn_set_last_image(conn, NULL));
-	retronet_conn_fini(conn);
+	conn_reboot(conn);
 
 	pthread_mutex_destroy(&conn->mutex);
 
@@ -477,6 +478,26 @@ conn_destroy(struct nabu_connection *conn)
 
 	free(conn->file_root);
 	free(conn);
+}
+
+/*
+ * conn_reboot --
+ *	Handle a the reboot of a client at the other end of the
+ *	connection.
+ */
+void
+conn_reboot(struct nabu_connection *conn)
+{
+	if (conn->nhacp != NULL) {
+		log_info("[%s] Clearing previous NHACP state.",
+		    conn_name(conn));
+		nhacp_conn_fini(conn);
+	}
+	if (conn->retronet != NULL) {
+		log_info("[%s] Clearing previous RetroNet state.",
+		    conn_name(conn));
+		retronet_conn_fini(conn);
+	}
 }
 
 /*

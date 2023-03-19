@@ -82,8 +82,12 @@ struct nabu_connection {
 	char		*file_root;
 
 	/*
-	 * RetroNet extensions context.  Alas, RetroNet is not modal,
-	 * so knowlege of it has to leak out to connection state.
+	 * NHACP extensions context.
+	 */
+	struct nhacp_context *nhacp;
+
+	/*
+	 * RetroNet extensions context.
 	 */
 	struct retronet_context *retronet;
 	bool		retronet_enabled;
@@ -115,6 +119,7 @@ extern unsigned int conn_count;
 
 void	conn_add_serial(struct conn_add_args *);
 void	conn_add_tcp(const struct conn_add_args *);
+void	conn_reboot(struct nabu_connection *);
 void	conn_destroy(struct nabu_connection *);
 
 bool	conn_enumerate(bool (*)(struct nabu_connection *, void *), void *);

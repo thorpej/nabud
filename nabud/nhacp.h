@@ -30,5 +30,6 @@
 struct nabu_connection;
 
 bool	nhacp_start(struct nabu_connection *, uint8_t);
+void	nhacp_conn_fini(struct nabu_connection *);
 
 #endif /* nhacp_h_included */

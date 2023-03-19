@@ -401,11 +401,7 @@ adaptor_send_time(struct nabu_connection *conn)
 static void
 adaptor_msg_reset(struct nabu_connection *conn)
 {
-	if (conn->retronet != NULL) {
-		log_info("[%s] Clearing previous RetroNet state.",
-		    conn_name(conn));
-		retronet_conn_fini(conn);
-	}
+	conn_reboot(conn);
 	log_debug(LOG_SUBSYS_ADAPTOR,
 	    "[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));

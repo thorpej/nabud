@@ -1361,30 +1361,43 @@ static const unsigned int nhacp_request_type_count =
 #undef HANDLER_ENTRY
 
 /*
- * nhacp_context_alloc --
- *	Allocate an NHACP context for the specified connection.
- */
-static struct nhacp_context *
-nhacp_context_alloc(struct nabu_connection *conn)
-{
-	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
-	if (ctx != NULL) {
-		stext_context_init(&ctx->stext, conn,
-		    sizeof(struct nhacp_file_private),
-		    nhacp_file_private_init, nhacp_file_private_fini);
-	}
-	return ctx;
-}
-
-/*
  * nhacp_context_free --
  *	Free and NHACP context and all associated resources.
  */
 static void
 nhacp_context_free(struct nhacp_context *ctx)
 {
+	assert(ctx->stext.conn->nhacp == ctx);
+	ctx->stext.conn->nhacp = NULL;
 	stext_context_fini(&ctx->stext);
 	free(ctx);
+}
+
+/*
+ * nhacp_context_alloc --
+ *	Allocate an NHACP context for the specified connection.
+ */
+static struct nhacp_context *
+nhacp_context_alloc(struct nabu_connection *conn)
+{
+	/*
+	 * We may have been asked to start NHACP without an
+	 * intervening stop, which would indicate a reboot
+	 * of the client.  In this case, clear out any existing
+	 * state that may already exist.
+	 */
+	if (conn->nhacp != NULL) {
+		nhacp_context_free(conn->nhacp);
+	}
+
+	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
+	if (ctx != NULL) {
+		stext_context_init(&ctx->stext, conn,
+		    sizeof(struct nhacp_file_private),
+		    nhacp_file_private_init, nhacp_file_private_fini);
+		conn->nhacp = ctx;
+	}
+	return ctx;
 }
 
 /*
@@ -1701,4 +1714,16 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	log_info("[%s] Exiting NHACP mode.", conn_name(conn));
 	nhacp_context_free(ctx);
 	return true;
+}
+
+/*
+ * nhacp_conn_fini --
+ *	Tear down any lingering NHACP state for a connection.
+ */
+void
+nhacp_conn_fini(struct nabu_connection *conn)
+{
+	if (conn->nhacp != NULL) {
+		nhacp_context_free(conn->nhacp);
+	}
 }
