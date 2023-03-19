@@ -390,6 +390,9 @@ static const struct nhacp_error_map_entry {
 #ifdef HAVE_EFTYPE
 	ERRMAP2(EFTYPE, NHACP_EPERM),
 #endif /* HAVE_EFTYPE */
+	ERRMAP2(EXDEV, NHACP_EPERM),
+	ERRMAP2(EROFS, NHACP_EPERM),
+	ERRMAP(ENOTEMPTY),
 
 	/* Default */
 	ERRMAP2(-1, NHACP_EIO),
@@ -421,6 +424,7 @@ static const char * const nhacp_error_strings[] = {
 	ERRSTR(NHACP_ENOSPC,	"OUT OF SPACE"),
 	ERRSTR(NHACP_ESEEK,	"ILLEGAL SEEK"),
 	ERRSTR(NHACP_ENOTDIR,	"FILE IS NOT A DIRECTORY"),
+	ERRSTR(NHACP_ENOTEMPTY,	"DIRECTORY IS NOT EMPTY"),
 };
 static const unsigned int nhacp_error_string_count =
     sizeof(nhacp_error_strings) / sizeof(nhacp_error_strings[0]);
@@ -1220,6 +1224,109 @@ nhacp_req_get_dir_entry(struct nhacp_context *ctx)
 	nhacp_file_list_entry_free(e);
 }
 
+/*
+ * nhacp_req_remove --
+ *	Handle the REMOVE request.
+ */
+static void
+nhacp_req_remove(struct nhacp_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	char *name;
+	uint8_t namelen;
+	int error = 0;
+
+	namelen = ctx->request.remove.url_length;
+	name = (char *)ctx->request.remove.url_string;
+	name[namelen] = '\0';
+
+	char *path =
+	    fileio_resolve_path(name, conn->file_root, FILEIO_O_LOCAL_ROOT);
+	if (path != NULL) {
+		if (unlink(path) < 0) {
+			error = errno;
+			log_info("[%s] unlink(%s) failed: %s",
+			    conn_name(conn), path, strerror(error));
+		}
+		free(path);
+	} else {
+		error = errno;
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unable to resolve path: %s", conn_name(conn), name);
+	}
+
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_ok(ctx);
+	}
+}
+
+/*
+ * nhacp_req_rename --
+ *	Handle the RENAME request.
+ */
+static void
+nhacp_req_rename(struct nhacp_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	char *old_name, *new_name;
+	char *src_path = NULL, *dst_path = NULL;
+	uint8_t old_namelen, new_namelen;
+	int error = 0;
+	uint8_t *bp;
+
+	bp = ctx->request.rename.names;
+
+	old_namelen = *bp++;
+	old_name = (char *)bp;
+	bp += old_namelen;
+
+	new_namelen = *bp++;
+	new_name = (char *)bp;
+
+	old_name[old_namelen] = '\0';
+	new_name[new_namelen] = '\0';
+
+	src_path = fileio_resolve_path(old_name, conn->file_root,
+	    FILEIO_O_LOCAL_ROOT);
+	if (src_path == NULL) {
+		error = errno;
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unable to resolve src_path: %s", conn_name(conn),
+		    old_name);
+		goto out;
+	}
+	dst_path = fileio_resolve_path(new_name, conn->file_root,
+	    FILEIO_O_LOCAL_ROOT);
+	if (dst_path == NULL) {
+		error = errno;
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unable to resolve dst_path: %s", conn_name(conn),
+		    old_name);
+		goto out;
+	}
+
+	if (rename(src_path, dst_path) < 0) {
+		error = errno;
+		log_info("[%s] rename(%s, %s) failed: %s",
+		    conn_name(conn), src_path, dst_path, strerror(error));
+	}
+
+ out:
+	if (src_path != NULL) {
+		free(src_path);
+	}
+	if (dst_path != NULL) {
+		free(dst_path);
+	}
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_ok(ctx);
+	}
+}
+
 #define	HANDLER_ENTRY(v, n)						\
 	[(v)] = {							\
 		.handler    = nhacp_req_ ## n ,				\
@@ -1245,6 +1352,8 @@ static const struct {
 	HANDLER_ENTRY(NHACP_REQ_FILE_SEEK,         file_seek),
 	HANDLER_ENTRY(NHACP_REQ_LIST_DIR,          list_dir),
 	HANDLER_ENTRY(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
+	HANDLER_ENTRY(NHACP_REQ_REMOVE,            remove),
+	HANDLER_ENTRY(NHACP_REQ_RENAME,            rename),
 };
 static const unsigned int nhacp_request_type_count =
     sizeof(nhacp_request_types) / sizeof(nhacp_request_types[0]);

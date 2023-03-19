@@ -103,6 +103,8 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_REQ_FILE_SEEK		0x0b
 #define	NHACP_REQ_LIST_DIR		0x0c
 #define	NHACP_REQ_GET_DIR_ENTRY		0x0d
+#define	NHACP_REQ_REMOVE		0x0e
+#define	NHACP_REQ_RENAME		0x0f
 #define	NHACP_REQ_END_PROTOCOL		0xef
 
 /* STORAGE-OPEN flags */
@@ -113,6 +115,12 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_O_DIRECTORY	0x0008	/* 1=must be dir, 0=must be reg */
 
 #define	NHACP_O_ACCMASK		(NHACP_O_RDWR | NHACP_O_RDONLY)
+
+/* REMOVE-FILE flags */
+#define	NHACP_REMOVE_FILE	0x0000	/* remove a regular file */
+#define	NHACP_REMOVE_DIR	0x0001	/* remove a directory */
+
+#define	NHACP_REMOVE_TYPEMASK	(NHACP_REMOVE_FILE | NHACP_REMOVE_DIR)
 
 /*
  * NHACP complex types, shared by multiple request/response messages.
@@ -220,6 +228,24 @@ struct nhacp_request {
 			uint8_t		slot;
 			uint8_t		max_name_length;
 		} get_dir_entry;
+		struct nhacp_request_remove {
+			uint8_t		type;
+			uint8_t		flags[2];	/* u16 */
+			uint8_t		url_length;
+			uint8_t		url_string[];
+		} remove;
+		struct nhacp_request_rename {
+			uint8_t		type;
+			/*
+			 * The names buffer is structured like:
+			 *
+			 * uint8_t	old_name_length;
+			 * uint8_t	old_name[];
+			 * uint8_t	new_name_length;
+			 * uint8_t	new_name[];
+			 */
+			uint8_t		names[];	/* old, new */
+		} rename;
 		struct nhacp_request_end_protocol {
 			uint8_t		type;
 		} end_protocol;
@@ -315,6 +341,7 @@ struct nhacp_response {
 #define	NHACP_ENOSPC		14	/* Out of space */
 #define	NHACP_ESEEK		15	/* Seek on non-seekable file */
 #define	NHACP_ENOTDIR		16	/* File is not a directory */
+#define	NHACP_ENOTEMPTY		17	/* Directory is not empty */
 
 /* FILE-SEEK whence values */
 #define	NHACP_SEEK_SET		0
