@@ -28,10 +28,6 @@
  * Support for the NABU HCCA Application Communication Protocol.
  *
  *    https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md
- *
- * This implementation employs Postel's law in the following way:
- * Protocol versioning is not strictly enforced -- so long as the
- * messages are in the right format, we allow them.
  */
 
 #include "config.h"
@@ -62,9 +58,12 @@
 #include "stext.h"
 
 struct nhacp_context {
-	struct stext_context stext;
-	uint16_t             nhacp_version;
-	uint16_t             nhacp_options;
+	struct stext_context      stext;
+	LIST_ENTRY(nhacp_context) link;
+	bool                      linked;
+	uint8_t                   session_id;
+	uint16_t                  nhacp_version;
+	uint16_t                  nhacp_options;
 
 	union {
 		struct nhacp_request request;
@@ -73,9 +72,9 @@ struct nhacp_context {
 };
 
 static inline size_t
-nhacp_crc_len(const struct nhacp_context *ctx)
+nhacp_crc_len(uint16_t options)
 {
-	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
+	if (options & NHACP_OPTION_CRC8) {
 		return 1;
 	}
 	return 0;
@@ -164,11 +163,120 @@ nhacp_file_is_directory(struct stext_file *f)
 }
 
 /*
+ * nhacp_context_free --
+ *	Free and NHACP context and all associated resources.
+ */
+static void
+nhacp_context_free(struct nhacp_context *ctx)
+{
+	if (ctx->linked) {
+		LIST_REMOVE(ctx, link);
+	}
+	stext_context_fini(&ctx->stext);
+	free(ctx);
+}
+
+/*
+ * nhacp_context_alloc --
+ *	Allocate an NHACP context for the specified connection.
+ */
+static struct nhacp_context *
+nhacp_context_alloc(struct nabu_connection *conn, uint8_t session_id)
+{
+	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
+	ctx->session_id = session_id;
+	stext_context_init(&ctx->stext, conn,
+	    sizeof(struct nhacp_file_private),
+	    nhacp_file_private_init, nhacp_file_private_fini);
+	return ctx;
+}
+
+/*
+ * nhacp_context_lookup --
+ *	Look up an NHACP context by session ID.
+ */
+static struct nhacp_context *
+nhacp_context_lookup(struct nabu_connection *conn, uint8_t session_id)
+{
+	struct nhacp_context *ctx;
+
+	LIST_FOREACH(ctx, &conn->nhacp_sessions, link) {
+		if (ctx->session_id == session_id) {
+			return ctx;
+		}
+	}
+	return NULL;
+}
+
+/*
+ * nhacp_context_init --
+ *	Initialize (and link up) an NHACP context.
+ */
+static bool
+nhacp_context_init(struct nabu_connection *conn, struct nhacp_context *ctx)
+{
+	assert(! ctx->linked);
+	assert(ctx->session_id == NHACP_SESSION_SYSTEM ||
+	       ctx->session_id == NHACP_SESSION_CREATE);
+	assert(ctx->session_id != NHACP_SESSION_SYSTEM ||
+	       nhacp_context_lookup(conn, NHACP_SESSION_SYSTEM) == NULL);
+
+	if (ctx->session_id == NHACP_SESSION_CREATE) {
+		uint8_t session_id;
+
+		for (session_id = NHACP_SESSION_SYSTEM + 1;
+		     session_id < NHACP_SESSION_CREATE;
+		     session_id++) {
+			if (nhacp_context_lookup(conn, session_id) == NULL) {
+				break;
+			}
+		}
+		if (session_id == NHACP_SESSION_CREATE) {
+			log_debug(LOG_SUBSYS_NHACP,
+			    "[%s] Out of NHACP sessions.", conn_name(conn));
+			return false;
+		}
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Allocated session ID %u.", conn_name(conn),
+		    session_id);
+		ctx->session_id = session_id;
+	}
+
+	ctx->linked = true;
+	LIST_INSERT_HEAD(&conn->nhacp_sessions, ctx, link);
+
+	return true;
+}
+
+/*
+ * nhacp_conn_reset --
+ *	Reset the connection's NHACP state, preserving the specified
+ *	context if it is on the connection's list.
+ */
+static void
+nhacp_conn_reset(struct nabu_connection *conn, struct nhacp_context *octx)
+{
+	struct nhacp_context *ctx, *tctx;
+
+	LIST_FOREACH_SAFE(ctx, &conn->nhacp_sessions, link, tctx) {
+		if (ctx == octx) {
+			stext_context_fini(&ctx->stext);
+		} else {
+			nhacp_context_free(ctx);
+		}
+	}
+}
+
+/*
  * Handle some NHACP protocol version differences.
  */
 static bool
 nhacp_reqlen_ok(struct nhacp_context *ctx, uint16_t reqlen)
 {
+	if (reqlen == 0) {
+		return false;
+	}
+
 	switch (ctx->nhacp_version) {
 	case NHACP_VERS_0_0:
 		/*
@@ -290,9 +398,9 @@ nhacp_file_attrs_from_fileio(const struct fileio_attrs *fa,
  *	how we share buffer space between them.
  */
 static uint8_t *
-nhacp_crc_ptr(struct nhacp_context *ctx)
+nhacp_crc_ptr(struct nhacp_context *ctx, uint16_t options)
 {
-	size_t crclen = nhacp_crc_len(ctx);
+	size_t crclen = nhacp_crc_len(options);
 
 #ifdef HAVE_STATIC_ASSERT
 	_Static_assert(
@@ -332,7 +440,7 @@ nhacp_crc_ptr(struct nhacp_context *ctx)
 static void
 nhacp_send_reply(struct nhacp_context *ctx, uint8_t type, uint16_t length)
 {
-	size_t crclen = nhacp_crc_len(ctx);
+	size_t crclen = nhacp_crc_len(ctx->nhacp_options);
 
 	length += crclen;
 	assert(length <= NHACP_MAX_MESSAGELEN);
@@ -347,7 +455,7 @@ nhacp_send_reply(struct nhacp_context *ctx, uint8_t type, uint16_t length)
 	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
 		assert(crclen == 1);
 
-		uint8_t *crc_ptr = nhacp_crc_ptr(ctx);
+		uint8_t *crc_ptr = nhacp_crc_ptr(ctx, ctx->nhacp_options);
 		assert(crc_ptr != NULL);
 
 		uint8_t crc = crc8_wcdma_init();
@@ -393,6 +501,8 @@ static const struct nhacp_error_map_entry {
 	ERRMAP2(EXDEV, NHACP_EPERM),
 	ERRMAP2(EROFS, NHACP_EPERM),
 	ERRMAP(ENOTEMPTY),
+	ERRMAP(ESRCH),
+	ERRMAP(EAGAIN),
 
 	/* Default */
 	ERRMAP2(-1, NHACP_EIO),
@@ -425,6 +535,9 @@ static const char * const nhacp_error_strings[] = {
 	ERRSTR(NHACP_ESEEK,	"ILLEGAL SEEK"),
 	ERRSTR(NHACP_ENOTDIR,	"FILE IS NOT A DIRECTORY"),
 	ERRSTR(NHACP_ENOTEMPTY,	"DIRECTORY IS NOT EMPTY"),
+	ERRSTR(NHACP_ESRCH,	"NO SUCH PROCESS"),
+	ERRSTR(NHACP_ENSESS,	"TOO MANY SESSIONS"),
+	ERRSTR(NHACP_EAGAIN,	"TRY AGAIN LATER"),
 };
 static const unsigned int nhacp_error_string_count =
     sizeof(nhacp_error_strings) / sizeof(nhacp_error_strings[0]);
@@ -556,6 +669,110 @@ nhacp_send_uint32(struct nhacp_context *ctx, uint32_t val)
 /*****************************************************************************
  * Request handling
  *****************************************************************************/
+
+/*
+ * nhacp_req_hello --
+ *	Handle the HELLO request.
+ */
+static void
+nhacp_req_hello(struct nhacp_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	extern char nabud_version[];
+
+	if (! NHACP_MAGIC_IS_VALID(ctx->request.hello.magic)) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Invalid HELLO magic: 0x%02x 0x%02x 0x%02x",
+		    conn_name(conn),
+		    ctx->request.hello.magic[0],
+		    ctx->request.hello.magic[1],
+		    ctx->request.hello.magic[2]);
+		/* Bogus magic -- just ignore it. */
+		return;
+	}
+
+	uint16_t version = nabu_get_uint16(ctx->request.hello.version);
+	uint16_t options = nabu_get_uint16(ctx->request.hello.options);
+
+	log_debug(LOG_SUBSYS_NHACP,
+	    "[%s] Client request NHACP version 0x%04x options 0x%04x.",
+	    conn_name(conn), version, options);
+
+	if (options & ~NABUD_NHACP_OPTIONS) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unsupported NHACP options 0x%04x.",
+		    conn_name(conn), options & ~NABUD_NHACP_OPTIONS);
+		/* Just ignore this. */
+		return;
+	}
+
+	switch (version) {
+	/*
+	 * Not allowed to start NHACP-0.0 this way.
+	 */
+	case NHACP_VERS_0_1:
+		break;
+
+	default:
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unsupported NHACP version 0x%04x.",
+		    conn_name(conn), version);
+		/* Just ignore this. */
+		return;
+	}
+
+	ctx->nhacp_version = version;
+	ctx->nhacp_options = options;
+
+	if (ctx->session_id == NHACP_SESSION_SYSTEM) {
+		/*
+		 * HELLO with the SYSTEM session means we need to
+		 * reset everything and start afresh.
+		 */
+		nhacp_conn_reset(ctx->stext.conn, ctx);
+	} else if (ctx->session_id != NHACP_SESSION_CREATE) {
+		/*
+		 * Can't request a new session with an ID that might
+		 * already be in-use.
+		 */
+		nhacp_send_error(ctx, NHACP_EINVAL);
+		if (! ctx->linked) {
+			nhacp_context_free(ctx);
+		}
+		return;
+	}
+
+	if (ctx->linked) {
+		assert(ctx->session_id == NHACP_SESSION_SYSTEM);
+	} else if (! nhacp_context_init(conn, ctx)) {
+		nhacp_send_error(ctx, NHACP_ENSESS);
+		nhacp_context_free(ctx);
+		return;
+	}
+
+	ctx->reply.session_started.session_id = ctx->session_id;
+	nabu_set_uint16(ctx->reply.session_started.version,
+	    NABUD_NHACP_VERSION);
+	snprintf((char *)ctx->reply.session_started.adapter_id, 256, "%s-%s",
+	    getprogname(), nabud_version);
+	ctx->reply.session_started.adapter_id_length =
+	   (uint8_t)strlen((char *)ctx->reply.session_started.adapter_id);
+	log_debug(LOG_SUBSYS_NHACP,
+	    "[%s] Sending proto version: 0x%04x server version: %s",
+	    conn_name(conn), NABUD_NHACP_VERSION,
+	    (char *)ctx->reply.session_started.adapter_id);
+	log_info("[%s] Established NHAP-%d.%d session %u.", conn_name(conn),
+	    NHACP_VERS_MAJOR(ctx->nhacp_version),
+	    NHACP_VERS_MINOR(ctx->nhacp_version),
+	    ctx->session_id);
+	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
+		log_info("[%s] session %u: CRC-8/WCDMA FCS option enabled.",
+		    conn_name(conn), ctx->session_id);
+	}
+	nhacp_send_reply(ctx, NHACP_RESP_SESSION_STARTED,
+	    sizeof(ctx->reply.session_started) +
+	    ctx->reply.session_started.adapter_id_length);
+}
 
 static int
 nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
@@ -1327,78 +1544,46 @@ nhacp_req_rename(struct nhacp_context *ctx)
 	}
 }
 
-#define	HANDLER_ENTRY(v, n)						\
+#define	HANDLER_ENTRY(v, n, mpv)					\
 	[(v)] = {							\
 		.handler    = nhacp_req_ ## n ,				\
 		.debug_desc = #v ,					\
 		.min_reqlen = sizeof(struct nhacp_request_ ## n ),	\
+		.min_version = (mpv),					\
 	}
+
+#define	ENTRY_0_0(v, n)		HANDLER_ENTRY(v, n, NHACP_VERS_0_0)
+#define	ENTRY_0_1(v, n)		HANDLER_ENTRY(v, n, NHACP_VERS_0_1)
 
 static const struct {
 	void		(*handler)(struct nhacp_context *);
 	const char	*debug_desc;
 	ssize_t		min_reqlen;
+	uint16_t	min_version;
 } nhacp_request_types[] = {
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_OPEN,      storage_open),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET,       storage_get),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT,       storage_put),
-	HANDLER_ENTRY(NHACP_REQ_GET_DATE_TIME,     get_date_time),
-	HANDLER_ENTRY(NHACP_REQ_FILE_CLOSE,        file_close),
-	HANDLER_ENTRY(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_GET_BLOCK, storage_get_block),
-	HANDLER_ENTRY(NHACP_REQ_STORAGE_PUT_BLOCK, storage_put_block),
-	HANDLER_ENTRY(NHACP_REQ_FILE_READ,         file_read),
-	HANDLER_ENTRY(NHACP_REQ_FILE_WRITE,        file_write),
-	HANDLER_ENTRY(NHACP_REQ_FILE_SEEK,         file_seek),
-	HANDLER_ENTRY(NHACP_REQ_LIST_DIR,          list_dir),
-	HANDLER_ENTRY(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
-	HANDLER_ENTRY(NHACP_REQ_REMOVE,            remove),
-	HANDLER_ENTRY(NHACP_REQ_RENAME,            rename),
+	ENTRY_0_1(NHACP_REQ_HELLO,             hello),
+	ENTRY_0_0(NHACP_REQ_STORAGE_OPEN,      storage_open),
+	ENTRY_0_0(NHACP_REQ_STORAGE_GET,       storage_get),
+	ENTRY_0_0(NHACP_REQ_STORAGE_PUT,       storage_put),
+	ENTRY_0_0(NHACP_REQ_GET_DATE_TIME,     get_date_time),
+	ENTRY_0_0(NHACP_REQ_FILE_CLOSE,        file_close),
+	ENTRY_0_1(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
+	ENTRY_0_1(NHACP_REQ_STORAGE_GET_BLOCK, storage_get_block),
+	ENTRY_0_1(NHACP_REQ_STORAGE_PUT_BLOCK, storage_put_block),
+	ENTRY_0_1(NHACP_REQ_FILE_READ,         file_read),
+	ENTRY_0_1(NHACP_REQ_FILE_WRITE,        file_write),
+	ENTRY_0_1(NHACP_REQ_FILE_SEEK,         file_seek),
+	ENTRY_0_1(NHACP_REQ_LIST_DIR,          list_dir),
+	ENTRY_0_1(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
+	ENTRY_0_1(NHACP_REQ_REMOVE,            remove),
+	ENTRY_0_1(NHACP_REQ_RENAME,            rename),
 };
 static const unsigned int nhacp_request_type_count =
     sizeof(nhacp_request_types) / sizeof(nhacp_request_types[0]);
 
+#undef ENTRY_0_0
+#undef ENTRY_0_1
 #undef HANDLER_ENTRY
-
-/*
- * nhacp_context_free --
- *	Free and NHACP context and all associated resources.
- */
-static void
-nhacp_context_free(struct nhacp_context *ctx)
-{
-	assert(ctx->stext.conn->nhacp == ctx);
-	ctx->stext.conn->nhacp = NULL;
-	stext_context_fini(&ctx->stext);
-	free(ctx);
-}
-
-/*
- * nhacp_context_alloc --
- *	Allocate an NHACP context for the specified connection.
- */
-static struct nhacp_context *
-nhacp_context_alloc(struct nabu_connection *conn)
-{
-	/*
-	 * We may have been asked to start NHACP without an
-	 * intervening stop, which would indicate a reboot
-	 * of the client.  In this case, clear out any existing
-	 * state that may already exist.
-	 */
-	if (conn->nhacp != NULL) {
-		nhacp_context_free(conn->nhacp);
-	}
-
-	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
-	if (ctx != NULL) {
-		stext_context_init(&ctx->stext, conn,
-		    sizeof(struct nhacp_file_private),
-		    nhacp_file_private_init, nhacp_file_private_fini);
-		conn->nhacp = ctx;
-	}
-	return ctx;
-}
 
 /*
  * nhacp_request_check --
@@ -1409,26 +1594,56 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
 	uint8_t req = ctx->request.generic.type;
+	uint16_t options, min_reqlen;
 
 	/* Max message length has already been checked. */
 	assert(length <= NHACP_MAX_MESSAGELEN);
 
-	if (req >= nhacp_request_type_count ||
-	    nhacp_request_types[req].handler == NULL) {
-		log_error("[%s] Unknown NHACP request: 0x%02x",
-		    conn_name(conn), ctx->request.generic.type);
+	switch (req) {
+	case NHACP_REQ_GOODBYE:		/* same as END-PROTOCOL in 0.0 */
+		min_reqlen = sizeof(struct nhacp_request_goodbye);
+		break;
+
+	default:
+		if (req >= nhacp_request_type_count ||
+		    nhacp_request_types[req].handler == NULL) {
+			log_error("[%s] Unknown NHACP request: 0x%02x",
+			    conn_name(conn), ctx->request.generic.type);
+			return false;
+		}
+		min_reqlen = nhacp_request_types[req].min_reqlen;
+		if (ctx->nhacp_version < nhacp_request_types[req].min_version) {
+			log_error("[%s] NHACP version (%u.%u) less than "
+			    "minimum required (%u.%u) for %s.", conn_name(conn),
+			    NHACP_VERS_MAJOR(ctx->nhacp_version),
+			    NHACP_VERS_MINOR(ctx->nhacp_version),
+			    NHACP_VERS_MAJOR(nhacp_request_types[
+							req].min_version),
+			    NHACP_VERS_MINOR(nhacp_request_types[
+							req].min_version),
+			    nhacp_request_types[req].debug_desc);
+		}
+		break;
+	}
+
+	if (length < min_reqlen) {
+		log_error("[%s] Runt NHACP request: %u < %u",
+		    conn_name(conn), length, min_reqlen);
 		return false;
 	}
 
-	if (length < nhacp_request_types[req].min_reqlen) {
-		log_error("[%s] Runt NHACP request: %u < %zd",
-		    conn_name(conn), length,
-		    nhacp_request_types[req].min_reqlen);
-		return false;
+	/*
+	 * If we're establishing a new NHACP session, get the options
+	 * directly from the HELLO message.
+	 */
+	if (ctx->request.generic.type == NHACP_REQ_HELLO) {
+		options = nabu_get_uint16(ctx->request.hello.options);
+	} else {
+		options = ctx->nhacp_options;
 	}
 
-	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
-		uint8_t *crc_ptr = nhacp_crc_ptr(ctx);
+	if (options & NHACP_OPTION_CRC8) {
+		uint8_t *crc_ptr = nhacp_crc_ptr(ctx, options);
 
 		if (*crc_ptr == 0) {
 			log_debug(LOG_SUBSYS_NHACP,
@@ -1442,6 +1657,7 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 			size_t crc_checklen =
 			    length + sizeof(ctx->request.length);
 			uint8_t crc = crc8_wcdma_init();
+			crc = crc8_wcdma_update(&ctx->session_id, 1, crc);
 			crc = crc8_wcdma_update(&ctx->request,
 			    crc_checklen, crc);
 			crc = crc8_wcdma_fini(crc);
@@ -1452,6 +1668,8 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 				 * so we can report computed vs. expected.
 				 */
 				crc = crc8_wcdma_init();
+				crc = crc8_wcdma_update(&ctx->session_id, 1,
+				    crc);
 				crc = crc8_wcdma_update(&ctx->request,
 				    crc_checklen - 1, crc);
 				crc = crc8_wcdma_fini(crc);
@@ -1466,15 +1684,27 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 		}
 	}
 
+	/*
+	 * All requests other than HELLO must be associated with an
+	 * established NHACP session.
+	 */
+	if (ctx->request.generic.type != NHACP_REQ_HELLO && !ctx->linked) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] No session for session ID %u.\n",
+		    conn_name(conn), ctx->session_id);
+		nhacp_send_error(ctx, NHACP_ESRCH);
+		return false;
+	}
+
 	return true;
 }
 
 /*
- * nhacp_request --
+ * nhacp_process_request --
  *	Invoke the handler for the specified request.
  */
 static inline void
-nhacp_request(struct nhacp_context *ctx)
+nhacp_process_request(struct nhacp_context *ctx)
 {
 	log_debug(LOG_SUBSYS_NHACP, "[%s] Got %s.", conn_name(ctx->stext.conn),
 	    nhacp_request_types[ctx->request.generic.type].debug_desc);
@@ -1482,101 +1712,23 @@ nhacp_request(struct nhacp_context *ctx)
 }
 
 /*
- * nhacp_recv_start --
- *	Receive and validate the versioned START-NHACP message.
+ * nhacp_start_0_0 --
+ *	Enter NHACP-0.0 mode on this connection.
  */
 static bool
-nhacp_recv_start(struct nabu_connection *conn, uint16_t *versionp,
-    uint16_t *optionsp)
-{
-	struct nabu_msg_start_nhacp start_nhacp;
-
-	conn_start_watchdog(conn, 1);
-
-	/*
-	 * We've already received the first byte (the message type);
-	 * receive the remaining bytes.
-	 */
-	if (! conn_recv(conn, &start_nhacp.magic, sizeof(start_nhacp) - 1)) {
-		if (conn_check_state(conn)) {
-			/* Error not already logged in this case. */
-			log_debug(LOG_SUBSYS_NHACP,
-			    "[%s] conn_recv() of START-NHACP message failed.",
-			    conn_name(conn));
-			return false;
-		}
-	}
-
-	if (! NHACP_MAGIC_IS_VALID(start_nhacp.magic)) {
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] Invalid START-NHACP magic: 0x%02x 0x%02x 0x%02x",
-		    conn_name(conn), start_nhacp.magic[0],
-		    start_nhacp.magic[1], start_nhacp.magic[2]);
-		return false;
-	}
-
-	*versionp = nabu_get_uint16(start_nhacp.version);
-	*optionsp = nabu_get_uint16(start_nhacp.options);
-
-	log_debug(LOG_SUBSYS_NHACP,
-	    "[%s] Client request NHACP version 0x%04x options 0x%04x.",
-	    conn_name(conn), *versionp, *optionsp);
-
-	/* We do enforce versioning here, however. */
-	switch (*versionp) {
-	case NHACP_VERS_0_0:
-	case NHACP_VERS_0_1:
-		break;
-
-	default:
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] Unsupported NHACP version 0x%04x.",
-		    conn_name(conn), *versionp);
-		return false;
-	}
-
-	if (*optionsp & ~NABUD_NHACP_OPTIONS) {
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] Unsupported NHACP options 0x%04x.",
-		    conn_name(conn), *optionsp & ~NABUD_NHACP_OPTIONS);
-		return false;
-	}
-	return true;
-}
-
-/*
- * nhacp_start --
- *	Enter NHACP mode on this connection.
- */
-bool
-nhacp_start(struct nabu_connection *conn, uint8_t msg)
+nhacp_start_0_0(struct nabu_connection *conn)
 {
 	struct nhacp_context *ctx;
 	extern char nabud_version[];
 	uint16_t reqlen;
-	uint16_t version, options = 0;
 
-	switch (msg) {
-	case NABU_MSG_START_NHACP_0_0:		/* original draft */
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] Got NABU_MSG_START_NHACP_0_0.", conn_name(conn));
-		version = NHACP_VERS_0_0;
-		break;
-
-	case NABU_MSG_START_NHACP:		/* versioned START-NHACP */
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] Got NABU_MSG_START_NHACP.", conn_name(conn));
-		if (! nhacp_recv_start(conn, &version, &options)) {
-			/*
-			 * Not a valid START-NHACP, or not a version
-			 * that we support.
-			 */
-			return false;
-		}
-		break;
-
-	default:
-		/* Not a NHACP start message. */
+	/*
+	 * Don't allow intermixing of 0.0 with 0.1-and-later.
+	 */
+	if (! LIST_EMPTY(&conn->nhacp_sessions)) {
+		log_error("[%s] NHACP-0.0 start requested while "
+		    "NHACP sessions are already established.",
+		    conn_name(conn));
 		return false;
 	}
 
@@ -1584,30 +1736,31 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	 * If we failed to allocate a context, just don't send
 	 * a reply -- act as if this were an unrecognized message.
 	 */
-	if ((ctx = nhacp_context_alloc(conn)) == NULL) {
+	if ((ctx = nhacp_context_alloc(conn, NHACP_SESSION_SYSTEM)) == NULL) {
 		log_error("[%s] Failed to allocate NHACP context.",
 		    conn_name(conn));
 		return true;
 	}
-	ctx->nhacp_version = version;
-	ctx->nhacp_options = options;
+	ctx->nhacp_version = NHACP_VERS_0_0;
+	ctx->nhacp_options = 0;
 
 	/*
 	 * Send a NHACP-STARTED response.  We know there's room at the end
 	 * for a NUL terminator.
 	 */
-	nabu_set_uint16(ctx->reply.nhacp_started.version, NABUD_NHACP_VERSION);
-	snprintf((char *)ctx->reply.nhacp_started.adapter_id, 256, "%s-%s",
-	    getprogname(), nabud_version);
-	ctx->reply.nhacp_started.adapter_id_length =
-	    (uint8_t)strlen((char *)ctx->reply.nhacp_started.adapter_id);
+	nabu_set_uint16(ctx->reply.nhacp_started_0_0.version,
+	    NABUD_NHACP_VERSION);
+	snprintf((char *)ctx->reply.nhacp_started_0_0.adapter_id, 256,
+	    "%s-%s", getprogname(), nabud_version);
+	ctx->reply.nhacp_started_0_0.adapter_id_length =
+	    (uint8_t)strlen((char *)ctx->reply.nhacp_started_0_0.adapter_id);
 	log_debug(LOG_SUBSYS_NHACP,
 	    "[%s] Sending proto version: 0x%04x server version: %s",
 	    conn_name(conn), NABUD_NHACP_VERSION,
-	    (char *)ctx->reply.nhacp_started.adapter_id);
-	nhacp_send_reply(ctx, NHACP_RESP_NHACP_STARTED,
-	    sizeof(ctx->reply.nhacp_started) +
-	    ctx->reply.nhacp_started.adapter_id_length);
+	    (char *)ctx->reply.nhacp_started_0_0.adapter_id);
+	nhacp_send_reply(ctx, NHACP_RESP_NHACP_STARTED_0_0,
+	    sizeof(ctx->reply.nhacp_started_0_0) +
+	    ctx->reply.nhacp_started_0_0.adapter_id_length);
 
 	/*
 	 * Now enter NHACP mode until we are asked to exit or until
@@ -1616,10 +1769,6 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 	log_info("[%s] Entering NHACP-%d.%d mode.", conn_name(conn),
 	    NHACP_VERS_MAJOR(ctx->nhacp_version),
 	    NHACP_VERS_MINOR(ctx->nhacp_version));
-	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
-		log_info("[%s] CRC-8/WCDMA FCS option enabled.",
-		    conn_name(conn));
-	}
 
 	for (;;) {
 		/* We want to block "forever" waiting for requests. */
@@ -1689,7 +1838,7 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 		 * Check for END-PROTOCOL before we do anything else.
 		 * There's no payload and no reply -- we just get out.
 		 */
-		if (ctx->request.generic.type == NHACP_REQ_END_PROTOCOL) {
+		if (ctx->request.generic.type == NHACP_REQ_END_PROTOCOL_0_0) {
 			log_debug(LOG_SUBSYS_NHACP,
 			    "[%s] Got NHACP_REQ_END_PROTOCOL.",
 			    conn_name(conn));
@@ -1707,12 +1856,135 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 			continue;
 		}
 
-		/* Everything checks out -- handle the request. */
-		nhacp_request(ctx);
+		/* Everything checks out -- process the request. */
+		nhacp_process_request(ctx);
 	}
 
 	log_info("[%s] Exiting NHACP mode.", conn_name(conn));
 	nhacp_context_free(ctx);
+	return true;
+}
+
+/*
+ * nhacp_request --
+ *	Handle an NHACP request.
+ */
+bool
+nhacp_request(struct nabu_connection *conn, uint8_t msg)
+{
+	struct nhacp_context *ctx;
+	uint16_t reqlen;
+	uint8_t session_id;
+
+	switch (msg) {
+	case NABU_MSG_START_NHACP_0_0:
+		/* This is a request to enter NHACP 0.0 mode. */
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Got NABU_MSG_START_NHACP_0_0.", conn_name(conn));
+		return nhacp_start_0_0(conn);
+
+	case NABU_MSG_NHACP_REQUEST:
+		/* This is an NHACP >= 0.1 request. */
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Got NABU_MSG_NHACP_REQUEST.", conn_name(conn));
+		break;
+
+	default:
+		/* Not an NHACP message. */
+		return false;
+	}
+
+	conn_start_watchdog(conn, 1);
+
+	/* Get the session ID. */
+	if (! conn_recv_byte(conn, &session_id)) {
+		if (! conn_check_state(conn)) {
+			/* Error already logged. */
+			return true;
+		}
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] conn_recv_byte() failed, returning.",
+		    conn_name(conn));
+		return true;
+	}
+
+	/* Look up the context associated with this session ID. */
+	ctx = nhacp_context_lookup(conn, session_id);
+	if (ctx == NULL) {
+		/*
+		 * No context found; allocate a new context in case
+		 * a new session is being established.
+		 */
+		ctx = nhacp_context_alloc(conn, session_id);
+		if (ctx == NULL) {
+			log_error("[%s] Failed to allocate context.",
+			    conn_name(conn));
+			return true;
+		}
+	}
+
+	/* Get the frame length. */
+	if (! conn_recv(conn, &ctx->request.length,
+			sizeof(ctx->request.length))) {
+		if (! conn_check_state(conn)) {
+			/* Error already logged. */
+			goto out;
+		}
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] conn_recv() failed, returning.",
+		    conn_name(conn));
+		goto out;
+	}
+
+	reqlen = nabu_get_uint16(ctx->request.length);
+
+	if (! nhacp_reqlen_ok(ctx, reqlen)) {
+		log_error("[%s] Bogus request length: 0x%04x.",
+		    conn_name(conn), reqlen);
+		goto out;
+	}
+
+	log_debug(LOG_SUBSYS_NHACP,
+	    "[%s] Receiving %u byte request.", conn_name(conn), reqlen);
+
+	/* Ok, receive the message. */
+	if (! conn_recv(conn, &ctx->request.max_request, reqlen)) {
+		if (! conn_check_state(conn)) {
+			/* Error already logged. */
+			goto out;
+		}
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] conn_recv() %u bytes failed.", conn_name(conn),
+		    reqlen);
+		goto out;
+	}
+
+	/*
+	 * Check that the client has sent a valid request.
+	 */
+	if (! nhacp_request_check(ctx, reqlen)) {
+		/*
+		 * Error already logged.  Just skip the
+		 * packet and continue.
+		 */
+		goto out;
+	}
+
+	/*
+	 * Everything checks out -- process the request.  GOODBYE is
+	 * handled as a special case.
+	 */
+	if (ctx->request.generic.type == NHACP_REQ_GOODBYE) {
+		log_info("[%s] Ending NHACP session %u.",
+		    conn_name(conn), ctx->session_id);
+		nhacp_context_free(ctx);
+		return true;
+	}
+	nhacp_process_request(ctx);
+ out:
+	if (! ctx->linked) {
+		nhacp_context_free(ctx);
+	}
 	return true;
 }
 
@@ -1723,7 +1995,5 @@ nhacp_start(struct nabu_connection *conn, uint8_t msg)
 void
 nhacp_conn_fini(struct nabu_connection *conn)
 {
-	if (conn->nhacp != NULL) {
-		nhacp_context_free(conn->nhacp);
-	}
+	nhacp_conn_reset(conn, NULL);
 }

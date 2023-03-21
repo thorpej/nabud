@@ -84,7 +84,7 @@ struct nabu_connection {
 	/*
 	 * NHACP extensions context.
 	 */
-	struct nhacp_context *nhacp;
+	LIST_HEAD(, nhacp_context) nhacp_sessions;
 
 	/*
 	 * RetroNet extensions context.

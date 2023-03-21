@@ -161,6 +161,7 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 	}
 
 	conn->type = type;
+	LIST_INIT(&conn->nhacp_sessions);
 
 	/* Not exactly "common", but hey, we allocate the conn here. */
 	if (conn->type == CONN_TYPE_SERIAL) {
@@ -488,7 +489,7 @@ conn_destroy(struct nabu_connection *conn)
 void
 conn_reboot(struct nabu_connection *conn)
 {
-	if (conn->nhacp != NULL) {
+	if (! LIST_EMPTY(&conn->nhacp_sessions)) {
 		log_info("[%s] Clearing previous NHACP state.",
 		    conn_name(conn));
 		nhacp_conn_fini(conn);

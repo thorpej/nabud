@@ -67,22 +67,16 @@
 #define	NHACP_MAX_MESSAGELEN		NHACP_MTU_0_0
 
 /*
- * The appliation on the NABU tells the server to go into NHACP
+ * The appliation on the NABU tells the server to go into NHACP (0.0)
  * mode by sending this message while in legacy mode.
  */
 #define	NABU_MSG_START_NHACP_0_0	0xaf
-#define	NABU_MSG_START_NHACP		0x8f
 
 /*
- * This message is received outside of the standard NHACP message
- * framing protocol.
+ * The application on the NABU tells the server that an NHACP (>= 0.1)
+ * request frame follows by sending this message.
  */
-struct nabu_msg_start_nhacp {
-	uint8_t		type;
-	uint8_t		magic[3];	/* "ACP" */
-	uint8_t		version[2];	/* u16: protocol version */
-	uint8_t		options[2];	/* u16: protocol options */
-};
+#define	NABU_MSG_NHACP_REQUEST		0x8f
 
 #define	NHACP_MAGIC_IS_VALID(cp)	((cp)[0] == 'A' &&	\
 					 (cp)[1] == 'C' &&	\
@@ -90,6 +84,10 @@ struct nabu_msg_start_nhacp {
 
 #define	NHACP_OPTION_CRC8		0x0001	/* Use CRC-8/WCDMA FCS */
 
+#define	NHACP_SESSION_SYSTEM		0x00	/* Special "system" session */
+#define	NHACP_SESSION_CREATE		0xff	/* Create a new session */
+
+#define	NHACP_REQ_HELLO			0x00
 #define	NHACP_REQ_STORAGE_OPEN		0x01
 #define	NHACP_REQ_STORAGE_GET		0x02
 #define	NHACP_REQ_STORAGE_PUT		0x03
@@ -105,7 +103,8 @@ struct nabu_msg_start_nhacp {
 #define	NHACP_REQ_GET_DIR_ENTRY		0x0d
 #define	NHACP_REQ_REMOVE		0x0e
 #define	NHACP_REQ_RENAME		0x0f
-#define	NHACP_REQ_END_PROTOCOL		0xef
+#define	NHACP_REQ_END_PROTOCOL_0_0	0xef
+#define	NHACP_REQ_GOODBYE		0xef
 
 /* STORAGE-OPEN flags */
 #define	NHACP_O_RDWR		0x0000	/* open for reading + writing */
@@ -144,6 +143,11 @@ struct nhacp_file_attrs {
 #define	NHACP_AF_SPEC		0x0008	/* file is a "special" file */
 
 struct nhacp_request {
+	/*
+	 * NHACP >= 0.1 includes a session ID just before the length,
+	 * but we don't include that here in the request structure in
+	 * order to make 0.0 compatibility easier.
+	 */
 	uint8_t		length[2];	/* u16: length of what follows */
 	union {
 		struct nhacp_request_generic {
@@ -153,6 +157,12 @@ struct nhacp_request {
 			uint8_t		type;
 			uint8_t		payload[NHACP_MAX_MESSAGELEN - 1];
 		} max_request;
+		struct nhacp_request_hello {
+			uint8_t		type;
+			uint8_t		magic[3];	/* "ACP" */
+			uint8_t		version[2];	/* u16 */
+			uint8_t		options[2];	/* u16 */
+		} hello;
 		struct nhacp_request_storage_open {
 			uint8_t		type;
 			uint8_t		req_slot;
@@ -246,13 +256,14 @@ struct nhacp_request {
 			 */
 			uint8_t		names[];	/* old, new */
 		} rename;
-		struct nhacp_request_end_protocol {
+		struct nhacp_request_goodbye {	/* END-PROTOCOL in 0.0 */
 			uint8_t		type;
-		} end_protocol;
+		} goodbye;
 	};
 };
 
-#define	NHACP_RESP_NHACP_STARTED	0x80
+#define	NHACP_RESP_NHACP_STARTED_0_0	0x80
+#define	NHACP_RESP_SESSION_STARTED	0x80
 #define	NHACP_RESP_OK			0x81
 #define	NHACP_RESP_ERROR		0x82
 #define	NHACP_RESP_STORAGE_LOADED	0x83
@@ -273,12 +284,19 @@ struct nhacp_response {
 			uint8_t		type;
 			uint8_t		payload[NHACP_MAX_MESSAGELEN - 1];
 		} max_response;
-		struct nhacp_response_nhacp_started {
+		struct nhacp_response_nhacp_started_0_0 {
 			uint8_t		type;
 			uint8_t		version[2];	/* u16 */
 			uint8_t		adapter_id_length;
 			uint8_t		adapter_id[];	/* char string */
-		} nhacp_started;
+		} nhacp_started_0_0;
+		struct nhacp_response_nhacp_session_started {
+			uint8_t		type;
+			uint8_t		session_id;
+			uint8_t		version[2];	/* u16 */
+			uint8_t		adapter_id_length;
+			uint8_t		adapter_id[];	/* char string */
+		} session_started;
 		struct nhacp_response_ok {
 			uint8_t		type;
 		} ok;
@@ -342,6 +360,9 @@ struct nhacp_response {
 #define	NHACP_ESEEK		15	/* Seek on non-seekable file */
 #define	NHACP_ENOTDIR		16	/* File is not a directory */
 #define	NHACP_ENOTEMPTY		17	/* Directory is not empty */
+#define	NHACP_ESRCH		18	/* No such process/session */
+#define	NHACP_ENSESS		19	/* Too many sessions */
+#define	NHACP_EAGAIN		20	/* Try again later */
 
 /* FILE-SEEK whence values */
 #define	NHACP_SEEK_SET		0

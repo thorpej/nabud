@@ -716,7 +716,7 @@ adaptor_event_loop(struct nabu_connection *conn)
 		}
 
 		/* Check for NHACP mode. */
-		if (nhacp_start(conn, msg)) {
+		if (nhacp_request(conn, msg)) {
 			/* Yup! */
 			continue;
 		}
