@@ -1696,7 +1696,7 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 	 */
 	if (ctx->request.generic.type != NHACP_REQ_HELLO && !ctx->linked) {
 		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] No session for session ID %u.\n",
+		    "[%s] No session for session ID %u.",
 		    conn_name(conn), ctx->session_id);
 		nhacp_send_error(ctx, NHACP_ESRCH);
 		return false;
@@ -1996,6 +1996,8 @@ nhacp_request(struct nabu_connection *conn, uint8_t msg)
 	nhacp_process_request(ctx);
  out:
 	if (! ctx->linked) {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Freeing unlinked context.", conn_name(conn));
 		nhacp_context_free(ctx);
 	}
 	return true;
