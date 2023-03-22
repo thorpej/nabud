@@ -1544,16 +1544,16 @@ nhacp_req_rename(struct nhacp_context *ctx)
 	}
 }
 
-#define	HANDLER_ENTRY(v, n, mpv)					\
+#define	HANDLER_ENTRY(v, d, n, mpv)					\
 	[(v)] = {							\
 		.handler    = nhacp_req_ ## n ,				\
-		.debug_desc = #v ,					\
+		.debug_desc = d ,					\
 		.min_reqlen = sizeof(struct nhacp_request_ ## n ),	\
 		.min_version = (mpv),					\
 	}
 
-#define	ENTRY_0_0(v, n)		HANDLER_ENTRY(v, n, NHACP_VERS_0_0)
-#define	ENTRY_0_1(v, n)		HANDLER_ENTRY(v, n, NHACP_VERS_0_1)
+#define	ENTRY_0_0(v, n)		HANDLER_ENTRY(v, #v, n, NHACP_VERS_0_0)
+#define	ENTRY_0_1(v, n)		HANDLER_ENTRY(v, #v, n, NHACP_VERS_0_1)
 
 static const struct {
 	void		(*handler)(struct nhacp_context *);
@@ -1594,7 +1594,7 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
 	uint8_t req = ctx->request.generic.type;
-	uint16_t options, min_reqlen;
+	uint16_t options, min_reqlen, version;
 
 	/* Max message length has already been checked. */
 	assert(length <= NHACP_MAX_MESSAGELEN);
@@ -1612,7 +1612,12 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 			return false;
 		}
 		min_reqlen = nhacp_request_types[req].min_reqlen;
-		if (ctx->nhacp_version < nhacp_request_types[req].min_version) {
+		if (ctx->request.generic.type == NHACP_REQ_HELLO) {
+			version = nabu_get_uint16(ctx->request.hello.version);
+		} else {
+			version = ctx->nhacp_version;
+		}
+		if (version < nhacp_request_types[req].min_version) {
 			log_error("[%s] NHACP version (%u.%u) less than "
 			    "minimum required (%u.%u) for %s.", conn_name(conn),
 			    NHACP_VERS_MAJOR(ctx->nhacp_version),
@@ -1622,6 +1627,7 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 			    NHACP_VERS_MINOR(nhacp_request_types[
 							req].min_version),
 			    nhacp_request_types[req].debug_desc);
+			return false;
 		}
 		break;
 	}
@@ -1915,12 +1921,19 @@ nhacp_request(struct nabu_connection *conn, uint8_t msg)
 		 * No context found; allocate a new context in case
 		 * a new session is being established.
 		 */
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Session %u not found; allocating a new one.",
+		    conn_name(conn), session_id);
 		ctx = nhacp_context_alloc(conn, session_id);
 		if (ctx == NULL) {
 			log_error("[%s] Failed to allocate context.",
 			    conn_name(conn));
 			return true;
 		}
+	} else {
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Found context for session ID %u.",
+		    conn_name(conn), session_id);
 	}
 
 	/* Get the frame length. */
