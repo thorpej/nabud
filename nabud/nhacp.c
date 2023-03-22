@@ -848,6 +848,10 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		return;
 	}
 
+	log_debug(LOG_SUBSYS_NHACP,
+	    "[%s] nhacp_o_flags 0x%04x -> fileio_o_flags 0x%08x",
+	    conn_name(ctx->stext.conn), nhacp_o_flags, fileio_o_flags);
+
 	error = stext_file_open(&ctx->stext,
 	    (const char *)ctx->request.storage_open.url_string,
 	    ctx->request.storage_open.req_slot, &attrs, fileio_o_flags, &f);
