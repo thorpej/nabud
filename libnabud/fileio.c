@@ -269,6 +269,9 @@ fileio_local_resolve_path(const char *location, const char *local_root,
 	char *fname;
 
 	if ((flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "LOCAL-ROOT required for '%s' but none specified.",
+		    location);
 		return EINVAL;
 	}
 
@@ -291,12 +294,17 @@ fileio_local_resolve_path(const char *location, const char *local_root,
 	}
 
 	if (strlen(location) == 0) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "zero-length file location??");
 		return EINVAL;
 	}
 
 	if (local_root != NULL) {
 		/* The local root must be an absolute path. */
 		if (*local_root != '/') {
+			log_debug(LOG_SUBSYS_FILEIO,
+			    "LOCAL-ROOT '%s' is not an absolute path.",
+			    local_root);
 			return EINVAL;
 		}
 		if (check_local_root_escape(location)) {
@@ -346,6 +354,9 @@ fileio_local_io_open(struct fileio *f, const char *location,
 		 * You cannot simultaneously require both a regular file
 		 * and a directory.
 		 */
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "Specified REGULAR+DIRECTORY for '%s' - make up your mind!",
+		    location);
 		errno = EINVAL;
 		return false;
 	}
@@ -733,6 +744,8 @@ fileio_resolve_path(const char *location, const char *local_root, int oflags)
 	int error;
 
 	if (! fileio_location_is_local(location, strlen(location))) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "Location '%s' is not local.", location);
 		errno = EINVAL;
 		return NULL;
 	}
