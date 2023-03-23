@@ -471,6 +471,7 @@ adaptor_msg_transmit_status(struct nabu_connection *conn)
 {
 	log_debug(LOG_SUBSYS_ADAPTOR,
 	    "[%s] Sending MABU_MSGSEQ_FINISHED.", conn_name(conn));
+	conn_send_byte(conn, NABU_SIGNAL_STATUS_YES);
 	conn_send(conn, nabu_msg_finished, sizeof(nabu_msg_finished));
 }
 
