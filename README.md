@@ -405,6 +405,11 @@ And you can select a file to loaded when the NABU boots and requests image
   the original ("0.0") NHACP is maintained.  WARNING: NHACP-0.1 SUPPORT
   IS SUBJECT TO CHANGE AS THE DRAFT EVOLVES.
 
+### nabud-1.2.2
+* Fixed an error in the GET-STATUS,TRANSMIT response that caused problems
+  with the newer alternate NABU development ROMs.  Tip-of-the-hat to
+  Nick Daniels for pointing it out.
+
 ### nabud-1.2.1
 * Experimental support for Cygwin (64-bit).
 * Support command history / editing in nabuctl in Docker builds,
