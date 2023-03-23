@@ -400,6 +400,11 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.2.2
+* Fixed an error in the GET-STATUS,TRANSMIT response that caused problems
+  with the newer alternate NABU development ROMs.  Tip-of-the-hat to
+  Nick Daniels for pointing it out.
+
 ### nabud-1.2.1
 * Experimental support for Cygwin (64-bit).
 * Support command history / editing in nabuctl in Docker builds,
