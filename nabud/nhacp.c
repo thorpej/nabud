@@ -1702,7 +1702,12 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 		log_debug(LOG_SUBSYS_NHACP,
 		    "[%s] No session for session ID %u.",
 		    conn_name(conn), ctx->session_id);
-		nhacp_send_error(ctx, NHACP_ESRCH);
+		/*
+		 * ...but we don't send errors back for GOODBYE.
+		 */
+		if (ctx->request.generic.type != NHACP_REQ_GOODBYE) {
+			nhacp_send_error(ctx, NHACP_ESRCH);
+		}
 		return false;
 	}
 
@@ -1992,9 +1997,15 @@ nhacp_request(struct nabu_connection *conn, uint8_t msg)
 	 * handled as a special case.
 	 */
 	if (ctx->request.generic.type == NHACP_REQ_GOODBYE) {
-		log_info("[%s] Ending NHACP session %u.",
-		    conn_name(conn), ctx->session_id);
-		nhacp_context_free(ctx);
+		if (ctx->session_id == NHACP_SESSION_SYSTEM) {
+			log_info("[%s] Ending all NHACP sessions.",
+			    conn_name(conn));
+			nhacp_conn_reset(conn, NULL);
+		} else {
+			log_info("[%s] Ending NHACP session %u.",
+			    conn_name(conn), ctx->session_id);
+			nhacp_context_free(ctx);
+		}
 		return true;
 	}
 	nhacp_process_request(ctx);
