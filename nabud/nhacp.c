@@ -538,6 +538,7 @@ static const char * const nhacp_error_strings[] = {
 	ERRSTR(NHACP_ESRCH,	"NO SUCH PROCESS"),
 	ERRSTR(NHACP_ENSESS,	"TOO MANY SESSIONS"),
 	ERRSTR(NHACP_EAGAIN,	"TRY AGAIN LATER"),
+	ERRSTR(NHACP_EROFS,	"FILE IS WRITE-PROTECTED"),
 };
 static const unsigned int nhacp_error_string_count =
     sizeof(nhacp_error_strings) / sizeof(nhacp_error_strings[0]);

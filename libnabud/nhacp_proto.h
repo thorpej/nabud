@@ -290,7 +290,7 @@ struct nhacp_response {
 			uint8_t		adapter_id_length;
 			uint8_t		adapter_id[];	/* char string */
 		} nhacp_started_0_0;
-		struct nhacp_response_nhacp_session_started {
+		struct nhacp_response_session_started {
 			uint8_t		type;
 			uint8_t		session_id;
 			uint8_t		version[2];	/* u16 */
@@ -363,6 +363,7 @@ struct nhacp_response {
 #define	NHACP_ESRCH		18	/* No such process/session */
 #define	NHACP_ENSESS		19	/* Too many sessions */
 #define	NHACP_EAGAIN		20	/* Try again later */
+#define	NHACP_EROFS		21	/* Object is write-protected */
 
 /* FILE-SEEK whence values */
 #define	NHACP_SEEK_SET		0
