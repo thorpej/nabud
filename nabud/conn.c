@@ -245,13 +245,29 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 	} else {
 		t.c_cflag &= ~CRTSCTS;
 	}
-
+	
+	// Linux can only set "standard" baud rates using regular cfsetspeed(), custom baud rates require the newer termios2 structure
+	#ifdef linux
+	struct termios2 t2;
+	ioctl(fd, TCGETS2, &t2);
+	t2.c_cflag &= ~CBAUD;
+	t2.c_cflag |= BOTHER;
+	t2.c_ispeed = (speed_t)args->baud;
+	t2.c_ospeed = (speed_t)args->baud;
+	int r = ioctl(fd, TCSETS2, &t2);
+	if (r != 0) {
+		log_error("[%s] termios2-setspeed(%u) failed: %s", args->port,
+		    args->baud, strerror(errno));
+		goto failed;
+	}
+	#else
 	if (cfsetspeed(&t, (speed_t)args->baud) < 0) {
 		log_error("[%s] cfsetspeed(%u) failed: %s", args->port,
 		    args->baud, strerror(errno));
 		goto failed;
 	}
-
+	#endif
+	
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
 		log_error("[%s] Failed to set 8N%u-%u%s: %s", args->port,
 		    args->stop_bits, args->baud,
