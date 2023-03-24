@@ -246,7 +246,16 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 		t.c_cflag &= ~CRTSCTS;
 	}
 	
+	if (tcsetattr(fd, TCSANOW, &t) < 0) {
+		log_error("[%s] Failed to set 8N%u-%u: %s", args->port,
+		    args->stop_bits,
+		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
+		goto failed;
+	}
+	
 	// Linux can only set "standard" baud rates using regular cfsetspeed(), custom baud rates require the newer termios2 structure
+	// has to be done last, as subsequent calls to standard termios after termios2 make you lose termios2 stuff !
+	
 	#ifdef linux
 	struct termios2 t2;
 	ioctl(fd, TCGETS2, &t2);
@@ -268,13 +277,6 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 	}
 	#endif
 	
-	if (tcsetattr(fd, TCSANOW, &t) < 0) {
-		log_error("[%s] Failed to set 8N%u-%u%s: %s", args->port,
-		    args->stop_bits, args->baud,
-		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
-		goto failed;
-	}
-
 	return true;
  failed:
 	return false;
