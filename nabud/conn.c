@@ -258,14 +258,18 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 	
 	#ifdef linux
 	struct termios2 t2;
-	ioctl(fd, TCGETS2, &t2);
+	
+	if (ioctl(fd, TCGETS2, &t2) < 0) {
+		log_error("[%s] ioctl-tcgets2(%u) failed: %s", args->port,
+		    args->baud, strerror(errno));
+		goto failed;
+	}
 	t2.c_cflag &= ~CBAUD;
 	t2.c_cflag |= BOTHER;
 	t2.c_ispeed = (speed_t)args->baud;
 	t2.c_ospeed = (speed_t)args->baud;
-	int r = ioctl(fd, TCSETS2, &t2);
-	if (r < 0) {
-		log_error("[%s] termios2-setspeed(%u) failed: %s", args->port,
+	if (ioctl(fd, TCSETS2, &t2) < 0) {
+		log_error("[%s] ioctl-tcsets2(%u) failed: %s", args->port,
 		    args->baud, strerror(errno));
 		goto failed;
 	}
