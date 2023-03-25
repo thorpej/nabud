@@ -1712,7 +1712,7 @@ command_nhacp_storage_put_block(int argc, char *argv[])
 }
 
 static bool
-command_nhacp_storage_close(int argc, char *argv[])
+command_nhacp_file_close(int argc, char *argv[])
 {
 	if (argc < 2) {
 		printf("Args, bro.\n");
@@ -1853,7 +1853,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-storage-put-block",
 				.func = command_nhacp_storage_put_block },
 	{ .name = "nhacp-get-date-time", .func = command_nhacp_get_date_time },
-	{ .name = "nhacp-storage-close", .func = command_nhacp_storage_close },
+	{ .name = "nhacp-file-close",	.func = command_nhacp_file_close },
 	{ .name = "nhacp-get-error-details",
 				.func = command_nhacp_get_error_details },
 	{ .name = "nhacp-list-dir",	.func = command_nhacp_list_dir },
