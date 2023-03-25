@@ -282,7 +282,7 @@ rn_req_file_open(struct retronet_context *ctx)
 	fname[fnamelen] = '\0';
 
 	int fileio_flags = (flags & RN_FILE_OPEN_RW) ?
-	    FILEIO_O_RDWR : FILEIO_O_RDONLY;
+	    FILEIO_O_RDWP : FILEIO_O_RDONLY;
 
 	error = stext_file_open(&ctx->stext, fname, reqslot, &attrs,
 	    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
@@ -291,18 +291,7 @@ rn_req_file_open(struct retronet_context *ctx)
 		 * The RetroNet API says to treat a busy requested
 		 * slot as "ok, then just allocate one.".  &shrug;
 		 */
-		reqslot = 0xff;
-		error = stext_file_open(&ctx->stext, fname, reqslot, &attrs,
-		    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
-	}
-	if (error != 0 && (flags & RN_FILE_OPEN_RW) != 0) {
-		/*
-		 * Auto-downgrade from RDWR -> RDWR_WP.
-		 */
-		log_debug(LOG_SUBSYS_RETRONET,
-		    "[%s] Auto-downgrading RDWR -> RDWR_WP.", conn_name(conn));
-		fileio_flags = FILEIO_O_RDWP;
-		error = stext_file_open(&ctx->stext, fname, reqslot, &attrs,
+		error = stext_file_open(&ctx->stext, fname, 0xff, &attrs,
 		    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
 	}
 

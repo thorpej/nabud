@@ -837,7 +837,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	 * had a slot for them.
 	 */
 	if (ctx->nhacp_version == NHACP_VERS_0_0) {
-		nhacp_o_flags = NHACP_O_RDWR | NHACP_O_CREAT;
+		nhacp_o_flags = NHACP_O_RDWP | NHACP_O_CREAT;
 	} else {
 		nhacp_o_flags =
 		    nabu_get_uint16(ctx->request.storage_open.flags);
@@ -856,22 +856,6 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	error = stext_file_open(&ctx->stext,
 	    (const char *)ctx->request.storage_open.url_string,
 	    ctx->request.storage_open.req_slot, &attrs, fileio_o_flags, &f);
-	if (error != 0 && ctx->nhacp_version == NHACP_VERS_0_0) {
-		/*
-		 * For NHACP-0.0, we will auto-downgrade from RDWR to
-		 * RDWR_WP.
-		 */
-		log_debug(LOG_SUBSYS_NHACP,
-		    "[%s] Auto-downgrading RDWR -> RDWR_WP.",
-		    conn_name(ctx->stext.conn));
-		fileio_o_flags &= ~FILEIO_O_ACCMODE;
-		fileio_o_flags |= FILEIO_O_RDWP;
-		error = stext_file_open(&ctx->stext,
-		    (const char *)ctx->request.storage_open.url_string,
-		    ctx->request.storage_open.req_slot, &attrs,
-		    fileio_o_flags, &f);
-	}
-
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
