@@ -499,7 +499,7 @@ static const struct nhacp_error_map_entry {
 	ERRMAP2(EFTYPE, NHACP_EPERM),
 #endif /* HAVE_EFTYPE */
 	ERRMAP2(EXDEV, NHACP_EPERM),
-	ERRMAP2(EROFS, NHACP_EPERM),
+	ERRMAP(EROFS),
 	ERRMAP(ENOTEMPTY),
 	ERRMAP(ESRCH),
 	ERRMAP(EAGAIN),
@@ -779,20 +779,20 @@ static int
 nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
 {
 
-	switch (nhacp_o_flags & NHACP_O_ACCMASK) {
-	case NHACP_O_RDWR:
-		*fileio_o_flagsp = FILEIO_O_RDWR;
-		break;
-
+	switch (nhacp_o_flags & NHACP_O_ACCMODE) {
 	case NHACP_O_RDONLY:
 		*fileio_o_flagsp = FILEIO_O_RDONLY;
 		break;
 
+	case NHACP_O_RDWR:
+		*fileio_o_flagsp = FILEIO_O_RDWR;
+		break;
+
+	case NHACP_O_RDWR_WP:
+		*fileio_o_flagsp = FILEIO_O_RDWR_WP;
+		break;
+
 	default:
-		/*
-		 * Not actually possible because NHACP_O_RDWR == 0.
-		 * Compiler should DCE this into a puff of greasy smoke.
-		 */
 		return EINVAL;
 	}
 	if (nhacp_o_flags & NHACP_O_CREAT) {
@@ -856,6 +856,21 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	error = stext_file_open(&ctx->stext,
 	    (const char *)ctx->request.storage_open.url_string,
 	    ctx->request.storage_open.req_slot, &attrs, fileio_o_flags, &f);
+	if (error != 0 && ctx->nhacp_version == NHACP_VERS_0_0) {
+		/*
+		 * For NHACP-0.0, we will auto-downgrade from RDWR to
+		 * RDWR_WP.
+		 */
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Auto-downgrading RDWR -> RDWR_WP.",
+		    conn_name(ctx->stext.conn));
+		fileio_o_flags &= ~FILEIO_O_ACCMODE;
+		fileio_o_flags |= FILEIO_O_RDWR_WP;
+		error = stext_file_open(&ctx->stext,
+		    (const char *)ctx->request.storage_open.url_string,
+		    ctx->request.storage_open.req_slot, &attrs,
+		    fileio_o_flags, &f);
+	}
 
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));

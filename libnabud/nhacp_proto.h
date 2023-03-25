@@ -107,13 +107,13 @@
 #define	NHACP_REQ_GOODBYE		0xef
 
 /* STORAGE-OPEN flags */
-#define	NHACP_O_RDWR		0x0000	/* open for reading + writing */
-#define	NHACP_O_RDONLY		0x0001	/* open only for reading */
-#define	NHACP_O_CREAT		0x0002	/* create file if it does not exist */
-#define	NHACP_O_EXCL		0x0004	/* fail create if file already exists */
+#define	NHACP_O_ACCMODE		0x0007	/* mask for access mode */
+#define	NHACP_O_RDONLY		0x0000	/* open only for reading */
+#define	NHACP_O_RDWR		0x0001	/* open for reading + writing */
+#define	NHACP_O_RDWR_WP		0x0002	/* RDWR + lazy write-protect */
 #define	NHACP_O_DIRECTORY	0x0008	/* 1=must be dir, 0=must be reg */
-
-#define	NHACP_O_ACCMASK		(NHACP_O_RDWR | NHACP_O_RDONLY)
+#define	NHACP_O_CREAT		0x0010	/* create file if it does not exist */
+#define	NHACP_O_EXCL		0x0020	/* fail create if file already exists */
 
 /* REMOVE-FILE flags */
 #define	NHACP_REMOVE_FILE	0x0000	/* remove a regular file */

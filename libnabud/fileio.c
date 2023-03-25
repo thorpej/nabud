@@ -76,6 +76,7 @@ struct fileio_ops {
 struct fileio {
 	char		*location;	/* might be a URL */
 	int		flags;
+	bool		writable;
 
 	const struct fileio_ops *ops;
 
@@ -91,14 +92,78 @@ struct fileio {
 	};
 };
 
-static bool
-fileio_io_ok(struct fileio *f, bool writing)
+static inline int
+fileio_accmode(struct fileio *f)
 {
-	if (writing && (f->flags & FILEIO_O_RDWR) == 0) {
-		errno = EBADF;
-		return false;
+	return f->flags & FILEIO_O_ACCMODE;
+}
+
+static int
+fileio_accmode_to_o_flags(struct fileio *f)
+{
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDONLY:
+		f->writable = false;
+		return O_RDONLY;
+
+	case FILEIO_O_RDWR:
+	case FILEIO_O_RDWR_WP:
+		f->writable = true;
+		return O_RDWR;
+
+	default:
+		f->writable = false;
+		return -1;
 	}
-	return true;
+}
+
+static int
+fileio_accmode_downgrade_o_flags(struct fileio *f)
+{
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDWR_WP:
+		if (f->writable) {
+			f->writable = false;
+			return O_RDONLY;
+		}
+		/* FALLTHROUGH */
+
+	default:
+		return -1;
+	}
+}
+
+static int
+fileio_io_check(struct fileio *f, bool writing)
+{
+	int error = 0;
+
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDONLY:
+		if (writing) {
+			error = EBADF;
+		}
+		break;
+
+	case FILEIO_O_RDWR:
+		/*
+		 * If the underlying object isn't writable, then this
+		 * access mode should have already been denied.
+		 */
+		assert(f->writable);
+		break;
+
+	case FILEIO_O_RDWR_WP:
+		if (writing && !f->writable) {
+			error = EROFS;
+		}
+		break;
+
+	default:
+		abort();
+	}
+
+	return error;
 }
 
 /*
@@ -336,7 +401,14 @@ fileio_local_io_open(struct fileio *f, const char *location,
 {
 	int error;
 
-	int open_flags = (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY;
+	int open_flags = fileio_accmode_to_o_flags(f);
+	if (open_flags == -1) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "Bogus access mode: %d", fileio_accmode(f));
+		errno = EINVAL;
+		return false;
+	}
+ again:
 	if (f->flags & FILEIO_O_CREAT) {
 		open_flags |= O_CREAT;
 	}
@@ -392,6 +464,12 @@ fileio_local_io_open(struct fileio *f, const char *location,
 			errno = EPERM;
 		}
 #endif /* HAVE_EFTYPE */
+		if (errno == EACCES &&
+		    (open_flags = fileio_accmode_downgrade_o_flags(f)) != -1) {
+			log_debug(LOG_SUBSYS_FILEIO,
+			    "Downgrading access mode for '%s'", location);
+			goto again;
+		}
 		return false;
 	}
 
@@ -435,7 +513,14 @@ fileio_local_io_ok(struct fileio *f, bool writing)
 		errno = EBADF;
 		return false;
 	}
-	return fileio_io_ok(f, writing);
+
+	int error = fileio_io_check(f, writing);
+	if (error != 0) {
+		errno = error;
+		return false;
+	}
+
+	return true;
 }
 
 static void
@@ -588,6 +673,21 @@ static bool
 fileio_remote_io_open(struct fileio *f, const char *location,
     const char *local_root)
 {
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDONLY:
+	case FILEIO_O_RDWR_WP:
+		break;
+
+	case FILEIO_O_RDWR:
+		errno = EACCES;
+		return NULL;
+
+	default:
+		errno = EINVAL;
+		return NULL;
+	}
+
+	f->writable = false;
 	f->location = strdup(location);
 	if (f->location == NULL) {
 		errno = ENOMEM;
@@ -615,7 +715,14 @@ fileio_remote_io_ok(struct fileio *f, bool writing)
 		errno = EBADF;
 		return false;
 	}
-	return fileio_io_ok(f, writing);
+
+	int error = fileio_io_check(f, writing);
+	if (error != 0) {
+		errno = error;
+		return false;
+	}
+
+	return true;
 }
 
 static bool
@@ -704,11 +811,6 @@ fileio_open(const char *location, int flags, const char *local_root,
 	struct fileio *f;
 
 	fso = fileio_ops_for_location(location, strlen(location));
-
-	if (fso->ops->io_write == NULL && (flags & FILEIO_O_RDWR) != 0) {
-		errno = ENOTSUP;
-		return NULL;
-	}
 
 	f = calloc(1, sizeof(*f));
 	if (f == NULL) {
@@ -873,7 +975,7 @@ fileio_seek(struct fileio *f, off_t offset, int whence)
 	off_t pos = -1;
 
 	if (f->ops->io_seek == NULL) {
-		errno = ENOTSUP;
+		errno = ESPIPE;
 	} else if ((*f->ops->io_ok)(f, false)) {
 		pos = (*f->ops->io_seek)(f, offset, whence);
 	}
@@ -906,7 +1008,7 @@ fileio_pread(struct fileio *f, void *buf, size_t len, off_t offset)
 	ssize_t actual = -1;
 
 	if (f->ops->io_pread == NULL) {
-		errno = ENOTSUP;
+		errno = ESPIPE;
 	} else if ((*f->ops->io_ok)(f, false)) {
 		actual = (*f->ops->io_pread)(f, buf, len, offset);
 	}
@@ -922,8 +1024,8 @@ fileio_write(struct fileio *f, const void *buf, size_t len)
 {
 	ssize_t actual = -1;
 
-	if (f->ops->io_write == NULL) {
-		errno = ENOTSUP;
+	if (f->ops->io_write == NULL || !f->writable) {
+		errno = EROFS;
 	} else if ((*f->ops->io_ok)(f, true)) {
 		actual = (*f->ops->io_write)(f, buf, len);
 	}
@@ -940,7 +1042,7 @@ fileio_pwrite(struct fileio *f, const void *buf, size_t len, off_t offset)
 	ssize_t actual = -1;
 
 	if (f->ops->io_pwrite == NULL) {
-		errno = ENOTSUP;
+		errno = ESPIPE;
 	} else if ((*f->ops->io_ok)(f, true)) {
 		actual = (*f->ops->io_pwrite)(f, buf, len, offset);
 	}

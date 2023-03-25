@@ -1562,6 +1562,16 @@ command_nhacp_storage_open(int argc, char *argv[])
 			oflags |= NHACP_O_RDWR;
 			continue;
 		}
+		if (strcmp(argv[i], "rw_wp") == 0 ||
+		    strcmp(argv[i], "rdwr_wp") == 0) {
+			if (have_accmode) {
+				printf("Already have access mode.\n");
+				cli_throw();
+			}
+			have_accmode = true;
+			oflags |= NHACP_O_RDWR_WP;
+			continue;
+		}
 		if (strcmp(argv[i], "ro") == 0 ||
 		    strcmp(argv[i], "rdonly") == 0) {
 			if (have_accmode) {
