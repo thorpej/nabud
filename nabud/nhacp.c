@@ -788,8 +788,8 @@ nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
 		*fileio_o_flagsp = FILEIO_O_RDWR;
 		break;
 
-	case NHACP_O_RDWR_WP:
-		*fileio_o_flagsp = FILEIO_O_RDWR_WP;
+	case NHACP_O_RDWP:
+		*fileio_o_flagsp = FILEIO_O_RDWP;
 		break;
 
 	default:
@@ -865,7 +865,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		    "[%s] Auto-downgrading RDWR -> RDWR_WP.",
 		    conn_name(ctx->stext.conn));
 		fileio_o_flags &= ~FILEIO_O_ACCMODE;
-		fileio_o_flags |= FILEIO_O_RDWR_WP;
+		fileio_o_flags |= FILEIO_O_RDWP;
 		error = stext_file_open(&ctx->stext,
 		    (const char *)ctx->request.storage_open.url_string,
 		    ctx->request.storage_open.req_slot, &attrs,

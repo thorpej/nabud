@@ -61,7 +61,7 @@ const char *	fileio_location(struct fileio *);
 #define	FILEIO_O_ACCMODE	0x0007	/* access mode mask */
 #define	FILEIO_O_RDONLY		0x0000
 #define	FILEIO_O_RDWR		0x0001
-#define	FILEIO_O_RDWR_WP	0x0002
+#define	FILEIO_O_RDWP		0x0002	/* RDWR + lazy write-protect */
 #define	FILEIO_O_LOCAL_ROOT	0x0008	/* require a local root */
 #define	FILEIO_O_CREAT		0x0010
 #define	FILEIO_O_EXCL		0x0020

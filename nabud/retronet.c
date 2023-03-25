@@ -301,7 +301,7 @@ rn_req_file_open(struct retronet_context *ctx)
 		 */
 		log_debug(LOG_SUBSYS_RETRONET,
 		    "[%s] Auto-downgrading RDWR -> RDWR_WP.", conn_name(conn));
-		fileio_flags = FILEIO_O_RDWR_WP;
+		fileio_flags = FILEIO_O_RDWP;
 		error = stext_file_open(&ctx->stext, fname, reqslot, &attrs,
 		    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
 	}

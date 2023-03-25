@@ -107,7 +107,7 @@ fileio_accmode_to_o_flags(struct fileio *f)
 		return O_RDONLY;
 
 	case FILEIO_O_RDWR:
-	case FILEIO_O_RDWR_WP:
+	case FILEIO_O_RDWP:
 		f->writable = true;
 		return O_RDWR;
 
@@ -121,7 +121,7 @@ static int
 fileio_accmode_downgrade_o_flags(struct fileio *f)
 {
 	switch (fileio_accmode(f)) {
-	case FILEIO_O_RDWR_WP:
+	case FILEIO_O_RDWP:
 		if (f->writable) {
 			f->writable = false;
 			return O_RDONLY;
@@ -153,7 +153,7 @@ fileio_io_check(struct fileio *f, bool writing)
 		assert(f->writable);
 		break;
 
-	case FILEIO_O_RDWR_WP:
+	case FILEIO_O_RDWP:
 		if (writing && !f->writable) {
 			error = EROFS;
 		}
@@ -675,7 +675,7 @@ fileio_remote_io_open(struct fileio *f, const char *location,
 {
 	switch (fileio_accmode(f)) {
 	case FILEIO_O_RDONLY:
-	case FILEIO_O_RDWR_WP:
+	case FILEIO_O_RDWP:
 		break;
 
 	case FILEIO_O_RDWR:

@@ -1569,7 +1569,7 @@ command_nhacp_storage_open(int argc, char *argv[])
 				cli_throw();
 			}
 			have_accmode = true;
-			oflags |= NHACP_O_RDWR_WP;
+			oflags |= NHACP_O_RDWP;
 			continue;
 		}
 		if (strcmp(argv[i], "ro") == 0 ||
