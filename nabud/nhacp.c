@@ -1719,7 +1719,8 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 	 * All requests other than HELLO must be associated with an
 	 * established NHACP session.
 	 */
-	if (ctx->request.generic.type != NHACP_REQ_HELLO && !ctx->linked) {
+	if (ctx->request.generic.type != NHACP_REQ_HELLO && !ctx->linked &&
+	    ctx->nhacp_version != NHACP_VERS_0_0) {
 		log_debug(LOG_SUBSYS_NHACP,
 		    "[%s] No session for session ID %u.",
 		    conn_name(conn), ctx->session_id);
