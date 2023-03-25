@@ -1667,8 +1667,13 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 			 */
 			size_t crc_checklen =
 			    length + sizeof(ctx->request.length);
+			uint8_t request_header[2] = {
+				NABU_MSG_NHACP_REQUEST,
+				ctx->session_id,
+			};
 			uint8_t crc = crc8_wcdma_init();
-			crc = crc8_wcdma_update(&ctx->session_id, 1, crc);
+			crc = crc8_wcdma_update(request_header,
+			    sizeof(request_header), crc);
 			crc = crc8_wcdma_update(&ctx->request,
 			    crc_checklen, crc);
 			crc = crc8_wcdma_fini(crc);

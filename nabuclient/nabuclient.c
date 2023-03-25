@@ -1221,6 +1221,10 @@ nhacp_send(uint8_t op, uint16_t length)
 {
 	uint8_t *crc_ptr = NULL;
 	uint8_t crc = 0;
+	uint8_t request_header[2] = {
+		NABU_MSG_NHACP_REQUEST,
+		nhacp_session,
+	};
 
 	if (nhacp_options & NHACP_OPTION_CRC8) {
 		crc_ptr = (uint8_t *)&nhacp_buf.request.max_request + length;
@@ -1233,7 +1237,8 @@ nhacp_send(uint8_t op, uint16_t length)
 	if (nhacp_options & NHACP_OPTION_CRC8) {
 		if (! nhacp_crc_rxonly) {
 			crc = crc8_wcdma_init();
-			crc = crc8_wcdma_update(&nhacp_session, 1, crc);
+			crc = crc8_wcdma_update(&request_header,
+			    sizeof(request_header), crc);
 			crc = crc8_wcdma_update(&nhacp_buf.request,
 			    (uintptr_t)crc_ptr - (uintptr_t)&nhacp_buf.request,
 			    crc);
@@ -1243,8 +1248,7 @@ nhacp_send(uint8_t op, uint16_t length)
 	}
 
 	if (nhacp_version >= NHACP_VERS_0_1) {
-		nabu_send_byte(NABU_MSG_NHACP_REQUEST);
-		nabu_send_byte(nhacp_session);
+		nabu_send(request_header, sizeof(request_header));
 	}
 	nabu_send(&nhacp_buf.request,
 	    length + sizeof(nhacp_buf.request.length));
