@@ -114,6 +114,7 @@
 #define	NHACP_O_DIRECTORY	0x0008	/* 1=must be dir, 0=must be reg */
 #define	NHACP_O_CREAT		0x0010	/* create file if it does not exist */
 #define	NHACP_O_EXCL		0x0020	/* fail create if file already exists */
+#define	NHACP_O_TRUNC		0x0040	/* truncate existing file to 0 */
 
 /* REMOVE-FILE flags */
 #define	NHACP_REMOVE_FILE	0x0000	/* remove a regular file */
