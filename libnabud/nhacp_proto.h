@@ -99,12 +99,13 @@
 #define	NHACP_REQ_FILE_READ		0x09
 #define	NHACP_REQ_FILE_WRITE		0x0a
 #define	NHACP_REQ_FILE_SEEK		0x0b
-#define	NHACP_REQ_LIST_DIR		0x0c
-#define	NHACP_REQ_GET_DIR_ENTRY		0x0d
-#define	NHACP_REQ_REMOVE		0x0e
-#define	NHACP_REQ_RENAME		0x0f
-#define	NHACP_REQ_FILE_SETSIZE		0x10
-#define	NHACP_REQ_MKDIR			0x11
+#define	NHACP_REQ_FILE_GETATTR		0x0c
+#define	NHACP_REQ_FILE_SETSIZE		0x0d
+#define	NHACP_REQ_LIST_DIR		0x0e
+#define	NHACP_REQ_GET_DIR_ENTRY		0x0f
+#define	NHACP_REQ_REMOVE		0x10
+#define	NHACP_REQ_RENAME		0x11
+#define	NHACP_REQ_MKDIR			0x12
 #define	NHACP_REQ_END_PROTOCOL_0_0	0xef
 #define	NHACP_REQ_GOODBYE		0xef
 
@@ -230,6 +231,15 @@ struct nhacp_request {
 			uint8_t		offset[4];	/* s32 */
 			uint8_t		whence;
 		} file_seek;
+		struct nhacp_request_file_getattr {
+			uint8_t		type;
+			uint8_t		slot;
+		} file_getattr;
+		struct nhacp_request_file_setsize {
+			uint8_t		type;
+			uint8_t		slot;
+			uint8_t		size[4];	/* u32 */
+		} file_setsize;
 		struct nhacp_request_list_dir {
 			uint8_t		type;
 			uint8_t		slot;
@@ -259,11 +269,6 @@ struct nhacp_request {
 			 */
 			uint8_t		names[];	/* old, new */
 		} rename;
-		struct nhacp_request_file_setsize {
-			uint8_t		type;
-			uint8_t		slot;
-			uint8_t		size[4];	/* u32 */
-		} file_setsize;
 		struct nhacp_request_mkdir {
 			uint8_t		type;
 			uint8_t		url_length;
@@ -286,6 +291,7 @@ struct nhacp_request {
 #define	NHACP_RESP_UINT8_VALUE		0x87
 #define	NHACP_RESP_UINT16_VALUE		0x88
 #define	NHACP_RESP_UINT32_VALUE		0x89
+#define	NHACP_RESP_FILE_ATTRS		0x8a
 
 struct nhacp_response {
 	uint8_t		length[2];	/* u16: length of what follows */
@@ -339,6 +345,10 @@ struct nhacp_response {
 			uint8_t		name_length;
 			uint8_t		name[];
 		} dir_entry;
+		struct nhacp_response_file_attrs {
+			uint8_t		type;
+			struct nhacp_file_attrs attrs;
+		} file_attrs;
 		struct nhacp_response_uint8_value {
 			uint8_t		type;
 			uint8_t		value;

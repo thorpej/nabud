@@ -1556,6 +1556,35 @@ nhacp_req_rename(struct nhacp_context *ctx)
 }
 
 /*
+ * nhacp_req_file_getattr --
+ *	Handle the FILE-GETATTR request.
+ */
+static void
+nhacp_req_file_getattr(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+	struct fileio_attrs attrs;
+
+	f = stext_file_find(&ctx->stext, ctx->request.file_getattr.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_getattr.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	int error = stext_file_getattr(f, &attrs);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_file_attrs_from_fileio(&attrs,
+		    &ctx->reply.file_attrs.attrs);
+		nhacp_send_reply(ctx, NHACP_RESP_FILE_ATTRS,
+		    sizeof(ctx->reply.file_attrs));
+	}
+}
+
+/*
  * nhacp_req_file_setsize --
  *	Handle the FILE-SETSIZE request.
  */
@@ -1654,11 +1683,12 @@ static const struct {
 	ENTRY_0_1(NHACP_REQ_FILE_READ,         file_read),
 	ENTRY_0_1(NHACP_REQ_FILE_WRITE,        file_write),
 	ENTRY_0_1(NHACP_REQ_FILE_SEEK,         file_seek),
+	ENTRY_0_1(NHACP_REQ_FILE_GETATTR,      file_getattr),
+	ENTRY_0_1(NHACP_REQ_FILE_SETSIZE,      file_setsize),
 	ENTRY_0_1(NHACP_REQ_LIST_DIR,          list_dir),
 	ENTRY_0_1(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
 	ENTRY_0_1(NHACP_REQ_REMOVE,            remove),
 	ENTRY_0_1(NHACP_REQ_RENAME,            rename),
-	ENTRY_0_1(NHACP_REQ_FILE_SETSIZE,      file_setsize),
 	ENTRY_0_1(NHACP_REQ_MKDIR,             mkdir),
 };
 static const unsigned int nhacp_request_type_count =
