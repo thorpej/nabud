@@ -1463,8 +1463,10 @@ nhacp_req_remove(struct nhacp_context *ctx)
 	struct nabu_connection *conn = ctx->stext.conn;
 	char *name;
 	uint8_t namelen;
+	uint16_t flags;
 	int error = 0;
 
+	flags = nabu_get_uint16(ctx->request.remove.flags);
 	namelen = ctx->request.remove.url_length;
 	name = (char *)ctx->request.remove.url_string;
 	name[namelen] = '\0';
@@ -1472,10 +1474,20 @@ nhacp_req_remove(struct nhacp_context *ctx)
 	char *path =
 	    fileio_resolve_path(name, conn->file_root, FILEIO_O_LOCAL_ROOT);
 	if (path != NULL) {
-		if (unlink(path) < 0) {
+		const char *which;
+		int rv;
+
+		if (flags & NHACP_REMOVE_DIR) {
+			which = "rmdir";
+			rv = rmdir(path);
+		} else {
+			which = "unlink";
+			rv = unlink(path);
+		}
+		if (rv < 0) {
 			error = errno;
-			log_info("[%s] unlink(%s) failed: %s",
-			    conn_name(conn), path, strerror(error));
+			log_info("[%s] %s(%s) failed: %s",
+			    conn_name(conn), which, path, strerror(error));
 		}
 		free(path);
 	} else {
