@@ -1826,6 +1826,25 @@ command_nhacp_file_setsize(int argc, char *argv[])
 }
 
 static bool
+command_nhacp_mkdir(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	nhacp_buf.request.mkdir.url_length = (uint8_t)strlen(argv[2]);
+	strcpy((char *)nhacp_buf.request.mkdir.url_string, argv[2]);
+
+	printf("Sending: NHACP_REQ_MKDIR.\n");
+	nhacp_send(NHACP_REQ_MKDIR,
+	    sizeof(nhacp_buf.request.mkdir));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_goodbye(int argc, char *argv[])
 {
 	printf("Sending: NHACP_REQ_GOODBYE.\n");
@@ -1885,6 +1904,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-list-dir",	.func = command_nhacp_list_dir },
 	{ .name = "nhacp-get-dir-entry",.func = command_nhacp_get_dir_entry },
 	{ .name = "nhacp-file-setsize",	.func = command_nhacp_file_setsize },
+	{ .name = "nhacp-mkdir",	.func = command_nhacp_mkdir },
 	{ .name = "nhacp-goodbye",	.func = command_nhacp_goodbye },
 
 	CMDTAB_EOL(cli_command_unknown)

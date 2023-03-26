@@ -32,6 +32,7 @@
 
 #include "config.h"
 
+#include <sys/stat.h>
 #include <assert.h>
 #include <errno.h>
 #include <glob.h>
@@ -1586,6 +1587,44 @@ nhacp_req_file_setsize(struct nhacp_context *ctx)
 	}
 }
 
+/*
+ * nhacp_req_mkdir --
+ *	Handle the MKDIR request.
+ */
+static void
+nhacp_req_mkdir(struct nhacp_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	char *name;
+	uint8_t namelen;
+	int error = 0;
+
+	namelen = ctx->request.mkdir.url_length;
+	name = (char *)ctx->request.mkdir.url_string;
+	name[namelen] = '\0';
+
+	char *path =
+	    fileio_resolve_path(name, conn->file_root, FILEIO_O_LOCAL_ROOT);
+	if (path != NULL) {
+		if (mkdir(path, 0777) < 0) {
+			error = errno;
+			log_info("[%s] mkdir('%s', 0777) failed: %s",
+			    conn_name(conn), path, strerror(error));
+		}
+		free(path);
+	} else {
+		error = errno;
+		log_debug(LOG_SUBSYS_NHACP,
+		    "[%s] Unable to resolve path: %s", conn_name(conn), name);
+	}
+
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_ok(ctx);
+	}
+}
+
 #define	HANDLER_ENTRY(v, d, n, mpv)					\
 	[(v)] = {							\
 		.handler    = nhacp_req_ ## n ,				\
@@ -1620,6 +1659,7 @@ static const struct {
 	ENTRY_0_1(NHACP_REQ_REMOVE,            remove),
 	ENTRY_0_1(NHACP_REQ_RENAME,            rename),
 	ENTRY_0_1(NHACP_REQ_FILE_SETSIZE,      file_setsize),
+	ENTRY_0_1(NHACP_REQ_MKDIR,             mkdir),
 };
 static const unsigned int nhacp_request_type_count =
     sizeof(nhacp_request_types) / sizeof(nhacp_request_types[0]);
