@@ -1804,6 +1804,28 @@ command_nhacp_get_dir_entry(int argc, char *argv[])
 }
 
 static bool
+command_nhacp_file_setsize(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint32_t size = stext_parse_offset(argv[2]);	/* yes, offset */
+
+	nhacp_buf.request.file_setsize.slot = slot;
+	nabu_set_uint32(nhacp_buf.request.file_setsize.size, size);
+
+	printf("Sending: NHACP_REQ_FILE_SETSIZE.\n");
+	nhacp_send(NHACP_REQ_FILE_SETSIZE,
+	    sizeof(nhacp_buf.request.file_setsize));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_goodbye(int argc, char *argv[])
 {
 	printf("Sending: NHACP_REQ_GOODBYE.\n");
@@ -1862,6 +1884,7 @@ static const struct cmdtab cmdtab[] = {
 				.func = command_nhacp_get_error_details },
 	{ .name = "nhacp-list-dir",	.func = command_nhacp_list_dir },
 	{ .name = "nhacp-get-dir-entry",.func = command_nhacp_get_dir_entry },
+	{ .name = "nhacp-file-setsize",	.func = command_nhacp_file_setsize },
 	{ .name = "nhacp-goodbye",	.func = command_nhacp_goodbye },
 
 	CMDTAB_EOL(cli_command_unknown)

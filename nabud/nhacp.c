@@ -1554,6 +1554,38 @@ nhacp_req_rename(struct nhacp_context *ctx)
 	}
 }
 
+/*
+ * nhacp_req_file_setsize --
+ *	Handle the FILE-SETSIZE request.
+ */
+static void
+nhacp_req_file_setsize(struct nhacp_context *ctx)
+{
+	struct stext_file *f;
+
+	f = stext_file_find(&ctx->stext, ctx->request.file_setsize.slot);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_setsize.slot);
+		nhacp_send_error(ctx, NHACP_EBADF);
+		return;
+	}
+
+	if (nhacp_file_is_directory(f)) {
+		nhacp_send_error(ctx, NHACP_EISDIR);
+		return;
+	}
+
+	uint32_t size = nabu_get_uint32(ctx->request.file_setsize.size);
+
+	int error = stext_file_truncate(f, size);
+	if (error != 0) {
+		nhacp_send_error(ctx, nhacp_error_from_unix(error));
+	} else {
+		nhacp_send_ok(ctx);
+	}
+}
+
 #define	HANDLER_ENTRY(v, d, n, mpv)					\
 	[(v)] = {							\
 		.handler    = nhacp_req_ ## n ,				\
@@ -1587,6 +1619,7 @@ static const struct {
 	ENTRY_0_1(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
 	ENTRY_0_1(NHACP_REQ_REMOVE,            remove),
 	ENTRY_0_1(NHACP_REQ_RENAME,            rename),
+	ENTRY_0_1(NHACP_REQ_FILE_SETSIZE,      file_setsize),
 };
 static const unsigned int nhacp_request_type_count =
     sizeof(nhacp_request_types) / sizeof(nhacp_request_types[0]);
