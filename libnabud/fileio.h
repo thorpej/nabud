@@ -68,6 +68,7 @@ const char *	fileio_location(struct fileio *);
 #define	FILEIO_O_REGULAR	0x0040
 #define	FILEIO_O_DIRECTORY	0x0080
 #define	FILEIO_O_TEXT		0x0100	/* open as text; maybe CRLF xlation */
+#define	FILEIO_O_TRUNC		0x0200
 
 void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 			  size_t, size_t *filesizep);

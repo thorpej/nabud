@@ -123,6 +123,10 @@ fileio_accmode_downgrade_o_flags(struct fileio *f)
 	switch (fileio_accmode(f)) {
 	case FILEIO_O_RDWP:
 		if (f->writable) {
+			if (f->flags & FILEIO_O_TRUNC) {
+				/* Can't truncate in this case. */
+				return -1;
+			}
 			f->writable = false;
 			return O_RDONLY;
 		}
@@ -419,6 +423,9 @@ fileio_local_io_open(struct fileio *f, const char *location,
 		open_flags |= O_TEXT;
 	} else {
 		open_flags |= O_BINARY;
+	}
+	if (f->flags & FILEIO_O_TRUNC) {
+		open_flags |= O_TRUNC;
 	}
 	if ((f->flags & (FILEIO_O_REGULAR | FILEIO_O_DIRECTORY)) ==
 	    (FILEIO_O_REGULAR | FILEIO_O_DIRECTORY)) {
