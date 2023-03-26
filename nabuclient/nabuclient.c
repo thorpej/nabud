@@ -1826,6 +1826,75 @@ command_nhacp_file_setsize(int argc, char *argv[])
 }
 
 static bool
+command_nhacp_remove(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	nabu_set_uint16(nhacp_buf.request.remove.flags, NHACP_REMOVE_FILE);
+	nhacp_buf.request.remove.url_length = (uint8_t)strlen(argv[1]);
+	strcpy((char *)nhacp_buf.request.remove.url_string, argv[1]);
+
+	printf("Sending: NHACP_REQ_REMOVE (NHACP_REMOVE_FILE).\n");
+	nhacp_send(NHACP_REQ_REMOVE,
+	    sizeof(nhacp_buf.request.remove) +
+	    nhacp_buf.request.remove.url_length);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_rmdir(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	nabu_set_uint16(nhacp_buf.request.remove.flags, NHACP_REMOVE_DIR);
+	nhacp_buf.request.remove.url_length = (uint8_t)strlen(argv[1]);
+	strcpy((char *)nhacp_buf.request.remove.url_string, argv[1]);
+
+	printf("Sending: NHACP_REQ_REMOVE (NHACP_REMOVE_DIR).\n");
+	nhacp_send(NHACP_REQ_REMOVE,
+	    sizeof(nhacp_buf.request.remove) +
+	    nhacp_buf.request.remove.url_length);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_rename(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t *buf = nhacp_buf.request.rename.names;
+
+	*buf++ = (uint8_t)strlen(argv[1]);
+	strcpy((char *)buf, argv[1]);
+	buf += strlen(argv[1]);
+
+	*buf++ = (uint8_t)strlen(argv[2]);
+	strcpy((char *)buf, argv[2]);
+
+	printf("Sending: NHACP_REQ_RENAME.\n");
+	nhacp_send(NHACP_REQ_RENAME,
+	    sizeof(nhacp_buf.request.rename) +
+	    sizeof(*buf) + strlen(argv[1]) +
+	    sizeof(*buf) + strlen(argv[2]));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_mkdir(int argc, char *argv[])
 {
 	if (argc < 2) {
@@ -1833,12 +1902,13 @@ command_nhacp_mkdir(int argc, char *argv[])
 		cli_throw();
 	}
 
-	nhacp_buf.request.mkdir.url_length = (uint8_t)strlen(argv[2]);
-	strcpy((char *)nhacp_buf.request.mkdir.url_string, argv[2]);
+	nhacp_buf.request.mkdir.url_length = (uint8_t)strlen(argv[1]);
+	strcpy((char *)nhacp_buf.request.mkdir.url_string, argv[1]);
 
 	printf("Sending: NHACP_REQ_MKDIR.\n");
 	nhacp_send(NHACP_REQ_MKDIR,
-	    sizeof(nhacp_buf.request.mkdir));
+	    sizeof(nhacp_buf.request.mkdir) +
+	    nhacp_buf.request.mkdir.url_length);
 
 	nhacp_decode_reply();
 	return false;
@@ -1901,9 +1971,12 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-file-close",	.func = command_nhacp_file_close },
 	{ .name = "nhacp-get-error-details",
 				.func = command_nhacp_get_error_details },
+	{ .name = "nhacp-file-setsize",	.func = command_nhacp_file_setsize },
 	{ .name = "nhacp-list-dir",	.func = command_nhacp_list_dir },
 	{ .name = "nhacp-get-dir-entry",.func = command_nhacp_get_dir_entry },
-	{ .name = "nhacp-file-setsize",	.func = command_nhacp_file_setsize },
+	{ .name = "nhacp-remove",	.func = command_nhacp_remove },
+	{ .name = "nhacp-rmdir",	.func = command_nhacp_rmdir },
+	{ .name = "nhacp-rename",	.func = command_nhacp_rename },
 	{ .name = "nhacp-mkdir",	.func = command_nhacp_mkdir },
 	{ .name = "nhacp-goodbye",	.func = command_nhacp_goodbye },
 
