@@ -1595,6 +1595,10 @@ command_nhacp_storage_open(int argc, char *argv[])
 			oflags |= NHACP_O_DIRECTORY;
 			continue;
 		}
+		if (strcmp(argv[i], "trunc") == 0) {
+			oflags |= NHACP_O_TRUNC;
+			continue;
+		}
 		printf("Unknown open flag: %s\n", argv[i]);
 		cli_throw();
 	}

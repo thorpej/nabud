@@ -782,6 +782,7 @@ nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
 	switch (nhacp_o_flags & NHACP_O_ACCMODE) {
 	case NHACP_O_RDONLY:
 		*fileio_o_flagsp = FILEIO_O_RDONLY;
+		nhacp_o_flags &= ~NHACP_O_TRUNC;
 		break;
 
 	case NHACP_O_RDWR:
@@ -797,6 +798,8 @@ nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
 	}
 	if (nhacp_o_flags & NHACP_O_CREAT) {
 		*fileio_o_flagsp |= FILEIO_O_CREAT;
+	} else {
+		nhacp_o_flags &= ~NHACP_O_EXCL;
 	}
 	if (nhacp_o_flags & NHACP_O_EXCL) {
 		*fileio_o_flagsp |= FILEIO_O_EXCL;
@@ -805,6 +808,9 @@ nhacp_o_flags_to_fileio(uint16_t nhacp_o_flags, int *fileio_o_flagsp)
 		*fileio_o_flagsp |= FILEIO_O_DIRECTORY;
 	} else {
 		*fileio_o_flagsp |= FILEIO_O_REGULAR;
+	}
+	if (nhacp_o_flags & NHACP_O_TRUNC) {
+		*fileio_o_flagsp |= FILEIO_O_TRUNC;
 	}
 
 	return 0;
