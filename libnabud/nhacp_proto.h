@@ -99,8 +99,8 @@
 #define	NHACP_REQ_FILE_READ		0x09
 #define	NHACP_REQ_FILE_WRITE		0x0a
 #define	NHACP_REQ_FILE_SEEK		0x0b
-#define	NHACP_REQ_FILE_GETATTR		0x0c
-#define	NHACP_REQ_FILE_SETSIZE		0x0d
+#define	NHACP_REQ_FILE_GET_INFO		0x0c
+#define	NHACP_REQ_FILE_SET_SIZE		0x0d
 #define	NHACP_REQ_LIST_DIR		0x0e
 #define	NHACP_REQ_GET_DIR_ENTRY		0x0f
 #define	NHACP_REQ_REMOVE		0x10
@@ -231,15 +231,15 @@ struct nhacp_request {
 			uint8_t		offset[4];	/* s32 */
 			uint8_t		whence;
 		} file_seek;
-		struct nhacp_request_file_getattr {
+		struct nhacp_request_file_get_info {
 			uint8_t		type;
 			uint8_t		slot;
-		} file_getattr;
-		struct nhacp_request_file_setsize {
+		} file_get_info;
+		struct nhacp_request_file_set_size {
 			uint8_t		type;
 			uint8_t		slot;
 			uint8_t		size[4];	/* u32 */
-		} file_setsize;
+		} file_set_size;
 		struct nhacp_request_list_dir {
 			uint8_t		type;
 			uint8_t		slot;
@@ -287,11 +287,10 @@ struct nhacp_request {
 #define	NHACP_RESP_STORAGE_LOADED	0x83
 #define	NHACP_RESP_DATA_BUFFER		0x84
 #define	NHACP_RESP_DATE_TIME		0x85
-#define	NHACP_RESP_DIR_ENTRY		0x86
+#define	NHACP_RESP_FILE_INFO		0x86
 #define	NHACP_RESP_UINT8_VALUE		0x87
 #define	NHACP_RESP_UINT16_VALUE		0x88
 #define	NHACP_RESP_UINT32_VALUE		0x89
-#define	NHACP_RESP_FILE_ATTRS		0x8a
 
 struct nhacp_response {
 	uint8_t		length[2];	/* u16: length of what follows */
@@ -339,16 +338,12 @@ struct nhacp_response {
 			uint8_t		type;
 			struct nhacp_date_time date_time;
 		} date_time;
-		struct nhacp_response_dir_entry {
+		struct nhacp_response_file_info {
 			uint8_t		type;
 			struct nhacp_file_attrs attrs;
 			uint8_t		name_length;
 			uint8_t		name[];
-		} dir_entry;
-		struct nhacp_response_file_attrs {
-			uint8_t		type;
-			struct nhacp_file_attrs attrs;
-		} file_attrs;
+		} file_info;
 		struct nhacp_response_uint8_value {
 			uint8_t		type;
 			uint8_t		value;

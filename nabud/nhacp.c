@@ -83,7 +83,7 @@ nhacp_crc_len(uint16_t options)
 
 struct nhacp_file_list_entry {
 	STAILQ_ENTRY(nhacp_file_list_entry) link;
-	struct nhacp_response_dir_entry *dir_entry;
+	struct nhacp_response_file_info *file_info;
 };
 
 struct nhacp_file_private {
@@ -104,7 +104,7 @@ struct nhacp_file_private {
 static struct nhacp_file_list_entry *
 nhacp_file_list_entry_alloc(size_t namelen)
 {
-	struct nhacp_response_dir_entry *de = calloc(1, sizeof(*de) + namelen);
+	struct nhacp_response_file_info *de = calloc(1, sizeof(*de) + namelen);
 	if (de == NULL) {
 		return NULL;
 	}
@@ -115,15 +115,15 @@ nhacp_file_list_entry_alloc(size_t namelen)
 		return NULL;
 	}
 
-	e->dir_entry = de;
+	e->file_info = de;
 	return e;
 }
 
 static void
 nhacp_file_list_entry_free(struct nhacp_file_list_entry *e)
 {
-	if (e->dir_entry != NULL) {
-		free(e->dir_entry);
+	if (e->file_info != NULL) {
+		free(e->file_info);
 	}
 	free(e);
 }
@@ -1389,9 +1389,9 @@ nhacp_req_list_dir(struct nhacp_context *ctx)
 			goto bad;
 		}
 
-		nhacp_file_attrs_from_fileio(&attrs, &e->dir_entry->attrs);
-		e->dir_entry->name_length = (uint8_t)fnamelen;
-		memcpy(e->dir_entry->name, fname, fnamelen);
+		nhacp_file_attrs_from_fileio(&attrs, &e->file_info->attrs);
+		e->file_info->name_length = (uint8_t)fnamelen;
+		memcpy(e->file_info->name, fname, fnamelen);
 		STAILQ_INSERT_TAIL(&fp->file_list, e, link);
 	}
 
@@ -1441,15 +1441,15 @@ nhacp_req_get_dir_entry(struct nhacp_context *ctx)
 	 * name to whatever the client is willing to accept.
 	 */
 	STAILQ_REMOVE_HEAD(&fp->file_list, link);
-	if (e->dir_entry->name_length >
+	if (e->file_info->name_length >
 	    ctx->request.get_dir_entry.max_name_length) {
-		e->dir_entry->name_length =
+		e->file_info->name_length =
 		    ctx->request.get_dir_entry.max_name_length;
 	}
-	memcpy(&ctx->reply.dir_entry, e->dir_entry,
-	    sizeof(ctx->reply.dir_entry) + e->dir_entry->name_length);
-	nhacp_send_reply(ctx, NHACP_RESP_DIR_ENTRY,
-	    sizeof(ctx->reply.dir_entry) + e->dir_entry->name_length);
+	memcpy(&ctx->reply.file_info, e->file_info,
+	    sizeof(ctx->reply.file_info) + e->file_info->name_length);
+	nhacp_send_reply(ctx, NHACP_RESP_FILE_INFO,
+	    sizeof(ctx->reply.file_info) + e->file_info->name_length);
 	nhacp_file_list_entry_free(e);
 }
 
@@ -1569,19 +1569,20 @@ nhacp_req_rename(struct nhacp_context *ctx)
 }
 
 /*
- * nhacp_req_file_getattr --
+ * nhacp_req_file_get_info --
  *	Handle the FILE-GETATTR request.
  */
 static void
-nhacp_req_file_getattr(struct nhacp_context *ctx)
+nhacp_req_file_get_info(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 	struct fileio_attrs attrs;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_getattr.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_get_info.slot);
 	if (f == NULL) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.file_getattr.slot);
+		    conn_name(ctx->stext.conn),
+		    ctx->request.file_get_info.slot);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1591,25 +1592,27 @@ nhacp_req_file_getattr(struct nhacp_context *ctx)
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
 		nhacp_file_attrs_from_fileio(&attrs,
-		    &ctx->reply.file_attrs.attrs);
-		nhacp_send_reply(ctx, NHACP_RESP_FILE_ATTRS,
-		    sizeof(ctx->reply.file_attrs));
+		    &ctx->reply.file_info.attrs);
+		ctx->reply.file_info.name_length = 0;
+		nhacp_send_reply(ctx, NHACP_RESP_FILE_INFO,
+		    sizeof(ctx->reply.file_info));
 	}
 }
 
 /*
- * nhacp_req_file_setsize --
- *	Handle the FILE-SETSIZE request.
+ * nhacp_req_file_set_size --
+ *	Handle the FILE-SET-SIZE request.
  */
 static void
-nhacp_req_file_setsize(struct nhacp_context *ctx)
+nhacp_req_file_set_size(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_setsize.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_set_size.slot);
 	if (f == NULL) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.file_setsize.slot);
+		    conn_name(ctx->stext.conn),
+		    ctx->request.file_set_size.slot);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1619,7 +1622,7 @@ nhacp_req_file_setsize(struct nhacp_context *ctx)
 		return;
 	}
 
-	uint32_t size = nabu_get_uint32(ctx->request.file_setsize.size);
+	uint32_t size = nabu_get_uint32(ctx->request.file_set_size.size);
 
 	int error = stext_file_truncate(f, size);
 	if (error != 0) {
@@ -1696,8 +1699,8 @@ static const struct {
 	ENTRY_0_1(NHACP_REQ_FILE_READ,         file_read),
 	ENTRY_0_1(NHACP_REQ_FILE_WRITE,        file_write),
 	ENTRY_0_1(NHACP_REQ_FILE_SEEK,         file_seek),
-	ENTRY_0_1(NHACP_REQ_FILE_GETATTR,      file_getattr),
-	ENTRY_0_1(NHACP_REQ_FILE_SETSIZE,      file_setsize),
+	ENTRY_0_1(NHACP_REQ_FILE_GET_INFO,     file_get_info),
+	ENTRY_0_1(NHACP_REQ_FILE_SET_SIZE,     file_set_size),
 	ENTRY_0_1(NHACP_REQ_LIST_DIR,          list_dir),
 	ENTRY_0_1(NHACP_REQ_GET_DIR_ENTRY,     get_dir_entry),
 	ENTRY_0_1(NHACP_REQ_REMOVE,            remove),

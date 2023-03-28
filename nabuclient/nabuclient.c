@@ -1441,17 +1441,19 @@ nhacp_decode_reply(void)
 		    &nhacp_buf.reply.date_time.date_time);
 		break;
 
-	case NHACP_RESP_DIR_ENTRY:
-		printf("Got: NHACP_RESP_DIR_ENTRY.\n");
-		if (nhacp_length < sizeof(nhacp_buf.reply.dir_entry)) {
+	case NHACP_RESP_FILE_INFO:
+		printf("Got: NHACP_RESP_FILE_INFO.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.file_info)) {
 			printf("*** RUNT ***\n");
 			cli_throw();
 		}
-		nhacp_buf.reply.dir_entry.name[
-		    nhacp_buf.reply.dir_entry.name_length] = '\0';
-		printf("--> File name: '%s' <--\n",
-		    (char *)nhacp_buf.reply.dir_entry.name);
-		nhacp_decode_file_attrs(&nhacp_buf.reply.dir_entry.attrs);
+		if (nhacp_buf.reply.file_info.name_length != 0) {
+			nhacp_buf.reply.file_info.name[
+			    nhacp_buf.reply.file_info.name_length] = '\0';
+			printf("--> File name: '%s' <--\n",
+			    (char *)nhacp_buf.reply.file_info.name);
+		}
+		nhacp_decode_file_attrs(&nhacp_buf.reply.file_info.attrs);
 		break;
 
 	default:
@@ -1804,7 +1806,7 @@ command_nhacp_get_dir_entry(int argc, char *argv[])
 }
 
 static bool
-command_nhacp_file_setsize(int argc, char *argv[])
+command_nhacp_file_set_size(int argc, char *argv[])
 {
 	if (argc < 3) {
 		printf("Args, bro.\n");
@@ -1814,12 +1816,12 @@ command_nhacp_file_setsize(int argc, char *argv[])
 	uint8_t slot = stext_parse_slot(argv[1]);
 	uint32_t size = stext_parse_offset(argv[2]);	/* yes, offset */
 
-	nhacp_buf.request.file_setsize.slot = slot;
-	nabu_set_uint32(nhacp_buf.request.file_setsize.size, size);
+	nhacp_buf.request.file_set_size.slot = slot;
+	nabu_set_uint32(nhacp_buf.request.file_set_size.size, size);
 
-	printf("Sending: NHACP_REQ_FILE_SETSIZE.\n");
-	nhacp_send(NHACP_REQ_FILE_SETSIZE,
-	    sizeof(nhacp_buf.request.file_setsize));
+	printf("Sending: NHACP_REQ_FILE_SET_SIZE.\n");
+	nhacp_send(NHACP_REQ_FILE_SET_SIZE,
+	    sizeof(nhacp_buf.request.file_set_size));
 
 	nhacp_decode_reply();
 	return false;
@@ -1971,7 +1973,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-file-close",	.func = command_nhacp_file_close },
 	{ .name = "nhacp-get-error-details",
 				.func = command_nhacp_get_error_details },
-	{ .name = "nhacp-file-setsize",	.func = command_nhacp_file_setsize },
+	{ .name = "nhacp-file-set-size",.func = command_nhacp_file_set_size },
 	{ .name = "nhacp-list-dir",	.func = command_nhacp_list_dir },
 	{ .name = "nhacp-get-dir-entry",.func = command_nhacp_get_dir_entry },
 	{ .name = "nhacp-remove",	.func = command_nhacp_remove },
