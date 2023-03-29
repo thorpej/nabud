@@ -680,6 +680,15 @@ static bool
 fileio_remote_io_open(struct fileio *f, const char *location,
     const char *local_root)
 {
+	/*
+	 * We can't open directories here (at least, not in the traditional
+	 * sense).
+	 */
+	if (f->flags & FILEIO_O_DIRECTORY) {
+		errno = ENOTDIR;
+		return NULL;
+	}
+
 	switch (fileio_accmode(f)) {
 	case FILEIO_O_RDONLY:
 	case FILEIO_O_RDWP:
