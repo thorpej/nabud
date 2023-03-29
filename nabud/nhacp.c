@@ -45,6 +45,7 @@
 #include <time.h>
 
 #define	NABU_PROTO_INLINES
+#define	NHACP_PROTO_INLINES
 
 #include "libnabud/crc8_wcdma.h"
 #include "libnabud/fileio.h"
@@ -593,7 +594,6 @@ nhacp_send_error_details(struct nhacp_context *ctx, uint16_t code,
     size_t max_message_length)
 {
 	const char *error_message = NULL;
-	size_t message_length = 0;
 	char message_buffer[sizeof("UNKNOWN ERROR XXXXX")];
 
 	if (max_message_length != 0) {
@@ -603,23 +603,15 @@ nhacp_send_error_details(struct nhacp_context *ctx, uint16_t code,
 			    "UNKNOWN ERROR %u", code);
 			error_message = message_buffer;
 		}
-		message_length = strlen(error_message);
-
-		assert(max_message_length < 256);
-		if (message_length > max_message_length) {
-			message_length = max_message_length;
-		}
 	}
 
 	nabu_set_uint16(ctx->reply.error.code, code);
-	ctx->reply.error.message_length = (uint8_t)message_length;
-	if (message_length != 0) {
-		memcpy(ctx->reply.error.message, error_message,
-		    message_length);
-	}
+	nhacp_string_set_limit(&ctx->reply.error.message, error_message,
+	    max_message_length);
 
 	nhacp_send_reply(ctx, NHACP_RESP_ERROR,
-	    sizeof(ctx->reply.error) + message_length);
+	    sizeof(ctx->reply.error) +
+	    nhacp_strsize(&ctx->reply.error.message));
 }
 
 /*
@@ -755,14 +747,14 @@ nhacp_req_hello(struct nhacp_context *ctx)
 	ctx->reply.session_started.session_id = ctx->session_id;
 	nabu_set_uint16(ctx->reply.session_started.version,
 	    NABUD_NHACP_VERSION);
-	snprintf((char *)ctx->reply.session_started.adapter_id, 256, "%s-%s",
-	    getprogname(), nabud_version);
-	ctx->reply.session_started.adapter_id_length =
-	   (uint8_t)strlen((char *)ctx->reply.session_started.adapter_id);
+	snprintf((char *)ctx->reply.session_started.adapter_id.bytes, 256,
+	    "%s-%s", getprogname(), nabud_version);
+	ctx->reply.session_started.adapter_id.length =
+	   (uint8_t)strlen((char *)ctx->reply.session_started.adapter_id.bytes);
 	log_debug(LOG_SUBSYS_NHACP,
 	    "[%s] Sending proto version: 0x%04x server version: %s",
 	    conn_name(conn), NABUD_NHACP_VERSION,
-	    (char *)ctx->reply.session_started.adapter_id);
+	    (char *)ctx->reply.session_started.adapter_id.bytes);
 	log_info("[%s] Established NHAP-%d.%d session %u.", conn_name(conn),
 	    NHACP_VERS_MAJOR(ctx->nhacp_version),
 	    NHACP_VERS_MINOR(ctx->nhacp_version),
@@ -773,7 +765,7 @@ nhacp_req_hello(struct nhacp_context *ctx)
 	}
 	nhacp_send_reply(ctx, NHACP_RESP_SESSION_STARTED,
 	    sizeof(ctx->reply.session_started) +
-	    ctx->reply.session_started.adapter_id_length);
+	    nhacp_strsize(&ctx->reply.session_started.adapter_id));
 }
 
 static int
@@ -836,8 +828,8 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	 * STORAGE-OPEN request, so we can simply NUL-terminate in
 	 * situ.
 	 */
-	ctx->request.storage_open.url_string[
-	    ctx->request.storage_open.url_length] = '\0';
+	const char *url =
+	    nhacp_string_get(&ctx->request.storage_open.url);
 
 	/*
 	 * NHACP-0.0 did not define any open flags, even though it
@@ -860,8 +852,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	    "[%s] nhacp_o_flags 0x%04x -> fileio_o_flags 0x%08x",
 	    conn_name(ctx->stext.conn), nhacp_o_flags, fileio_o_flags);
 
-	error = stext_file_open(&ctx->stext,
-	    (const char *)ctx->request.storage_open.url_string,
+	error = stext_file_open(&ctx->stext, url,
 	    ctx->request.storage_open.req_slot, &attrs, fileio_o_flags, &f);
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
@@ -1323,22 +1314,26 @@ nhacp_req_list_dir(struct nhacp_context *ctx)
 	/* Clear out any previous file list. */
 	nhacp_file_free_file_list(fp);
 
-	ctx->request.list_dir.pattern[
-	    ctx->request.list_dir.pattern_length] = '\0';
+	/* If the pattern length is 0, then we treat it as "*". */
+	const char *pattern;
+	if (nhacp_strlen(&ctx->request.list_dir.pattern) == 0) {
+		pattern = "*";
+	} else {
+		pattern = nhacp_string_get(&ctx->request.list_dir.pattern);
+	}
 
 	/* Sanitize the pattern. */
-	if (strchr((char *)ctx->request.list_dir.pattern, '/') != NULL) {
+	if (strchr(pattern, '/') != NULL) {
 		log_debug(LOG_SUBSYS_NHACP,
 		    "[%s] Pattern '%s' contains path separator.",
-		    conn_name(conn), (char *)ctx->request.list_dir.pattern);
+		    conn_name(conn), pattern);
 		nhacp_send_error(ctx, NHACP_EINVAL);
 		return;
 	}
 
 	memset(&g, 0, sizeof(g));
 
-	if (asprintf(&path, "%s/%s", location,
-		     (char *)ctx->request.list_dir.pattern) < 0) {
+	if (asprintf(&path, "%s/%s", location, pattern) < 0) {
 		log_error("[%s] Unable to allocate memory for glob pattern.",
 		    conn_name(conn));
 		nhacp_send_error(ctx, NHACP_ENOMEM);
@@ -1390,8 +1385,7 @@ nhacp_req_list_dir(struct nhacp_context *ctx)
 		}
 
 		nhacp_file_attrs_from_fileio(&attrs, &e->file_info->attrs);
-		e->file_info->name_length = (uint8_t)fnamelen;
-		memcpy(e->file_info->name, fname, fnamelen);
+		nhacp_string_set(&e->file_info->name, fname);
 		STAILQ_INSERT_TAIL(&fp->file_list, e, link);
 	}
 
@@ -1441,15 +1435,15 @@ nhacp_req_get_dir_entry(struct nhacp_context *ctx)
 	 * name to whatever the client is willing to accept.
 	 */
 	STAILQ_REMOVE_HEAD(&fp->file_list, link);
-	if (e->file_info->name_length >
+	if (e->file_info->name.length >
 	    ctx->request.get_dir_entry.max_name_length) {
-		e->file_info->name_length =
+		e->file_info->name.length =
 		    ctx->request.get_dir_entry.max_name_length;
 	}
 	memcpy(&ctx->reply.file_info, e->file_info,
-	    sizeof(ctx->reply.file_info) + e->file_info->name_length);
+	    sizeof(ctx->reply.file_info) + e->file_info->name.length);
 	nhacp_send_reply(ctx, NHACP_RESP_FILE_INFO,
-	    sizeof(ctx->reply.file_info) + e->file_info->name_length);
+	    sizeof(ctx->reply.file_info) + e->file_info->name.length);
 	nhacp_file_list_entry_free(e);
 }
 
@@ -1461,15 +1455,12 @@ static void
 nhacp_req_remove(struct nhacp_context *ctx)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
-	char *name;
-	uint8_t namelen;
+	const char *name;
 	uint16_t flags;
 	int error = 0;
 
 	flags = nabu_get_uint16(ctx->request.remove.flags);
-	namelen = ctx->request.remove.url_length;
-	name = (char *)ctx->request.remove.url_string;
-	name[namelen] = '\0';
+	name = nhacp_string_get(&ctx->request.remove.url);
 
 	char *path =
 	    fileio_resolve_path(name, conn->file_root, FILEIO_O_LOCAL_ROOT);
@@ -1511,23 +1502,18 @@ static void
 nhacp_req_rename(struct nhacp_context *ctx)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
-	char *old_name, *new_name;
+	struct nhacp_string *new_name_arg;
+	const char *old_name, *new_name;
 	char *src_path = NULL, *dst_path = NULL;
-	uint8_t old_namelen, new_namelen;
 	int error = 0;
-	uint8_t *bp;
 
-	bp = ctx->request.rename.names;
+	new_name_arg = nhacp_string_skip(&ctx->request.rename.old_name);
 
-	old_namelen = *bp++;
-	old_name = (char *)bp;
-	bp += old_namelen;
-
-	new_namelen = *bp++;
-	new_name = (char *)bp;
-
-	old_name[old_namelen] = '\0';
-	new_name[new_namelen] = '\0';
+	/*
+	 * Make sure to get these in reverse order!  See nhacp_string_get().
+	 */
+	new_name = nhacp_string_get(new_name_arg);
+	old_name = nhacp_string_get(&ctx->request.rename.old_name);
 
 	src_path = fileio_resolve_path(old_name, conn->file_root,
 	    FILEIO_O_LOCAL_ROOT);
@@ -1593,7 +1579,7 @@ nhacp_req_file_get_info(struct nhacp_context *ctx)
 	} else {
 		nhacp_file_attrs_from_fileio(&attrs,
 		    &ctx->reply.file_info.attrs);
-		ctx->reply.file_info.name_length = 0;
+		ctx->reply.file_info.name.length = 0;
 		nhacp_send_reply(ctx, NHACP_RESP_FILE_INFO,
 		    sizeof(ctx->reply.file_info));
 	}
@@ -1640,13 +1626,10 @@ static void
 nhacp_req_mkdir(struct nhacp_context *ctx)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
-	char *name;
-	uint8_t namelen;
+	const char *name;
 	int error = 0;
 
-	namelen = ctx->request.mkdir.url_length;
-	name = (char *)ctx->request.mkdir.url_string;
-	name[namelen] = '\0';
+	name = nhacp_string_get(&ctx->request.mkdir.url);
 
 	char *path =
 	    fileio_resolve_path(name, conn->file_root, FILEIO_O_LOCAL_ROOT);
@@ -1896,17 +1879,17 @@ nhacp_start_0_0(struct nabu_connection *conn)
 	 */
 	nabu_set_uint16(ctx->reply.nhacp_started_0_0.version,
 	    NABUD_NHACP_VERSION);
-	snprintf((char *)ctx->reply.nhacp_started_0_0.adapter_id, 256,
+	snprintf((char *)ctx->reply.nhacp_started_0_0.adapter_id.bytes, 256,
 	    "%s-%s", getprogname(), nabud_version);
-	ctx->reply.nhacp_started_0_0.adapter_id_length =
-	    (uint8_t)strlen((char *)ctx->reply.nhacp_started_0_0.adapter_id);
+	ctx->reply.nhacp_started_0_0.adapter_id.length = (uint8_t)
+	    strlen((char *)ctx->reply.nhacp_started_0_0.adapter_id.bytes);
 	log_debug(LOG_SUBSYS_NHACP,
 	    "[%s] Sending proto version: 0x%04x server version: %s",
 	    conn_name(conn), NABUD_NHACP_VERSION,
-	    (char *)ctx->reply.nhacp_started_0_0.adapter_id);
+	    (char *)ctx->reply.nhacp_started_0_0.adapter_id.bytes);
 	nhacp_send_reply(ctx, NHACP_RESP_NHACP_STARTED_0_0,
 	    sizeof(ctx->reply.nhacp_started_0_0) +
-	    ctx->reply.nhacp_started_0_0.adapter_id_length);
+	    nhacp_strsize(&ctx->reply.nhacp_started_0_0.adapter_id));
 
 	/*
 	 * Now enter NHACP mode until we are asked to exit or until

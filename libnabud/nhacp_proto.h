@@ -140,6 +140,11 @@ struct nhacp_file_attrs {
 	uint8_t		file_size[4];	/* u32 */
 };
 
+struct nhacp_string {
+	uint8_t		length;
+	uint8_t		bytes[];
+};
+
 /* attribute flags */
 #define	NHACP_AF_RD		0x0001	/* file is readable */
 #define	NHACP_AF_WR		0x0002	/* file is writable */
@@ -171,8 +176,7 @@ struct nhacp_request {
 			uint8_t		type;
 			uint8_t		req_slot;
 			uint8_t		flags[2];	/* u16 */
-			uint8_t		url_length;
-			uint8_t		url_string[];	/* char string */
+			struct nhacp_string url;
 		} storage_open;
 		struct nhacp_request_storage_get {
 			uint8_t		type;
@@ -243,8 +247,7 @@ struct nhacp_request {
 		struct nhacp_request_list_dir {
 			uint8_t		type;
 			uint8_t		slot;
-			uint8_t		pattern_length;
-			uint8_t		pattern[];
+			struct nhacp_string pattern;
 		} list_dir;
 		struct nhacp_request_get_dir_entry {
 			uint8_t		type;
@@ -254,25 +257,16 @@ struct nhacp_request {
 		struct nhacp_request_remove {
 			uint8_t		type;
 			uint8_t		flags[2];	/* u16 */
-			uint8_t		url_length;
-			uint8_t		url_string[];
+			struct nhacp_string url;
 		} remove;
 		struct nhacp_request_rename {
 			uint8_t		type;
-			/*
-			 * The names buffer is structured like:
-			 *
-			 * uint8_t	old_name_length;
-			 * uint8_t	old_name[];
-			 * uint8_t	new_name_length;
-			 * uint8_t	new_name[];
-			 */
-			uint8_t		names[];	/* old, new */
+			struct nhacp_string old_name;
+			/* struct nhacp_string new_name follows */
 		} rename;
 		struct nhacp_request_mkdir {
 			uint8_t		type;
-			uint8_t		url_length;
-			uint8_t		url_string[];
+			struct nhacp_string url;
 		} mkdir;
 		struct nhacp_request_goodbye {	/* END-PROTOCOL in 0.0 */
 			uint8_t		type;
@@ -305,15 +299,13 @@ struct nhacp_response {
 		struct nhacp_response_nhacp_started_0_0 {
 			uint8_t		type;
 			uint8_t		version[2];	/* u16 */
-			uint8_t		adapter_id_length;
-			uint8_t		adapter_id[];	/* char string */
+			struct nhacp_string adapter_id;
 		} nhacp_started_0_0;
 		struct nhacp_response_session_started {
 			uint8_t		type;
 			uint8_t		session_id;
 			uint8_t		version[2];	/* u16 */
-			uint8_t		adapter_id_length;
-			uint8_t		adapter_id[];	/* char string */
+			struct nhacp_string adapter_id;
 		} session_started;
 		struct nhacp_response_ok {
 			uint8_t		type;
@@ -321,8 +313,7 @@ struct nhacp_response {
 		struct nhacp_response_error {
 			uint8_t		type;
 			uint8_t		code[2];	/* u16 */
-			uint8_t		message_length;
-			uint8_t		message[];	/* char string */
+			struct nhacp_string message;
 		} error;
 		struct nhacp_response_storage_loaded {
 			uint8_t		type;
@@ -341,8 +332,7 @@ struct nhacp_response {
 		struct nhacp_response_file_info {
 			uint8_t		type;
 			struct nhacp_file_attrs attrs;
-			uint8_t		name_length;
-			uint8_t		name[];
+			struct nhacp_string name;
 		} file_info;
 		struct nhacp_response_uint8_value {
 			uint8_t		type;
@@ -387,5 +377,97 @@ struct nhacp_response {
 #define	NHACP_SEEK_SET		0
 #define	NHACP_SEEK_CUR		1
 #define	NHACP_SEEK_END		2
+
+#ifdef NHACP_PROTO_INLINES
+
+/*
+ * nhacp_strlen --
+ *	Return the effective length of an NHACP string.
+ */
+static uint8_t
+nhacp_strlen(const struct nhacp_string *s)
+{
+	uint8_t len;
+
+	for (len = 0; len < s->length; len++) {
+		if (s->bytes[len] == '\0') {
+			break;
+		}
+	}
+
+	return len;
+}
+
+/*
+ * nhacp_strsize --
+ *	Return the size of an NHACP string bytes field.
+ */
+static inline uint8_t
+nhacp_strsize(const struct nhacp_string *s)
+{
+	return s->length;
+}
+
+/*
+ * nhacp_string_get --
+ *	Get a pointer to an NHACP string.  N.B. this NUL-terminates the
+ *	string in-place, so get references to any following message
+ *	fields first!  Assumes there is space after the string to do this!
+ */
+static const char *
+nhacp_string_get(struct nhacp_string *s)
+{
+	s->bytes[nhacp_strlen(s)] = '\0';
+	return (const char *)&s->bytes[0];
+}
+
+/*
+ * nhacp_string_set_limit --
+ *	Set the value of an NHACP string, with a limit on the max
+ *	number of bytes.
+ */
+static void
+nhacp_string_set_limit(struct nhacp_string *s, const char *cp, size_t lim)
+{
+	size_t len;
+
+	assert(lim <= UINT8_MAX);
+
+	if (cp != NULL) {
+		len = strlen(cp);
+		if (len > lim) {
+			len = lim;
+		}
+	} else {
+		len = 0;
+	}
+
+	s->length = (uint8_t)len;
+	if (len != 0) {
+		memcpy(s->bytes, cp, len);
+	}
+}
+
+/*
+ * nhacp_string_set --
+ *	Set the value of an NHACP string.
+ */
+static inline void
+nhacp_string_set(struct nhacp_string *s, const char *cp)
+{
+	nhacp_string_set_limit(s, cp, UINT8_MAX);
+}
+
+/*
+ * nhacp_string_skip --
+ *	Skip over an NHACP string (to get to the next field in a message).
+ */
+static inline void *
+nhacp_string_skip(struct nhacp_string *s)
+{
+	return &s->bytes[s->length];
+}
+
+#endif /* NHACP_PROTO_INLINES */
 
 #endif /* nhacp_proto_h_included */

@@ -57,6 +57,7 @@
 #include <netinet/tcp.h>
 
 #define	NABU_PROTO_INLINES
+#define	NHACP_PROTO_INLINES
 
 #include "libnabud/cli.h"
 #include "libnabud/crc16_genibus.h"
@@ -1359,26 +1360,26 @@ nhacp_decode_reply(void)
 			cli_throw();
 		}
 		if (nhacp_version == NHACP_VERS_0_0) {
-			nhacp_buf.reply.nhacp_started_0_0.adapter_id[
-			    nhacp_buf.reply.nhacp_started_0_0.adapter_id_length] = '\0';
+			const char *id =
+			    nhacp_string_get(&nhacp_buf.reply.nhacp_started_0_0.adapter_id);
 			printf("Got: NHACP_RESP_NHACP_STARTED_0_0.\n");
 			printf("Server Vers=$%02X $%02X ID len=%u '%s'\n",
 			    nhacp_buf.reply.nhacp_started_0_0.version[0],
 			    nhacp_buf.reply.nhacp_started_0_0.version[1],
-			    nhacp_buf.reply.nhacp_started_0_0.adapter_id_length,
-			    nhacp_buf.reply.nhacp_started_0_0.adapter_id);
+			    nhacp_buf.reply.nhacp_started_0_0.adapter_id.length,
+			    id);
 		} else {
 			nhacp_session =
 			    nhacp_buf.reply.session_started.session_id;
-			nhacp_buf.reply.session_started.adapter_id[
-			    nhacp_buf.reply.session_started.adapter_id_length] = '\0';
+			const char *id =
+			    nhacp_string_get(&nhacp_buf.reply.session_started.adapter_id);
 			printf("Got: NHACP_RESP_SESSION_STARTED.\n");
 			printf("Session=%u Server Vers=$%02X $%02X ID len=%u "
 			    "'%s'\n", nhacp_session,
 			    nhacp_buf.reply.session_started.version[0],
 			    nhacp_buf.reply.session_started.version[1],
-			    nhacp_buf.reply.session_started.adapter_id_length,
-			    nhacp_buf.reply.session_started.adapter_id);
+			    nhacp_buf.reply.session_started.adapter_id.length,
+			    id);
 		}
 		break;
 
@@ -1392,12 +1393,12 @@ nhacp_decode_reply(void)
 			printf("*** RUNT ***\n");
 			cli_throw();
 		}
-		if (nhacp_buf.reply.error.message_length != 0) {
-			nhacp_buf.reply.error.message[
-			    nhacp_buf.reply.error.message_length] = '\0';
+		if (nhacp_buf.reply.error.message.length != 0) {
+			const char *message =
+			    nhacp_string_get(&nhacp_buf.reply.error.message);
 			printf("--> Code %u Message '%s' <--\n",
 			    nabu_get_uint16(nhacp_buf.reply.error.code),
-			    (char *)nhacp_buf.reply.error.message);
+			    message);
 		} else {
 			printf("--> Code %u <--\n",
 			    nabu_get_uint16(nhacp_buf.reply.error.code));
@@ -1447,11 +1448,10 @@ nhacp_decode_reply(void)
 			printf("*** RUNT ***\n");
 			cli_throw();
 		}
-		if (nhacp_buf.reply.file_info.name_length != 0) {
-			nhacp_buf.reply.file_info.name[
-			    nhacp_buf.reply.file_info.name_length] = '\0';
-			printf("--> File name: '%s' <--\n",
-			    (char *)nhacp_buf.reply.file_info.name);
+		if (nhacp_buf.reply.file_info.name.length != 0) {
+			const char *name =
+			    nhacp_string_get(&nhacp_buf.reply.file_info.name);
+			printf("--> File name: '%s' <--\n", name);
 		}
 		nhacp_decode_file_attrs(&nhacp_buf.reply.file_info.attrs);
 		break;
@@ -1548,8 +1548,7 @@ command_nhacp_storage_open(int argc, char *argv[])
 	uint8_t req_slot = stext_parse_slot(argv[1]);
 
 	nhacp_buf.request.storage_open.req_slot = req_slot;
-	nhacp_buf.request.storage_open.url_length = (uint8_t)strlen(argv[2]);
-	strcpy((char *)nhacp_buf.request.storage_open.url_string, argv[2]);
+	nhacp_string_set(&nhacp_buf.request.storage_open.url, argv[2]);
 
 	bool have_accmode = false;
 	uint16_t oflags = 0;
@@ -1771,14 +1770,12 @@ command_nhacp_list_dir(int argc, char *argv[])
 	const char *pattern = argv[2];
 
 	nhacp_buf.request.list_dir.slot = slot;
-	nhacp_buf.request.list_dir.pattern_length = (uint8_t)strlen(pattern);
-	memcpy(nhacp_buf.request.list_dir.pattern, pattern,
-	    nhacp_buf.request.list_dir.pattern_length);
+	nhacp_string_set(&nhacp_buf.request.list_dir.pattern, pattern);
 
 	printf("Sending: NHACP_REQ_LIST_DIR.\n");
 	nhacp_send(NHACP_REQ_LIST_DIR,
 	    sizeof(nhacp_buf.request.list_dir) +
-	    nhacp_buf.request.list_dir.pattern_length);
+	    nhacp_strsize(&nhacp_buf.request.list_dir.pattern));
 
 	nhacp_decode_reply();
 	return false;
@@ -1836,13 +1833,12 @@ command_nhacp_remove(int argc, char *argv[])
 	}
 
 	nabu_set_uint16(nhacp_buf.request.remove.flags, NHACP_REMOVE_FILE);
-	nhacp_buf.request.remove.url_length = (uint8_t)strlen(argv[1]);
-	strcpy((char *)nhacp_buf.request.remove.url_string, argv[1]);
+	nhacp_string_set(&nhacp_buf.request.remove.url, argv[1]);
 
 	printf("Sending: NHACP_REQ_REMOVE (NHACP_REMOVE_FILE).\n");
 	nhacp_send(NHACP_REQ_REMOVE,
 	    sizeof(nhacp_buf.request.remove) +
-	    nhacp_buf.request.remove.url_length);
+	    nhacp_strsize(&nhacp_buf.request.remove.url));
 
 	nhacp_decode_reply();
 	return false;
@@ -1857,13 +1853,12 @@ command_nhacp_rmdir(int argc, char *argv[])
 	}
 
 	nabu_set_uint16(nhacp_buf.request.remove.flags, NHACP_REMOVE_DIR);
-	nhacp_buf.request.remove.url_length = (uint8_t)strlen(argv[1]);
-	strcpy((char *)nhacp_buf.request.remove.url_string, argv[1]);
+	nhacp_string_set(&nhacp_buf.request.remove.url, argv[1]);
 
 	printf("Sending: NHACP_REQ_REMOVE (NHACP_REMOVE_DIR).\n");
 	nhacp_send(NHACP_REQ_REMOVE,
 	    sizeof(nhacp_buf.request.remove) +
-	    nhacp_buf.request.remove.url_length);
+	    nhacp_strsize(&nhacp_buf.request.remove.url));
 
 	nhacp_decode_reply();
 	return false;
@@ -1877,20 +1872,18 @@ command_nhacp_rename(int argc, char *argv[])
 		cli_throw();
 	}
 
-	uint8_t *buf = nhacp_buf.request.rename.names;
+	nhacp_string_set(&nhacp_buf.request.rename.old_name, argv[1]);
 
-	*buf++ = (uint8_t)strlen(argv[1]);
-	strcpy((char *)buf, argv[1]);
-	buf += strlen(argv[1]);
-
-	*buf++ = (uint8_t)strlen(argv[2]);
-	strcpy((char *)buf, argv[2]);
+	struct nhacp_string *new_name_arg =
+	    nhacp_string_skip(&nhacp_buf.request.rename.old_name);
+	nhacp_string_set(new_name_arg, argv[2]);
 
 	printf("Sending: NHACP_REQ_RENAME.\n");
 	nhacp_send(NHACP_REQ_RENAME,
 	    sizeof(nhacp_buf.request.rename) +
-	    sizeof(*buf) + strlen(argv[1]) +
-	    sizeof(*buf) + strlen(argv[2]));
+	    nhacp_strsize(&nhacp_buf.request.rename.old_name) +
+	    sizeof(*new_name_arg) +
+	    nhacp_strsize(new_name_arg));
 
 	nhacp_decode_reply();
 	return false;
@@ -1904,13 +1897,12 @@ command_nhacp_mkdir(int argc, char *argv[])
 		cli_throw();
 	}
 
-	nhacp_buf.request.mkdir.url_length = (uint8_t)strlen(argv[1]);
-	strcpy((char *)nhacp_buf.request.mkdir.url_string, argv[1]);
+	nhacp_string_set(&nhacp_buf.request.mkdir.url, argv[1]);
 
 	printf("Sending: NHACP_REQ_MKDIR.\n");
 	nhacp_send(NHACP_REQ_MKDIR,
 	    sizeof(nhacp_buf.request.mkdir) +
-	    nhacp_buf.request.mkdir.url_length);
+	    nhacp_strsize(&nhacp_buf.request.mkdir.url));
 
 	nhacp_decode_reply();
 	return false;
