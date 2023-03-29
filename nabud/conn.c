@@ -41,6 +41,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <termios.h>
+#ifdef linux
+#include <sys/ioctl.h>
+#include "termbits2.h"
+#endif
 #include <unistd.h>
 
 #include <netinet/in.h>
@@ -203,7 +207,7 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 }
 
 /*
- * The native buad rate of the NABU is:
+ * The native baud rate of the NABU is:
  *
  *	3.57954MHz	 / 2			/ 16
  *	NTSC Colorbust	   on-board divider	  on-chip divider on TR1863
@@ -247,7 +251,7 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 	}
 	
 	if (tcsetattr(fd, TCSANOW, &t) < 0) {
-		log_error("[%s] Failed to set 8N%u-%u: %s", args->port,
+		log_error("[%s] Failed to set 8N%u-%s: %s", args->port,
 		    args->stop_bits,
 		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
 		goto failed;
