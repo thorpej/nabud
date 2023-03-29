@@ -1761,13 +1761,16 @@ command_nhacp_get_error_details(int argc, char *argv[])
 static bool
 command_nhacp_list_dir(int argc, char *argv[])
 {
-	if (argc < 3) {
+	if (argc < 2) {
 		printf("Args, bro.\n");
 		cli_throw();
 	}
 
 	uint8_t slot = stext_parse_slot(argv[1]);
-	const char *pattern = argv[2];
+	const char *pattern = NULL;
+	if (argc > 2) {
+		pattern = argv[2];
+	}
 
 	nhacp_buf.request.list_dir.slot = slot;
 	nhacp_string_set(&nhacp_buf.request.list_dir.pattern, pattern);
