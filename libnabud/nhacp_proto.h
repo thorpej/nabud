@@ -174,19 +174,19 @@ struct nhacp_request {
 		} hello;
 		struct nhacp_request_storage_open {
 			uint8_t		type;
-			uint8_t		req_slot;
+			uint8_t		req_fdesc;
 			uint8_t		flags[2];	/* u16 */
 			struct nhacp_string url;
 		} storage_open;
 		struct nhacp_request_storage_get {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		offset[4];	/* u32 */
 			uint8_t		length[2];	/* u16 */
 		} storage_get;
 		struct nhacp_request_storage_put {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		offset[4];	/* u32 */
 			uint8_t		length[2];	/* u16 */
 			uint8_t		data[];
@@ -196,7 +196,7 @@ struct nhacp_request {
 		} get_date_time;
 		struct nhacp_request_file_close {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 		} file_close;
 		struct nhacp_request_get_error_details {
 			uint8_t		type;
@@ -205,53 +205,53 @@ struct nhacp_request {
 		} get_error_details;
 		struct nhacp_request_storage_get_block {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		block_number[4];/* u32 */
 			uint8_t		block_length[2];/* u16 */
 		} storage_get_block;
 		struct nhacp_request_storage_put_block {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		block_number[4];/* u32 */
 			uint8_t		block_length[2];/* u16 */
 			uint8_t		data[];
 		} storage_put_block;
 		struct nhacp_request_file_read {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		flags[2];	/* u16 */
 			uint8_t		length[2];	/* u16 */
 		} file_read;
 		struct nhacp_request_file_write {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		flags[2];	/* u16 */
 			uint8_t		length[2];	/* u16 */
 			uint8_t		data[];
 		} file_write;
 		struct nhacp_request_file_seek {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		offset[4];	/* s32 */
 			uint8_t		whence;
 		} file_seek;
 		struct nhacp_request_file_get_info {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 		} file_get_info;
 		struct nhacp_request_file_set_size {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		size[4];	/* u32 */
 		} file_set_size;
 		struct nhacp_request_list_dir {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			struct nhacp_string pattern;
 		} list_dir;
 		struct nhacp_request_get_dir_entry {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		max_name_length;
 		} get_dir_entry;
 		struct nhacp_request_remove {
@@ -317,7 +317,7 @@ struct nhacp_response {
 		} error;
 		struct nhacp_response_storage_loaded {
 			uint8_t		type;
-			uint8_t		slot;
+			uint8_t		fdesc;
 			uint8_t		length[4];	/* u32 */
 		} storage_loaded;
 		struct nhacp_response_data_buffer {

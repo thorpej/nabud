@@ -831,7 +831,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 
 	/*
 	 * NHACP-0.0 did not define any open flags, even though it
-	 * had a slot for them.
+	 * had space for them.
 	 */
 	if (ctx->nhacp_version == NHACP_VERS_0_0) {
 		nhacp_o_flags = NHACP_O_RDWP | NHACP_O_CREAT;
@@ -851,7 +851,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 	    conn_name(ctx->stext.conn), nhacp_o_flags, fileio_o_flags);
 
 	error = stext_file_open(&ctx->stext, url,
-	    ctx->request.storage_open.req_slot, &attrs, fileio_o_flags, &f);
+	    ctx->request.storage_open.req_fdesc, &attrs, fileio_o_flags, &f);
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
@@ -863,7 +863,7 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 		fp->is_directory = attrs.is_directory;
 		fp->is_writable = attrs.is_writable;
 
-		ctx->reply.storage_loaded.slot = stext_file_slot(f);
+		ctx->reply.storage_loaded.fdesc = stext_file_slot(f);
 		nabu_set_uint32(ctx->reply.storage_loaded.length,
 		    (uint32_t)attrs.size);
 		nhacp_send_reply(ctx, NHACP_RESP_STORAGE_LOADED,
@@ -880,10 +880,10 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.storage_get.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.storage_get.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.storage_get.slot);
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
+		    conn_name(ctx->stext.conn), ctx->request.storage_get.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -896,8 +896,8 @@ nhacp_req_storage_get(struct nhacp_context *ctx)
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_get.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_get.length);
 
-	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u offset %u length %u",
-	    conn_name(ctx->stext.conn), ctx->request.storage_get.slot,
+	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u offset %u length %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_get.fdesc,
 	    offset, length);
 
 	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_GET)) {
@@ -923,10 +923,10 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.storage_put.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.storage_put.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.storage_put.slot);
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
+		    conn_name(ctx->stext.conn), ctx->request.storage_put.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -939,8 +939,8 @@ nhacp_req_storage_put(struct nhacp_context *ctx)
 	uint32_t offset = nabu_get_uint32(ctx->request.storage_put.offset);
 	uint16_t length = nabu_get_uint16(ctx->request.storage_put.length);
 
-	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u offset %u length %u",
-	    conn_name(ctx->stext.conn), ctx->request.storage_put.slot,
+	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u offset %u length %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_put.fdesc,
 	    offset, length);
 
 	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_PUT)) {
@@ -966,11 +966,11 @@ nhacp_req_storage_get_block(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.storage_get_block.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.storage_get_block.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.storage_get_block.slot);
+		    ctx->request.storage_get_block.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -985,8 +985,8 @@ nhacp_req_storage_get_block(struct nhacp_context *ctx)
 	uint16_t blklen =
 	    nabu_get_uint16(ctx->request.storage_get_block.block_length);
 
-	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u blkno %u blklen %u",
-	    conn_name(ctx->stext.conn), ctx->request.storage_get_block.slot,
+	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u blkno %u blklen %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_get_block.fdesc,
 	    blkno, blklen);
 
 	/*
@@ -1032,11 +1032,11 @@ nhacp_req_storage_put_block(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.storage_put_block.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.storage_put_block.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.storage_put_block.slot);
+		    ctx->request.storage_put_block.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1051,8 +1051,8 @@ nhacp_req_storage_put_block(struct nhacp_context *ctx)
 	uint16_t blklen =
 	    nabu_get_uint16(ctx->request.storage_put_block.block_length);
 
-	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u blkno %u blklen %u",
-	    conn_name(ctx->stext.conn), ctx->request.storage_put_block.slot,
+	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u blkno %u blklen %u",
+	    conn_name(ctx->stext.conn), ctx->request.storage_put_block.fdesc,
 	    blkno, blklen);
 
 	/*
@@ -1108,14 +1108,14 @@ nhacp_req_file_close(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_close.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_close.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.file_close.slot);
+		    ctx->request.file_close.fdesc);
 		return;
 	}
-	log_debug(LOG_SUBSYS_NHACP, "[%s] Closing file at slot %u.",
+	log_debug(LOG_SUBSYS_NHACP, "[%s] Closing file at fdesc %u.",
 	    conn_name(ctx->stext.conn), stext_file_slot(f));
 	stext_file_close(f);
 }
@@ -1141,10 +1141,10 @@ nhacp_req_file_read(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_read.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_read.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.file_read.slot);
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_read.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1157,8 +1157,8 @@ nhacp_req_file_read(struct nhacp_context *ctx)
 	uint16_t flags = nabu_get_uint16(ctx->request.file_read.flags);
 	uint16_t length = nabu_get_uint16(ctx->request.file_read.length);
 
-	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u flags 0x%04x length %u",
-	    conn_name(ctx->stext.conn), ctx->request.file_read.slot,
+	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u flags 0x%04x length %u",
+	    conn_name(ctx->stext.conn), ctx->request.file_read.fdesc,
 	    flags, length);
 
 	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_GET)) {
@@ -1188,10 +1188,10 @@ nhacp_req_file_write(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_write.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_write.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.file_write.slot);
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_write.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1204,8 +1204,8 @@ nhacp_req_file_write(struct nhacp_context *ctx)
 	uint16_t flags = nabu_get_uint16(ctx->request.file_write.flags);
 	uint16_t length = nabu_get_uint16(ctx->request.file_write.length);
 
-	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u flags 0x%04x length %u",
-	    conn_name(ctx->stext.conn), ctx->request.file_write.slot,
+	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u flags 0x%04x length %u",
+	    conn_name(ctx->stext.conn), ctx->request.file_write.fdesc,
 	    flags, length);
 
 	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_PUT)) {
@@ -1235,10 +1235,10 @@ nhacp_req_file_seek(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_seek.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_seek.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.file_seek.slot);
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
+		    conn_name(ctx->stext.conn), ctx->request.file_seek.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1263,8 +1263,8 @@ nhacp_req_file_seek(struct nhacp_context *ctx)
 		return;
 	}
 
-	log_debug(LOG_SUBSYS_NHACP, "[%s] slot %u whence %d offset %d",
-	    conn_name(ctx->stext.conn), ctx->request.file_seek.slot,
+	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u whence %d offset %d",
+	    conn_name(ctx->stext.conn), ctx->request.file_seek.fdesc,
 	    ctx->request.file_seek.whence, offset);
 
 	int error = stext_file_seek(f, &offset, whence);
@@ -1288,10 +1288,10 @@ nhacp_req_list_dir(struct nhacp_context *ctx)
 	char *path;
 	glob_t g;
 
-	f = stext_file_find(&ctx->stext, ctx->request.list_dir.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.list_dir.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
-		    conn_name(ctx->stext.conn), ctx->request.list_dir.slot);
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
+		    conn_name(ctx->stext.conn), ctx->request.list_dir.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1406,11 +1406,11 @@ nhacp_req_get_dir_entry(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.get_dir_entry.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.get_dir_entry.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.get_dir_entry.slot);
+		    ctx->request.get_dir_entry.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1562,11 +1562,11 @@ nhacp_req_file_get_info(struct nhacp_context *ctx)
 	struct stext_file *f;
 	struct fileio_attrs attrs;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_get_info.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_get_info.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.file_get_info.slot);
+		    ctx->request.file_get_info.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1592,11 +1592,11 @@ nhacp_req_file_set_size(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_set_size.slot);
+	f = stext_file_find(&ctx->stext, ctx->request.file_set_size.fdesc);
 	if (f == NULL) {
-		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for slot %u.",
+		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
 		    conn_name(ctx->stext.conn),
-		    ctx->request.file_set_size.slot);
+		    ctx->request.file_set_size.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}

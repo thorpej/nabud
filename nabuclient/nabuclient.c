@@ -1411,8 +1411,8 @@ nhacp_decode_reply(void)
 			printf("*** RUNT ***\n");
 			cli_throw();
 		}
-		printf("--> Slot %u Size %u <--\n",
-		    nhacp_buf.reply.storage_loaded.slot,
+		printf("--> Fdesc %u Size %u <--\n",
+		    nhacp_buf.reply.storage_loaded.fdesc,
 		    nabu_get_uint32(nhacp_buf.reply.storage_loaded.length));
 		break;
 
@@ -1547,7 +1547,7 @@ command_nhacp_storage_open(int argc, char *argv[])
 
 	uint8_t req_slot = stext_parse_slot(argv[1]);
 
-	nhacp_buf.request.storage_open.req_slot = req_slot;
+	nhacp_buf.request.storage_open.req_fdesc = req_slot;
 	if (strcmp(argv[2], "\"\"") == 0) {
 		nhacp_string_set(&nhacp_buf.request.storage_open.url, NULL);
 	} else {
@@ -1629,7 +1629,7 @@ command_nhacp_storage_get(int argc, char *argv[])
 	uint32_t offset = stext_parse_offset(argv[2]);
 	uint16_t length = nhacp_parse_length(argv[3]);
 
-	nhacp_buf.request.storage_get.slot = slot;
+	nhacp_buf.request.storage_get.fdesc = slot;
 	nabu_set_uint32(nhacp_buf.request.storage_get.offset, offset);
 	nabu_set_uint16(nhacp_buf.request.storage_get.length, length);
 
@@ -1653,7 +1653,7 @@ command_nhacp_storage_get_block(int argc, char *argv[])
 	uint32_t blkno = stext_parse_offset(argv[2]);
 	uint16_t blklen = nhacp_parse_length(argv[3]);
 
-	nhacp_buf.request.storage_get_block.slot = slot;
+	nhacp_buf.request.storage_get_block.fdesc = slot;
 	nabu_set_uint32(nhacp_buf.request.storage_get_block.block_number,
 	    blkno);
 	nabu_set_uint16(nhacp_buf.request.storage_get_block.block_length,
@@ -1679,7 +1679,7 @@ command_nhacp_storage_put(int argc, char *argv[])
 	uint32_t offset = stext_parse_offset(argv[2]);
 	uint16_t length = strlen(argv[3]);
 
-	nhacp_buf.request.storage_put.slot = slot;
+	nhacp_buf.request.storage_put.fdesc = slot;
 	nabu_set_uint32(nhacp_buf.request.storage_put.offset, offset);
 	nabu_set_uint16(nhacp_buf.request.storage_put.length, length);
 	memcpy(nhacp_buf.request.storage_put.data, argv[3], length);
@@ -1705,7 +1705,7 @@ command_nhacp_storage_put_block(int argc, char *argv[])
 	uint16_t blklen = nhacp_parse_length(argv[3]);
 	uint8_t val = stext_parse_slot(argv[4]);	/* good enough */
 
-	nhacp_buf.request.storage_put_block.slot = slot;
+	nhacp_buf.request.storage_put_block.fdesc = slot;
 	nabu_set_uint32(nhacp_buf.request.storage_put_block.block_number,
 	    blkno);
 	nabu_set_uint16(nhacp_buf.request.storage_put_block.block_length,
@@ -1730,7 +1730,7 @@ command_nhacp_file_close(int argc, char *argv[])
 
 	uint8_t slot = stext_parse_slot(argv[1]);
 
-	nhacp_buf.request.file_close.slot = slot;
+	nhacp_buf.request.file_close.fdesc = slot;
 
 	printf("Sending: NHACP_REQ_FILE_CLOSE.\n");
 	nhacp_send(NHACP_REQ_FILE_CLOSE,
@@ -1776,7 +1776,7 @@ command_nhacp_list_dir(int argc, char *argv[])
 		pattern = argv[2];
 	}
 
-	nhacp_buf.request.list_dir.slot = slot;
+	nhacp_buf.request.list_dir.fdesc = slot;
 	nhacp_string_set(&nhacp_buf.request.list_dir.pattern, pattern);
 
 	printf("Sending: NHACP_REQ_LIST_DIR.\n");
@@ -1798,7 +1798,7 @@ command_nhacp_get_dir_entry(int argc, char *argv[])
 
 	uint8_t slot = stext_parse_slot(argv[1]);
 
-	nhacp_buf.request.get_dir_entry.slot = slot;
+	nhacp_buf.request.get_dir_entry.fdesc = slot;
 	nhacp_buf.request.get_dir_entry.max_name_length = 255;
 
 	printf("Sending: NHACP_REQ_GET_DIR_ENTRY.\n");
@@ -1820,7 +1820,7 @@ command_nhacp_file_set_size(int argc, char *argv[])
 	uint8_t slot = stext_parse_slot(argv[1]);
 	uint32_t size = stext_parse_offset(argv[2]);	/* yes, offset */
 
-	nhacp_buf.request.file_set_size.slot = slot;
+	nhacp_buf.request.file_set_size.fdesc = slot;
 	nabu_set_uint32(nhacp_buf.request.file_set_size.size, size);
 
 	printf("Sending: NHACP_REQ_FILE_SET_SIZE.\n");
