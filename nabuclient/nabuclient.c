@@ -1548,7 +1548,11 @@ command_nhacp_storage_open(int argc, char *argv[])
 	uint8_t req_slot = stext_parse_slot(argv[1]);
 
 	nhacp_buf.request.storage_open.req_slot = req_slot;
-	nhacp_string_set(&nhacp_buf.request.storage_open.url, argv[2]);
+	if (strcmp(argv[2], "\"\"") == 0) {
+		nhacp_string_set(&nhacp_buf.request.storage_open.url, NULL);
+	} else {
+		nhacp_string_set(&nhacp_buf.request.storage_open.url, argv[2]);
+	}
 
 	bool have_accmode = false;
 	uint16_t oflags = 0;
