@@ -429,8 +429,8 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ### nabud-1.3
 * Support for the NHACP protocol version 0.1 draft.  Compatibility with
-  the original ("0.0") NHACP is maintained.  WARNING: NHACP-0.1 SUPPORT
-  IS SUBJECT TO CHANGE AS THE DRAFT EVOLVES.
+  the original ("0.0") NHACP is maintained.  More information about NHACP
+  can be found [here](https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md).
 
 ### nabud-1.2.2
 * Fixed an error in the GET-STATUS,TRANSMIT response that caused problems
