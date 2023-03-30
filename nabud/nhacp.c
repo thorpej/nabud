@@ -818,18 +818,16 @@ nhacp_req_storage_open(struct nhacp_context *ctx)
 {
 	struct fileio_attrs attrs;
 	struct stext_file *f;
+	const char *url;
 	int fileio_o_flags;
 	uint16_t nhacp_o_flags;
 	int error;
 
-	/*
-	 * The requested URL is no more than 255 bytes long, and we
-	 * know the buffer it's in is longer than the maximum size
-	 * STORAGE-OPEN request, so we can simply NUL-terminate in
-	 * situ.
-	 */
-	const char *url =
-	    nhacp_string_get(&ctx->request.storage_open.url);
+	if (nhacp_strlen(&ctx->request.storage_open.url) == 0) {
+		url = ".";
+	} else {
+		url = nhacp_string_get(&ctx->request.storage_open.url);
+	}
 
 	/*
 	 * NHACP-0.0 did not define any open flags, even though it
