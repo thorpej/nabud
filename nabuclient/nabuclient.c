@@ -1328,6 +1328,7 @@ nhacp_decode_reply(void)
 {
 	uint16_t min_replylen;
 	uint16_t length;
+	unsigned int val;
 
 	nhacp_recv();
 
@@ -1454,6 +1455,36 @@ nhacp_decode_reply(void)
 			printf("--> File name: '%s' <--\n", name);
 		}
 		nhacp_decode_file_attrs(&nhacp_buf.reply.file_info.attrs);
+		break;
+
+	case NHACP_RESP_UINT8_VALUE:
+		printf("Got: NHACP_RESP_UINT8_VALUE.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.uint8_value)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		val = nhacp_buf.reply.uint8_value.value;
+		printf("--> %u (0x%02x) <--\n", val, val);
+		break;
+
+	case NHACP_RESP_UINT16_VALUE:
+		printf("Got: NHACP_RESP_UINT16_VALUE.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.uint16_value)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		val = nabu_get_uint16(nhacp_buf.reply.uint16_value.value);
+		printf("--> %u (0x%04x) <--\n", val, val);
+		break;
+
+	case NHACP_RESP_UINT32_VALUE:
+		printf("Got: NHACP_RESP_UINT32_VALUE.\n");
+		if (nhacp_length < sizeof(nhacp_buf.reply.uint32_value)) {
+			printf("*** RUNT ***\n");
+			cli_throw();
+		}
+		val = nabu_get_uint32(nhacp_buf.reply.uint32_value.value);
+		printf("--> %u (0x%08x) <--\n", val, val);
 		break;
 
 	default:
@@ -1810,6 +1841,104 @@ command_nhacp_get_dir_entry(int argc, char *argv[])
 }
 
 static bool
+command_nhacp_file_read(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint16_t length = nhacp_parse_length(argv[2]);
+
+	nhacp_buf.request.file_read.fdesc = slot;
+	nabu_set_uint16(nhacp_buf.request.file_read.length, length);
+
+	printf("Sending: NHACP_REQ_FILE_READ.\n");
+	nhacp_send(NHACP_REQ_FILE_READ,
+	    sizeof(nhacp_buf.request.file_read));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_file_write(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint16_t length = strlen(argv[2]);
+
+	nhacp_buf.request.file_write.fdesc = slot;
+	nabu_set_uint16(nhacp_buf.request.file_write.length, length);
+	memcpy(nhacp_buf.request.file_write.data, argv[2], length);
+
+	printf("Sending: NHACP_REQ_FILE_WRITE.\n");
+	nhacp_send(NHACP_REQ_FILE_WRITE,
+	    sizeof(nhacp_buf.request.file_write) + length);
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_file_seek(int argc, char *argv[])
+{
+	if (argc < 4) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	int32_t offset = stext_parse_signed_offset(argv[2]);
+
+	nhacp_buf.request.file_seek.fdesc = slot;
+	nabu_set_uint32(nhacp_buf.request.file_seek.offset, offset);
+
+	if (strcmp(argv[3], "set") == 0) {
+		nhacp_buf.request.file_seek.whence = NHACP_SEEK_SET;
+	} else if (strcmp(argv[3], "cur") == 0) {
+		nhacp_buf.request.file_seek.whence = NHACP_SEEK_CUR;
+	} else if (strcmp(argv[3], "end") == 0) {
+		nhacp_buf.request.file_seek.whence = NHACP_SEEK_END;
+	} else {
+		printf("unknown whence, bro.\n");
+		cli_throw();
+	}
+
+	printf("Sending: NHACP_REQ_FILE_SEEK.\n");
+	nhacp_send(NHACP_REQ_FILE_SEEK,
+	    sizeof(nhacp_buf.request.file_seek));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
+command_nhacp_file_get_info(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	nhacp_buf.request.file_get_info.fdesc = slot;
+
+	printf("Sending: NHACP_REQ_FILE_GET_INFO.\n");
+	nhacp_send(NHACP_REQ_FILE_GET_INFO,
+	    sizeof(nhacp_buf.request.file_get_info));
+
+	nhacp_decode_reply();
+	return false;
+}
+
+static bool
 command_nhacp_file_set_size(int argc, char *argv[])
 {
 	if (argc < 3) {
@@ -1972,6 +2101,10 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-file-close",	.func = command_nhacp_file_close },
 	{ .name = "nhacp-get-error-details",
 				.func = command_nhacp_get_error_details },
+	{ .name = "nhacp-file-read",	.func = command_nhacp_file_read },
+	{ .name = "nhacp-file-write",	.func = command_nhacp_file_write },
+	{ .name = "nhacp-file-seek",	.func = command_nhacp_file_seek },
+	{ .name = "nhacp-file-get-info",.func = command_nhacp_file_get_info },
 	{ .name = "nhacp-file-set-size",.func = command_nhacp_file_set_size },
 	{ .name = "nhacp-list-dir",	.func = command_nhacp_list_dir },
 	{ .name = "nhacp-get-dir-entry",.func = command_nhacp_get_dir_entry },
