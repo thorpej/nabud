@@ -1852,6 +1852,7 @@ command_nhacp_file_read(int argc, char *argv[])
 	uint16_t length = nhacp_parse_length(argv[2]);
 
 	nhacp_buf.request.file_read.fdesc = slot;
+	nabu_set_uint16(nhacp_buf.request.file_read.flags, 0);
 	nabu_set_uint16(nhacp_buf.request.file_read.length, length);
 
 	printf("Sending: NHACP_REQ_FILE_READ.\n");
@@ -1874,6 +1875,7 @@ command_nhacp_file_write(int argc, char *argv[])
 	uint16_t length = strlen(argv[2]);
 
 	nhacp_buf.request.file_write.fdesc = slot;
+	nabu_set_uint16(nhacp_buf.request.file_read.flags, 0);
 	nabu_set_uint16(nhacp_buf.request.file_write.length, length);
 	memcpy(nhacp_buf.request.file_write.data, argv[2], length);
 
