@@ -171,7 +171,7 @@ parse_entry(struct parser_context *ctx)
 	/* Walk backward, setting NULs until the first non-whitespace. */
 	zero_back(cp, limit);
 
-	/* If the resulting name is not empty, create the category. */
+	/* If the resulting name is not empty, create the entry. */
 	size_t namelen = strlen(name);
 	if (namelen != 0) {
 		struct listing_entry *entry = entry_alloc(ctx);
