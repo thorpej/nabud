@@ -19,6 +19,9 @@
    function on your OS */
 #undef HAVE_LIBEDIT_READLINE
 
+/* Define if struct termios2 exists in <linux/termios.h> */
+#undef HAVE_LINUX_TERMIOS2
+
 /* Define to 1 if you have OpenSSL. */
 #undef HAVE_OPENSSL
 

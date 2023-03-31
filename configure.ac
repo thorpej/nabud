@@ -310,6 +310,20 @@ AC_COMPILE_IFELSE([
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 
+# Check for termios2 in <linux/termios.h>.
+#
+AC_MSG_CHECKING([for termios2 in <linux/termios.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <linux/termios.h>
+	]],[[
+		struct termios2 t2;
+		t2.c_cflag = BOTHER;
+	]])],[
+		AC_DEFINE(HAVE_LINUX_TERMIOS2, 1, [Define if struct termios2 exists in <linux/termios.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
 # Check for _Static_assert() in the compiler.
 #
 AC_MSG_CHECKING([for _Static_assert() support in the compiler])
