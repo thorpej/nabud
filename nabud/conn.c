@@ -52,6 +52,9 @@
 
 #include "adaptor.h"
 #include "conn.h"
+#ifdef HAVE_LINUX_TERMIOS2
+#include "conn_linux.h"
+#endif
 #include "image.h"
 #include "retronet.h"
 #include "nhacp.h"
@@ -248,6 +251,30 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 		t.c_cflag &= ~CRTSCTS;
 	}
 
+#ifdef HAVE_LINUX_TERMIOS2
+	/*
+	 * For Linux, we need to use a different API to set the speed,
+	 * but only after we use the standard termios API to set all
+	 * of the other parameters.  But we can't do it in-line here
+	 * because of course we can't (see conn_linux.c for details).
+	 *
+	 * Complicating matters, apparently Linux doesn't have termios2
+	 * on all architecture.  &shrug;
+	 */
+	if (tcsetattr(fd, TCSANOW, &t) < 0) {
+		log_error("[%s] Failed to set 8N%u%s: %s", args->port,
+		    args->stop_bits,
+		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
+		goto failed;
+	}
+
+	if (! conn_serial_setspeed_linux(fd, args)) {
+		/* Specific error message already logged. */
+		log_error("[%s] Failed to set %u baud.", args->port,
+		    args->baud);
+		goto failed;
+	}
+#else /* ! HAVE_LINUX_TERMIOS2 */
 	if (cfsetspeed(&t, (speed_t)args->baud) < 0) {
 		log_error("[%s] cfsetspeed(%u) failed: %s", args->port,
 		    args->baud, strerror(errno));
@@ -260,6 +287,7 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
 		goto failed;
 	}
+#endif /* HAVE_LINUX_TERMIOS2 */
 
 	return true;
  failed:
