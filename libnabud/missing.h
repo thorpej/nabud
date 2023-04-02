@@ -44,7 +44,7 @@
 
 #ifndef HAVE_O_NOCTTY
 #define	O_NOCTTY	0
-#endif
+#endif /* ! HAVE_O_NOCTTY */
 
 #ifndef HAVE_GETPROGNAME
 const char *	getprogname(void);
