@@ -30,7 +30,9 @@
  *    https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md
  */
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 #include <sys/stat.h>
 #include <assert.h>
