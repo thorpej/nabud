@@ -61,7 +61,7 @@
 
 #include "libnabud/cli.h"
 #include "libnabud/crc16_genibus.h"
-#include "libnabud/crc8_wcdma.h"
+#include "libnabud/crc8_cdma2000.h"
 #include "libnabud/missing.h"
 #include "libnabud/nabu_proto.h"
 #include "libnabud/nhacp_proto.h"
@@ -1237,13 +1237,13 @@ nhacp_send(uint8_t op, uint16_t length)
 
 	if (nhacp_options & NHACP_OPTION_CRC8) {
 		if (! nhacp_crc_rxonly) {
-			crc = crc8_wcdma_init();
-			crc = crc8_wcdma_update(&request_header,
+			crc = crc8_cdma2000_init();
+			crc = crc8_cdma2000_update(&request_header,
 			    sizeof(request_header), crc);
-			crc = crc8_wcdma_update(&nhacp_buf.request,
+			crc = crc8_cdma2000_update(&nhacp_buf.request,
 			    (uintptr_t)crc_ptr - (uintptr_t)&nhacp_buf.request,
 			    crc);
-			crc = crc8_wcdma_fini(crc);
+			crc = crc8_cdma2000_fini(crc);
 		}
 		*crc_ptr = crc;
 	}
@@ -1334,10 +1334,10 @@ nhacp_decode_reply(void)
 
 	if (nhacp_options & NHACP_OPTION_CRC8) {
 		/* Server MUST always include CRC. */
-		uint8_t crc = crc8_wcdma_init();
-		crc = crc8_wcdma_update(&nhacp_buf.reply,
+		uint8_t crc = crc8_cdma2000_init();
+		crc = crc8_cdma2000_update(&nhacp_buf.reply,
 		    nhacp_length + sizeof(nhacp_buf.reply.length), crc);
-		crc = crc8_wcdma_fini(crc);
+		crc = crc8_cdma2000_fini(crc);
 
 		if (crc == 0) {
 			printf("--> CRC-8 OK <--\n");

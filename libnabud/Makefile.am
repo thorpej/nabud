@@ -5,5 +5,6 @@ noinst_LTLIBRARIES	= libnabud.la
 
 libnabud_la_CPPFLAGS	= $(CLI_INCLUDES)
 
-libnabud_la_SOURCES	= atom.c cli.c conn_io.c crc16_genibus.c crc8_wcdma.c \
-			  fileio.c getprogname.c listing.c log.c
+libnabud_la_SOURCES	= atom.c cli.c conn_io.c crc16_genibus.c \
+			  crc8_cdma2000.c fileio.c getprogname.c \
+			  listing.c log.c

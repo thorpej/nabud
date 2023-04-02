@@ -49,7 +49,7 @@
 #define	NABU_PROTO_INLINES
 #define	NHACP_PROTO_INLINES
 
-#include "libnabud/crc8_wcdma.h"
+#include "libnabud/crc8_cdma2000.h"
 #include "libnabud/fileio.h"
 #include "libnabud/log.h"
 #include "libnabud/missing.h"
@@ -462,10 +462,10 @@ nhacp_send_reply(struct nhacp_context *ctx, uint8_t type, uint16_t length)
 		uint8_t *crc_ptr = nhacp_crc_ptr(ctx, ctx->nhacp_options);
 		assert(crc_ptr != NULL);
 
-		uint8_t crc = crc8_wcdma_init();
-		crc = crc8_wcdma_update(&ctx->reply,
+		uint8_t crc = crc8_cdma2000_init();
+		crc = crc8_cdma2000_update(&ctx->reply,
 		    (uintptr_t)crc_ptr - (uintptr_t)&ctx->reply, crc);
-		crc = crc8_wcdma_fini(crc);
+		crc = crc8_cdma2000_fini(crc);
 
 		*crc_ptr = crc;
 	}
@@ -1778,24 +1778,24 @@ nhacp_request_check(struct nhacp_context *ctx, uint16_t length)
 				NABU_MSG_NHACP_REQUEST,
 				ctx->session_id,
 			};
-			uint8_t crc = crc8_wcdma_init();
-			crc = crc8_wcdma_update(request_header,
+			uint8_t crc = crc8_cdma2000_init();
+			crc = crc8_cdma2000_update(request_header,
 			    sizeof(request_header), crc);
-			crc = crc8_wcdma_update(&ctx->request,
+			crc = crc8_cdma2000_update(&ctx->request,
 			    crc_checklen, crc);
-			crc = crc8_wcdma_fini(crc);
+			crc = crc8_cdma2000_fini(crc);
 
 			if (crc != 0) {
 				/*
 				 * Compute it again without the CRC byte
 				 * so we can report computed vs. expected.
 				 */
-				crc = crc8_wcdma_init();
-				crc = crc8_wcdma_update(&ctx->session_id, 1,
+				crc = crc8_cdma2000_init();
+				crc = crc8_cdma2000_update(&ctx->session_id, 1,
 				    crc);
-				crc = crc8_wcdma_update(&ctx->request,
+				crc = crc8_cdma2000_update(&ctx->request,
 				    crc_checklen - 1, crc);
-				crc = crc8_wcdma_fini(crc);
+				crc = crc8_cdma2000_fini(crc);
 				log_error("[%s] CRC-8 failure; "
 				    "computed 0x%02x != received 0x%02x",
 				    conn_name(ctx->stext.conn), crc, *crc_ptr);
