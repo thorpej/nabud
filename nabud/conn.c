@@ -31,6 +31,10 @@
  * or over a TCP socket to support NABU emulators.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
