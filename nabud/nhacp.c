@@ -185,10 +185,12 @@ nhacp_context_free(struct nhacp_context *ctx)
  *	Allocate an NHACP context for the specified connection.
  */
 static struct nhacp_context *
-nhacp_context_alloc(struct nabu_connection *conn, uint8_t session_id)
+nhacp_context_alloc(struct nabu_connection *conn, uint16_t version,
+    uint8_t session_id)
 {
 	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
 	ctx->session_id = session_id;
+	ctx->nhacp_version = version;
 	stext_context_init(&ctx->stext, conn,
 	    sizeof(struct nhacp_file_private),
 	    nhacp_file_private_init, nhacp_file_private_fini);
@@ -1865,12 +1867,12 @@ nhacp_start_0_0(struct nabu_connection *conn)
 	 * If we failed to allocate a context, just don't send
 	 * a reply -- act as if this were an unrecognized message.
 	 */
-	if ((ctx = nhacp_context_alloc(conn, NHACP_SESSION_SYSTEM)) == NULL) {
+	if ((ctx = nhacp_context_alloc(conn, NHACP_VERS_0_0,
+				       NHACP_SESSION_SYSTEM)) == NULL) {
 		log_error("[%s] Failed to allocate NHACP context.",
 		    conn_name(conn));
 		return true;
 	}
-	ctx->nhacp_version = NHACP_VERS_0_0;
 	ctx->nhacp_options = 0;
 
 	/*
@@ -2042,12 +2044,14 @@ nhacp_request(struct nabu_connection *conn, uint8_t msg)
 	if (ctx == NULL) {
 		/*
 		 * No context found; allocate a new context in case
-		 * a new session is being established.
+		 * a new session is being established.  Note that
+		 * this will be at least NHACP-0.1, so we default
+		 * to that until we process the client's HELLO.
 		 */
 		log_debug(LOG_SUBSYS_NHACP,
 		    "[%s] Session %u not found; allocating a new one.",
 		    conn_name(conn), session_id);
-		ctx = nhacp_context_alloc(conn, session_id);
+		ctx = nhacp_context_alloc(conn, NHACP_VERS_0_1, session_id);
 		if (ctx == NULL) {
 			log_error("[%s] Failed to allocate context.",
 			    conn_name(conn));
