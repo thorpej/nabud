@@ -727,6 +727,8 @@ nhacp_req_hello(struct nhacp_context *ctx)
 		 * HELLO with the SYSTEM session means we need to
 		 * reset everything and start afresh.
 		 */
+		log_info("[%s] Ending all NHACP sessions.",
+		    conn_name(conn));
 		nhacp_conn_reset(ctx->stext.conn, ctx);
 	} else if (ctx->session_id != NHACP_SESSION_CREATE) {
 		/*
