@@ -1249,6 +1249,8 @@ nhacp_send(uint8_t op, uint16_t length)
 	}
 
 	if (nhacp_version >= NHACP_VERS_0_1) {
+		printf("Sending: NHACP session ID: %u.\n",
+		    request_header[1]);
 		nabu_send(request_header, sizeof(request_header));
 	}
 	nabu_send(&nhacp_buf.request,
@@ -1534,6 +1536,7 @@ command_nhacp_hello(int argc, char *argv[])
 
 	nhacp_options = 0;
 	nhacp_crc_rxonly = false;
+	nhacp_session = NHACP_SESSION_SYSTEM;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "crc8-rx") == 0) {
 			nhacp_options |= NHACP_OPTION_CRC8;
@@ -1545,11 +1548,14 @@ command_nhacp_hello(int argc, char *argv[])
 			nhacp_crc_rxonly = false;
 			continue;
 		}
+		if (strcmp(argv[i], "create") == 0) {
+			nhacp_session = NHACP_SESSION_CREATE;
+			continue;
+		}
 		printf("Unknown start option: %s\n", argv[i]);
 		cli_throw();
 	}
 	nabu_set_uint16(nhacp_buf.request.hello.options, nhacp_options);
-	nhacp_session = NHACP_SESSION_SYSTEM;
 
 	printf("Sending: NHACP_REQ_HELLO.\n");
 	nhacp_send(NHACP_REQ_HELLO, sizeof(nhacp_buf.request.hello));
@@ -2055,6 +2061,21 @@ command_nhacp_goodbye(int argc, char *argv[])
 	return false;
 }
 
+static bool
+command_nhacp_session(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	uint8_t session_id = stext_parse_slot(argv[1]);	/* close enough */
+	printf("Switching to NHACP session ID %u.\n", session_id);
+	nhacp_session = session_id;
+
+	return false;
+}
+
 static bool	command_help(int, char *[]);
 
 static const struct cmdtab cmdtab[] = {
@@ -2115,6 +2136,7 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-rename",	.func = command_nhacp_rename },
 	{ .name = "nhacp-mkdir",	.func = command_nhacp_mkdir },
 	{ .name = "nhacp-goodbye",	.func = command_nhacp_goodbye },
+	{ .name = "nhacp-session",	.func = command_nhacp_session },
 
 	CMDTAB_EOL(cli_command_unknown)
 };
