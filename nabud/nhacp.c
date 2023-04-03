@@ -762,7 +762,7 @@ nhacp_req_hello(struct nhacp_context *ctx)
 	    NHACP_VERS_MINOR(ctx->nhacp_version),
 	    ctx->session_id);
 	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
-		log_info("[%s] session %u: CRC-8/WCDMA FCS option enabled.",
+		log_info("[%s] session %u: CRC-8 FCS option enabled.",
 		    conn_name(conn), ctx->session_id);
 	}
 	nhacp_send_reply(ctx, NHACP_RESP_SESSION_STARTED,
