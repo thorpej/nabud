@@ -219,7 +219,6 @@ static int
 rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
-	struct fileio *f;
 	char *fname;
 	uint8_t fnamelen;
 
@@ -235,28 +234,15 @@ rn_file_getattr(struct retronet_context *ctx, struct fileio_attrs *attrs)
 		return error;
 	}
 
-	/*
-	 * Open the file so we can get the size.  Yes, open.
-	 * This is necessary for remote files on the other
-	 * end of an HTTP connection, for example.
-	 *
-	 * It's OK to open a directory here, because we want to be able
-	 * to convey that information.
-	 */
 	log_debug(LOG_SUBSYS_RETRONET,
-	    "[%s] Opening '%s' in order to get attributes.",
+	    "[%s] Getting attributes for '%s'.",
 	    conn_name(ctx->stext.conn), fname);
-	f = fileio_open(fname,
-	    FILEIO_O_RDONLY | FILEIO_O_DIROK | FILEIO_O_LOCAL_ROOT,
-	    conn->file_root, attrs);
-	if (f == NULL) {
-		log_info("[%s] Opening '%s' failed: %s",
+	if (! fileio_getattr_location(fname, FILEIO_O_LOCAL_ROOT,
+				      conn->file_root, attrs)) {
+		log_info("[%s] Get attributes for '%s' failed: %s",
 		    conn_name(ctx->stext.conn), fname, strerror(errno));
 		return errno;
 	}
-
-	/* Now have the attrs; close the file. */
-	fileio_close(f);
 
 	return 0;
 }
@@ -296,17 +282,17 @@ rn_req_file_open(struct retronet_context *ctx)
 	fname[fnamelen] = '\0';
 
 	int fileio_flags = (flags & RN_FILE_OPEN_RW) ?
-	    FILEIO_O_RDWR : FILEIO_O_RDONLY;
+	    FILEIO_O_RDWP : FILEIO_O_RDONLY;
 
 	error = stext_file_open(&ctx->stext, fname, reqslot, &attrs,
-	    FILEIO_O_CREAT | fileio_flags, &f);
+	    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
 	if (error == EBUSY) {
 		/*
 		 * The RetroNet API says to treat a busy requested
 		 * slot as "ok, then just allocate one.".  &shrug;
 		 */
 		error = stext_file_open(&ctx->stext, fname, 0xff, &attrs,
-		    FILEIO_O_CREAT | fileio_flags, &f);
+		    FILEIO_O_CREAT | FILEIO_O_REGULAR | fileio_flags, &f);
 	}
 
 	/*
@@ -865,7 +851,7 @@ rn_req_file_delete(struct retronet_context *ctx)
 }
 
 static bool
-rn_file_copy_mode_getargs(struct retronet_context *ctx,
+rn_file_copy_move_getargs(struct retronet_context *ctx,
     const char **src_fnamep, const char **dst_fnamep, uint8_t *flagsp)
 {
 	struct nabu_connection *conn = ctx->stext.conn;
@@ -926,7 +912,7 @@ rn_req_file_copy(struct retronet_context *ctx)
 	uint8_t flags;
 
 	/* FILE-COPY and FILE-MOVE have the same args "structure". */
-	if (! rn_file_copy_mode_getargs(ctx, &src_fname, &dst_fname, &flags)) {
+	if (! rn_file_copy_move_getargs(ctx, &src_fname, &dst_fname, &flags)) {
 		log_error("[%s] Failed to get arguments.",
 		    conn_name(conn));
 		return;
@@ -952,7 +938,7 @@ rn_req_file_copy(struct retronet_context *ctx)
 	struct fileio *src_f = NULL, *dst_f = NULL;
 
 	src_f = fileio_open(src_fname,
-	    FILEIO_O_RDONLY | FILEIO_O_LOCAL_ROOT,
+	    FILEIO_O_RDONLY | FILEIO_O_REGULAR | FILEIO_O_LOCAL_ROOT,
 	    conn->file_root, NULL);
 	if (src_f == NULL) {
 		log_debug(LOG_SUBSYS_RETRONET,
@@ -966,7 +952,8 @@ rn_req_file_copy(struct retronet_context *ctx)
 	 * already resolved the path.
 	 */
 	dst_f = fileio_open(dst_path,
-	    FILEIO_O_RDWR | FILEIO_O_CREAT | dst_oflags, NULL, NULL);
+	    FILEIO_O_RDWR | FILEIO_O_CREAT | FILEIO_O_REGULAR | dst_oflags,
+	    NULL, NULL);
 	if (dst_f == NULL) {
 		log_debug(LOG_SUBSYS_RETRONET,
 		    "[%s] Unable to open dst '%s': %s",
@@ -1021,7 +1008,7 @@ rn_req_file_move(struct retronet_context *ctx)
 	uint8_t flags;
 
 	/* FILE-COPY and FILE-MOVE have the same args "structure". */
-	if (! rn_file_copy_mode_getargs(ctx, &src_fname, &dst_fname, &flags)) {
+	if (! rn_file_copy_move_getargs(ctx, &src_fname, &dst_fname, &flags)) {
 		log_error("[%s] Failed to get arguments.",
 		    conn_name(conn));
 		return;
@@ -1144,7 +1131,7 @@ rn_req_file_list(struct retronet_context *ctx)
 	 * to FILE-LIST line up exactly with "src", "dst", and "flags"
 	 * for FILE-MOVE and FILE-COPY.
 	 */
-	if (! rn_file_copy_mode_getargs(ctx, &where, &pattern, &flags)) {
+	if (! rn_file_copy_move_getargs(ctx, &where, &pattern, &flags)) {
 		log_error("[%s] Failed to get arguments.",
 		    conn_name(conn));
 		return;
@@ -1206,7 +1193,7 @@ rn_req_file_list(struct retronet_context *ctx)
 			    conn_name(conn));
 			goto out;
 		}
-		if (! fileio_getattr_path(g.gl_pathv[i], &attrs)) {
+		if (! fileio_getattr_location(g.gl_pathv[i], 0, NULL, &attrs)) {
 			log_error("[%s] Unable to get attrs for '%s': %s",
 			    conn_name(conn), g.gl_pathv[i], strerror(errno));
 			free(e);
@@ -1498,9 +1485,10 @@ static const unsigned int retronet_request_type_count =
 static struct retronet_context *
 retronet_context_alloc(struct nabu_connection *conn)
 {
+	assert(conn->retronet == NULL);
 	struct retronet_context *ctx = calloc(1, sizeof(*ctx));
 	if (ctx != NULL) {
-		stext_context_init(&ctx->stext, conn);
+		stext_context_init(&ctx->stext, conn, 0, NULL, NULL);
 		STAILQ_INIT(&ctx->file_list);
 		conn->retronet = ctx;
 	}

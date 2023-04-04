@@ -24,31 +24,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef missing_h_included
-#define	missing_h_included
+#ifndef conn_linux_h_included
+#define	conn_linux_h_included
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include <stdbool.h>
 
-/*
- * Elide some open(2) flags that might not exist on some systems.
- */
-#ifndef HAVE_O_TEXT
-#define	O_TEXT		0		/* this is a Windows thing */
-#endif /* ! HAVE_O_TEXT */
+bool	conn_serial_setspeed_linux(int, const struct conn_add_args *);
 
-#ifndef HAVE_O_BINARY
-#define	O_BINARY	0		/* this is a Windows thing */
-#endif /* ! HAVE_O_BINARY */
-
-#ifndef HAVE_O_NOCTTY
-#define	O_NOCTTY	0
-#endif /* ! HAVE_O_NOCTTY */
-
-#ifndef HAVE_GETPROGNAME
-const char *	getprogname(void);
-void		setprogname(const char *);
-#endif /* ! HAVE_GETPROGNAME */
-
-#endif /* missing_h_included */
+#endif /* conn_linux_h_included */

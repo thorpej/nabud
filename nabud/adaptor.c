@@ -75,6 +75,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define	NABU_PROTO_INLINES
 
+#include "libnabud/crc16_genibus.h"
 #include "libnabud/log.h"
 #include "libnabud/nhacp_proto.h"
 
@@ -269,7 +270,9 @@ adaptor_send_pak(struct nabu_connection *conn, uint32_t image,
 
 	memcpy(pktbuf, img->data + off, len);
 
-	nabu_set_crc(&pktbuf[len - 2], nabu_crc(pktbuf, len - 2));
+	uint16_t crc = crc16_genibus_fini(crc16_genibus_update(pktbuf, len - 2,
+	    crc16_genibus_init()));
+	nabu_set_crc(&pktbuf[len - 2], crc);
 
 	log_debug(LOG_SUBSYS_ADAPTOR,
 	    "[%s] Sending segment %u of image %06X%s", conn_name(conn),
@@ -333,7 +336,9 @@ adaptor_send_image(struct nabu_connection *conn, uint32_t image,
 	memcpy(&pktbuf[i], img->data + off, len);	/* payload */
 	i += len;
 
-	i += nabu_set_crc(&pktbuf[i], nabu_crc(pktbuf, i));
+	uint16_t crc = crc16_genibus_fini(crc16_genibus_update(pktbuf, i,
+	    crc16_genibus_init()));
+	i += nabu_set_crc(&pktbuf[i], crc);
 	if (i != pktlen) {
 		log_fatal("internal packet length error");
 	}
@@ -396,11 +401,7 @@ adaptor_send_time(struct nabu_connection *conn)
 static void
 adaptor_msg_reset(struct nabu_connection *conn)
 {
-	if (conn->retronet != NULL) {
-		log_info("[%s] Clearing previous RetroNet state.",
-		    conn_name(conn));
-		retronet_conn_fini(conn);
-	}
+	conn_reboot(conn);
 	log_debug(LOG_SUBSYS_ADAPTOR,
 	    "[%s] Sending NABU_MSGSEQ_ACK + NABU_STATE_CONFIRMED.",
 	    conn_name(conn));
@@ -687,24 +688,14 @@ adaptor_event_loop(struct nabu_connection *conn)
 		log_debug(LOG_SUBSYS_ADAPTOR,
 		    "[%s] Waiting for NABU.", conn_name(conn));
 		if (! conn_recv_byte(conn, &msg)) {
-			if (conn_state(conn) == CONN_STATE_EOF) {
-				log_info("[%s] Peer disconnected.",
-				    conn_name(conn));
+			if (! conn_check_state(conn)) {
+				/* Error already logged. */
 				break;
 			}
-			if (conn_state(conn) == CONN_STATE_CANCELLED) {
-				log_info("[%s] Received cancellation request.",
-				    conn_name(conn));
-				break;
-			}
-			if (conn_state(conn) == CONN_STATE_ABORTED) {
-				log_error("[%s] Connection aborted.",
-				    conn_name(conn));
-				break;
-			}
-			log_error("[%s] conn_recv_byte() failed, "
-			    "exiting event loop.", conn_name(conn));
-			break;
+			log_debug(LOG_SUBSYS_ADAPTOR,
+			    "[%s] conn_recv_byte() failed, "
+			    "continuing event loop.", conn_name(conn));
+			continue;
 		}
 
 		/*
@@ -726,7 +717,7 @@ adaptor_event_loop(struct nabu_connection *conn)
 		}
 
 		/* Check for NHACP mode. */
-		if (nhacp_start(conn, msg)) {
+		if (nhacp_request(conn, msg)) {
 			/* Yup! */
 			continue;
 		}

@@ -58,6 +58,8 @@ struct fileio_ops {
 			    const char *);
 	bool		(*io_ok)(struct fileio *, bool);
 	bool		(*io_getattr)(struct fileio *, struct fileio_attrs *);
+	bool		(*io_getattr_location)(const char *, int, const char *,
+			    struct fileio_attrs *);
 	void		(*io_close)(struct fileio *);
 
 	off_t		(*io_seek)(struct fileio *, off_t, int);
@@ -74,6 +76,7 @@ struct fileio_ops {
 struct fileio {
 	char		*location;	/* might be a URL */
 	int		flags;
+	bool		writable;
 
 	const struct fileio_ops *ops;
 
@@ -89,14 +92,82 @@ struct fileio {
 	};
 };
 
-static bool
-fileio_io_ok(struct fileio *f, bool writing)
+static inline int
+fileio_accmode(struct fileio *f)
 {
-	if (writing && (f->flags & FILEIO_O_RDWR) == 0) {
-		errno = EBADF;
-		return false;
+	return f->flags & FILEIO_O_ACCMODE;
+}
+
+static int
+fileio_accmode_to_o_flags(struct fileio *f)
+{
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDONLY:
+		f->writable = false;
+		return O_RDONLY;
+
+	case FILEIO_O_RDWR:
+	case FILEIO_O_RDWP:
+		f->writable = true;
+		return O_RDWR;
+
+	default:
+		f->writable = false;
+		return -1;
 	}
-	return true;
+}
+
+static int
+fileio_accmode_downgrade_o_flags(struct fileio *f)
+{
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDWP:
+		if (f->writable) {
+			if (f->flags & FILEIO_O_TRUNC) {
+				/* Can't truncate in this case. */
+				return -1;
+			}
+			f->writable = false;
+			return O_RDONLY;
+		}
+		/* FALLTHROUGH */
+
+	default:
+		return -1;
+	}
+}
+
+static int
+fileio_io_check(struct fileio *f, bool writing)
+{
+	int error = 0;
+
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDONLY:
+		if (writing) {
+			error = EBADF;
+		}
+		break;
+
+	case FILEIO_O_RDWR:
+		/*
+		 * If the underlying object isn't writable, then this
+		 * access mode should have already been denied.
+		 */
+		assert(f->writable);
+		break;
+
+	case FILEIO_O_RDWP:
+		if (writing && !f->writable) {
+			error = EROFS;
+		}
+		break;
+
+	default:
+		abort();
+	}
+
+	return error;
 }
 
 /*
@@ -267,6 +338,9 @@ fileio_local_resolve_path(const char *location, const char *local_root,
 	char *fname;
 
 	if ((flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "LOCAL-ROOT required for '%s' but none specified.",
+		    location);
 		return EINVAL;
 	}
 
@@ -289,12 +363,17 @@ fileio_local_resolve_path(const char *location, const char *local_root,
 	}
 
 	if (strlen(location) == 0) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "zero-length file location??");
 		return EINVAL;
 	}
 
 	if (local_root != NULL) {
 		/* The local root must be an absolute path. */
 		if (*local_root != '/') {
+			log_debug(LOG_SUBSYS_FILEIO,
+			    "LOCAL-ROOT '%s' is not an absolute path.",
+			    local_root);
 			return EINVAL;
 		}
 		if (check_local_root_escape(location)) {
@@ -326,16 +405,14 @@ fileio_local_io_open(struct fileio *f, const char *location,
 {
 	int error;
 
-	error = fileio_local_resolve_path(location, local_root, f->flags,
-	    &f->location);
-	if (error != 0) {
-		errno = error;
+	int open_flags = fileio_accmode_to_o_flags(f);
+	if (open_flags == -1) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "Bogus access mode: %d", fileio_accmode(f));
+		errno = EINVAL;
 		return false;
 	}
-
-	/* If open fails, caller will free f->location. */
-
-	int open_flags = (f->flags & FILEIO_O_RDWR) ? O_RDWR : O_RDONLY;
+ again:
 	if (f->flags & FILEIO_O_CREAT) {
 		open_flags |= O_CREAT;
 	}
@@ -347,31 +424,88 @@ fileio_local_io_open(struct fileio *f, const char *location,
 	} else {
 		open_flags |= O_BINARY;
 	}
+	if (f->flags & FILEIO_O_TRUNC) {
+		open_flags |= O_TRUNC;
+	}
+	if ((f->flags & (FILEIO_O_REGULAR | FILEIO_O_DIRECTORY)) ==
+	    (FILEIO_O_REGULAR | FILEIO_O_DIRECTORY)) {
+		/*
+		 * You cannot simultaneously require both a regular file
+		 * and a directory.
+		 */
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "Specified REGULAR+DIRECTORY for '%s' - make up your mind!",
+		    location);
+		errno = EINVAL;
+		return false;
+	}
+#ifdef HAVE_O_REGULAR
+	if (f->flags & FILEIO_O_REGULAR) {
+		open_flags |= O_REGULAR;
+	}
+#endif /* HAVE_O_REGULAR */
+#ifdef HAVE_O_DIRECTORY
+	if (f->flags & FILEIO_O_DIRECTORY) {
+		open_flags |= O_DIRECTORY;
+	}
+#endif /* HAVE_O_DIRECTORY */
 
-	f->local.fd = open(f->location, open_flags, 0666);
-	if (f->local.fd < 0) {
+	error = fileio_local_resolve_path(location, local_root, f->flags,
+	    &f->location);
+	if (error != 0) {
+		errno = error;
 		return false;
 	}
 
-	/*
-	 * Only regular files, unless the caller says they're OK
-	 * opening a directory (probably for a getattr call later).
-	 */
+	/* If open fails, caller will free f->location. */
+
+	f->local.fd = open(f->location, open_flags, 0666);
+	if (f->local.fd < 0) {
+#ifdef HAVE_EFTYPE
+		/*
+		 * The NetBSD kernel returns EFTYPE of you specify
+		 * O_REGULAR and the file is not a regular file.
+		 * EPERM maps better to our intended message here.
+		 */
+		if (errno == EFTYPE) {
+			errno = EPERM;
+		}
+#endif /* HAVE_EFTYPE */
+		if (errno == EACCES &&
+		    (open_flags = fileio_accmode_downgrade_o_flags(f)) != -1) {
+			log_debug(LOG_SUBSYS_FILEIO,
+			    "Downgrading access mode for '%s'", location);
+			goto again;
+		}
+		return false;
+	}
+
 	struct stat sb;
 	if (fstat(f->local.fd, &sb) < 0) {
 		goto bad;
 	}
-	if (S_ISDIR(sb.st_mode)) {
-		if (f->flags & FILEIO_O_DIROK) {
-			f->local.is_directory = true;
-		} else {
-			errno = EISDIR;
-			goto bad;
-		}
-	} else if (!S_ISREG(sb.st_mode)) {
+
+	/*
+	 * If the caller has specified directory-only or regular-only,
+	 * then enforce that.
+	 *
+	 * If the system we're running on has both O_REGULAR and
+	 * O_DIRECTORY, then this has been done for us already.
+	 */
+#ifndef HAVE_O_REGULAR
+	if ((f->flags & FILEIO_O_REGULAR) && !S_ISREG(sb.st_mode)) {
 		errno = EPERM;
 		goto bad;
 	}
+#endif /* HAVE_O_REGULAR */
+#ifndef HAVE_O_DIRECTORY
+	if ((f->flags & FILEIO_O_DIRECTORY) && !S_ISDIR(sb.st_mode)) {
+		errno = ENOTDIR;
+		goto bad;
+	}
+#endif /* HAVE_O_DIRECTORY */
+
+	f->local.is_directory = !!S_ISDIR(sb.st_mode);
 
 	return true;
  bad:
@@ -386,7 +520,14 @@ fileio_local_io_ok(struct fileio *f, bool writing)
 		errno = EBADF;
 		return false;
 	}
-	return fileio_io_ok(f, writing);
+
+	int error = fileio_io_check(f, writing);
+	if (error != 0) {
+		errno = error;
+		return false;
+	}
+
+	return true;
 }
 
 static void
@@ -418,6 +559,34 @@ fileio_local_io_getattr(struct fileio *f, struct fileio_attrs *attrs)
 
 	fileio_stat_to_attrs(f->location, &sb, attrs);
 	return true;
+}
+
+static bool
+fileio_local_io_getattr_location(const char *location, int flags,
+    const char *local_root, struct fileio_attrs *attrs)
+{
+	struct stat sb;
+	char *path = NULL;
+	bool rv = false;
+	int error;
+
+	error = fileio_local_resolve_path(location, local_root, flags,
+	    &path);
+	if (error == 0) {
+		if (stat(path, &sb) == 0) {
+			fileio_stat_to_attrs(path, &sb, attrs);
+			rv = true;
+		} else {
+			error = errno;
+		}
+	}
+	if (path != NULL) {
+		free(path);
+	}
+	if (! rv) {
+		errno = error;
+	}
+	return rv;
 }
 
 static void
@@ -491,16 +660,17 @@ fileio_local_io_pwrite(struct fileio *f, const void *buf, size_t len,
 }
 
 static const struct fileio_ops fileio_local_ops = {
-	.io_open	=	fileio_local_io_open,
-	.io_ok		=	fileio_local_io_ok,
-	.io_getattr	=	fileio_local_io_getattr,
-	.io_close	=	fileio_local_io_close,
-	.io_seek	=	fileio_local_io_seek,
-	.io_truncate	=	fileio_local_io_truncate,
-	.io_read	=	fileio_local_io_read,
-	.io_write	=	fileio_local_io_write,
-	.io_pread	=	fileio_local_io_pread,
-	.io_pwrite	=	fileio_local_io_pwrite,
+	.io_open		=	fileio_local_io_open,
+	.io_ok			=	fileio_local_io_ok,
+	.io_getattr		=	fileio_local_io_getattr,
+	.io_getattr_location	=	fileio_local_io_getattr_location,
+	.io_close		=	fileio_local_io_close,
+	.io_seek		=	fileio_local_io_seek,
+	.io_truncate		=	fileio_local_io_truncate,
+	.io_read		=	fileio_local_io_read,
+	.io_write		=	fileio_local_io_write,
+	.io_pread		=	fileio_local_io_pread,
+	.io_pwrite		=	fileio_local_io_pwrite,
 };
 
 /*
@@ -510,6 +680,30 @@ static bool
 fileio_remote_io_open(struct fileio *f, const char *location,
     const char *local_root)
 {
+	/*
+	 * We can't open directories here (at least, not in the traditional
+	 * sense).
+	 */
+	if (f->flags & FILEIO_O_DIRECTORY) {
+		errno = ENOTDIR;
+		return NULL;
+	}
+
+	switch (fileio_accmode(f)) {
+	case FILEIO_O_RDONLY:
+	case FILEIO_O_RDWP:
+		break;
+
+	case FILEIO_O_RDWR:
+		errno = EACCES;
+		return NULL;
+
+	default:
+		errno = EINVAL;
+		return NULL;
+	}
+
+	f->writable = false;
 	f->location = strdup(location);
 	if (f->location == NULL) {
 		errno = ENOMEM;
@@ -537,7 +731,14 @@ fileio_remote_io_ok(struct fileio *f, bool writing)
 		errno = EBADF;
 		return false;
 	}
-	return fileio_io_ok(f, writing);
+
+	int error = fileio_io_check(f, writing);
+	if (error != 0) {
+		errno = error;
+		return false;
+	}
+
+	return true;
 }
 
 static bool
@@ -627,11 +828,6 @@ fileio_open(const char *location, int flags, const char *local_root,
 
 	fso = fileio_ops_for_location(location, strlen(location));
 
-	if (fso->ops->io_write == NULL && (flags & FILEIO_O_RDWR) != 0) {
-		errno = ENOTSUP;
-		return NULL;
-	}
-
 	f = calloc(1, sizeof(*f));
 	if (f == NULL) {
 		errno = ENOMEM;
@@ -666,6 +862,8 @@ fileio_resolve_path(const char *location, const char *local_root, int oflags)
 	int error;
 
 	if (! fileio_location_is_local(location, strlen(location))) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "Location '%s' is not local.", location);
 		errno = EINVAL;
 		return NULL;
 	}
@@ -730,19 +928,37 @@ fileio_getattr(struct fileio *f, struct fileio_attrs *attrs)
 }
 
 /*
- * fileio_getattr_path --
- *	Do a fileio_getattr(), but on a path instead of a fileio.
+ * fileio_getattr_location --
+ *	Do a fileio_getattr(), but on a location instead of a fileio.
  */
 bool
-fileio_getattr_path(const char *path, struct fileio_attrs *attrs)
+fileio_getattr_location(const char *location, int flags,
+    const char *local_root, struct fileio_attrs *attrs)
 {
-	struct stat sb;
+	const struct fileio_scheme_ops *fso;
 
-	if (stat(path, &sb) < 0) {
-		return false;
+	fso = fileio_ops_for_location(location, strlen(location));
+
+	/* Sanitize the flags; only care about local root here. */
+	flags &= FILEIO_O_LOCAL_ROOT;
+
+	/*
+	 * If the scheme supports a getattr-by-location directly, then do
+	 * that.  Otherwise, we call back to opening the file to get the
+	 * attrs and immediately closing it.
+	 */
+	if (fso->ops->io_getattr_location != NULL) {
+		return (*fso->ops->io_getattr_location)(location, flags,
+		    local_root, attrs);
 	}
 
-	fileio_stat_to_attrs(path, &sb, attrs);
+	struct fileio *f = fileio_open(location, FILEIO_O_RDONLY | flags,
+	    local_root, attrs);
+	if (f == NULL) {
+		return false;
+	}
+	fileio_close(f);
+
 	return true;
 }
 
@@ -775,7 +991,7 @@ fileio_seek(struct fileio *f, off_t offset, int whence)
 	off_t pos = -1;
 
 	if (f->ops->io_seek == NULL) {
-		errno = ENOTSUP;
+		errno = ESPIPE;
 	} else if ((*f->ops->io_ok)(f, false)) {
 		pos = (*f->ops->io_seek)(f, offset, whence);
 	}
@@ -808,7 +1024,7 @@ fileio_pread(struct fileio *f, void *buf, size_t len, off_t offset)
 	ssize_t actual = -1;
 
 	if (f->ops->io_pread == NULL) {
-		errno = ENOTSUP;
+		errno = ESPIPE;
 	} else if ((*f->ops->io_ok)(f, false)) {
 		actual = (*f->ops->io_pread)(f, buf, len, offset);
 	}
@@ -824,8 +1040,8 @@ fileio_write(struct fileio *f, const void *buf, size_t len)
 {
 	ssize_t actual = -1;
 
-	if (f->ops->io_write == NULL) {
-		errno = ENOTSUP;
+	if (f->ops->io_write == NULL || !f->writable) {
+		errno = EROFS;
 	} else if ((*f->ops->io_ok)(f, true)) {
 		actual = (*f->ops->io_write)(f, buf, len);
 	}
@@ -842,7 +1058,7 @@ fileio_pwrite(struct fileio *f, const void *buf, size_t len, off_t offset)
 	ssize_t actual = -1;
 
 	if (f->ops->io_pwrite == NULL) {
-		errno = ENOTSUP;
+		errno = ESPIPE;
 	} else if ((*f->ops->io_ok)(f, true)) {
 		actual = (*f->ops->io_pwrite)(f, buf, len, offset);
 	}
@@ -919,7 +1135,8 @@ fileio_load_file_from_location(const char *location, int oflags, size_t extra,
 
 	assert((oflags & ~FILEIO_O_TEXT) == 0);
 
-	f = fileio_open(location, FILEIO_O_RDONLY | oflags, NULL, attrs);
+	f = fileio_open(location, FILEIO_O_RDONLY | FILEIO_O_REGULAR | oflags,
+	    NULL, attrs);
 	if (f == NULL) {
 		log_error("Unable to open %s", location);
 		return NULL;

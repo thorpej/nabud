@@ -22,6 +22,9 @@ and _daemon(3)_.
     * As many RS422 serial ports as you can connect to your system for
       real NABU hardware.
     * Support for connections from NABU emulators (such as MAME) over TCP.
+    * Support for connections from network-connected serial port interfaces
+      over TCP.
+      [**_See configuration note below._**](#Using-network-serial-adapters)
 * Decrypt and serve NABU _pak_ files (available from NabuRetroNet).
 * Serve your own or others' homebrew NABU binaries (_nabu_ files).
 * High-performance; nabud implements a content cache to optimize common
@@ -266,6 +269,30 @@ run it like so:
     % sudo systemctl enable nabud.service
     % sudo systemctl start nabud.service
 
+## Using network serial adapters
+
+Network serial adapters like [this one](https://www.amazon.com/USR-TCP232-306-Serial-Ethernet-Device-Server/dp/B07G5P4CPR/)
+have become an increasingly popular way to connect a NABU to a network
+adapter such as nabud.  nabud will work with these adapters.  However,
+it's important to keep in mind some details about how serial communication
+on the NABU works.
+
+The NABU PC has a system clock that is centered around the NTSC color burst
+subcarrier frequency (~3.58MHz).  Because of this, the baud rate used by
+the HCCA (network adapter) serial port is not one of the standard baud
+rates supported by most serial adapters: 111860 baud.  115200 baud is the
+closest standard baud rate, but is about 3% too fast.  As a result, when
+nabud streams a long series of bytes to the NABU (when the NABU loads a
+program image, for example), it's very likely that some of the bytes will
+get mangled because the NABU misses a start bit.
+
+Because most network serial adapters don't support configuring arbitrary
+baud rates, you need to figure the adapter to use 2 stop bits by selecting
+"8N2" as the data format.  This will stretch the stop time to ensure that
+after each byte, the NABU's UART will see the next byte's start bit and
+can get back in-sync with the sender.  If you have problems running at
+115200 baud with a network serial adapter, check for this first!
+
 ## Controlling nabud with nabuctl
 
 A control program, nabuctl, is provided that allows you to interact with
@@ -399,6 +426,14 @@ And you can select a file to loaded when the NABU boots and requests image
     nabuctl> 
 
 ## Changes
+
+### nabud-1.3
+* Support for the NHACP protocol version 0.1 draft.  Compatibility with
+  the original ("0.0") NHACP is maintained.  More information about NHACP
+  can be found [here](https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md).
+* On Linux, Use _termios2_ to set the baud rate for serial connections, since
+  that mechanism can support arbitrary baud rates, unlike the termios API in
+  glibc.
 
 ### nabud-1.2.2
 * Fixed an error in the GET-STATUS,TRANSMIT response that caused problems

@@ -56,7 +56,6 @@ struct stext_file {
 	const struct stext_fileops *ops;
 	uint8_t		slot;
 	bool		linked;
-	bool		writable;
 
 	union {
 		struct {
@@ -70,6 +69,9 @@ struct stext_file {
 			char		*location;
 		} shadow;
 	};
+
+	/* Pointer at the end to ensure private data alignment */
+	struct stext_context *context;
 };
 
 struct stext_fileops {
@@ -86,6 +88,31 @@ struct stext_fileops {
 	const char * (*file_location)(struct stext_file *);
 	void	(*file_close)(struct stext_file *);
 };
+
+static struct stext_file *
+stext_file_alloc(struct stext_context *ctx)
+{
+	struct stext_file *f;
+
+	f = calloc(1, sizeof(*f) + ctx->file_private_size);
+	if (f != NULL) {
+		f->context = ctx;
+		if (ctx->file_private_size != 0 &&
+		    ctx->file_private_init != NULL) {
+			(*ctx->file_private_init)(stext_file_private(f));
+		}
+	}
+	return f;
+}
+
+static void
+stext_file_free(struct stext_file *f)
+{
+	if (f->context->file_private_fini != NULL) {
+		(*f->context->file_private_fini)(stext_file_private(f));
+	}
+	free(f);
+}
 
 /*
  * stext_file_insert --
@@ -183,10 +210,15 @@ stext_file_find(struct stext_context *ctx, uint8_t slot)
  *	Initlaize a storage extension context.
  */
 void
-stext_context_init(struct stext_context *ctx, struct nabu_connection *conn)
+stext_context_init(struct stext_context *ctx, struct nabu_connection *conn,
+    size_t file_private_size,
+    void (*file_private_init)(void *), void (*file_private_fini)(void *))
 {
 	LIST_INIT(&ctx->files);
 	ctx->conn = conn;
+	ctx->file_private_size = file_private_size;
+	ctx->file_private_init = file_private_init;
+	ctx->file_private_fini = file_private_fini;
 }
 
 /*
@@ -382,6 +414,7 @@ stext_fileop_read_shadow(struct stext_file *f, void *vbuf, uint16_t *lengthp)
 	return error;
 }
 
+#if 0
 static int
 stext_fileop_write_shadow(struct stext_file *f, const void *vbuf,
     uint16_t length)
@@ -395,6 +428,7 @@ stext_fileop_write_shadow(struct stext_file *f, const void *vbuf,
 	}
 	return error;
 }
+#endif
 
 static int
 stext_fileop_pread_shadow(struct stext_file *f, void *vbuf, uint32_t offset,
@@ -414,6 +448,7 @@ stext_fileop_pread_shadow(struct stext_file *f, void *vbuf, uint32_t offset,
 	return 0;
 }
 
+#if 0
 static int
 stext_fileop_pwrite_shadow(struct stext_file *f, const void *vbuf,
     uint32_t offset, uint16_t length)
@@ -435,6 +470,7 @@ stext_fileop_pwrite_shadow(struct stext_file *f, const void *vbuf,
 	f->shadow.mtime = time(NULL);
 	return 0;
 }
+#endif
 
 static off_t
 stext_fileop_seek_shadow(struct stext_file *f, off_t offset, int whence)
@@ -470,6 +506,7 @@ stext_fileop_seek_shadow(struct stext_file *f, off_t offset, int whence)
 	return f->shadow.cursor;
 }
 
+#if 0
 static int
 stext_fileop_truncate_shadow(struct stext_file *f, uint32_t size)
 {
@@ -489,6 +526,7 @@ stext_fileop_truncate_shadow(struct stext_file *f, uint32_t size)
 	}
 	return 0;
 }
+#endif
 
 static int
 stext_fileop_getattr_shadow(struct stext_file *f, struct fileio_attrs *attrs)
@@ -497,7 +535,7 @@ stext_fileop_getattr_shadow(struct stext_file *f, struct fileio_attrs *attrs)
 
 	attrs->size = f->shadow.length;
 	attrs->mtime = f->shadow.mtime;
-	attrs->is_writable = true;
+	attrs->is_writable = f->ops->file_write != NULL;
 	attrs->is_seekable = true;
 
 	return 0;
@@ -520,11 +558,8 @@ stext_fileop_close_shadow(struct stext_file *f)
 static const struct stext_fileops stext_fileops_shadow = {
 	.max_length	= MAX_SHADOW_LENGTH,
 	.file_read	= stext_fileop_read_shadow,
-	.file_write	= stext_fileop_write_shadow,
 	.file_pread	= stext_fileop_pread_shadow,
-	.file_pwrite	= stext_fileop_pwrite_shadow,
 	.file_seek	= stext_fileop_seek_shadow,
-	.file_truncate	= stext_fileop_truncate_shadow,
 	.file_getattr	= stext_fileop_getattr_shadow,
 	.file_location	= stext_fileop_location_shadow,
 	.file_close	= stext_fileop_close_shadow,
@@ -542,12 +577,11 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 	struct stext_file *f = NULL;
 	struct fileio *fileio = NULL;
 	bool need_shadow = false;
-	bool want_write = (oflags & FILEIO_O_RDWR) == FILEIO_O_RDWR;
 	int error = 0;
 
 	*outfp = NULL;
 
-	f = calloc(1, sizeof(*f));
+	f = stext_file_alloc(ctx);
 	if (f == NULL) {
 		log_error("[%s] Unable to allocate file object for '%s'",
 		    conn_name(ctx->conn), filename);
@@ -559,32 +593,9 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 	fileio = fileio_open(filename, FILEIO_O_LOCAL_ROOT | oflags,
 	    ctx->conn->file_root, attrs);
 	if (fileio == NULL) {
-		/*
-		 * Try opening read-only.  If that succeeds, then we just
-		 * allocate a shadow file.
-		 */
-		oflags = (oflags & ~FILEIO_O_RDWR) | FILEIO_O_RDONLY;
-		fileio = fileio_open(filename, FILEIO_O_LOCAL_ROOT | oflags,
-		    ctx->conn->file_root, attrs);
-		if (fileio != NULL) {
-			log_debug(LOG_SUBSYS_STEXT,
-			    "[%s] Need R/W shadow buffer for '%s'",
-			    conn_name(ctx->conn), filename);
-			need_shadow = true;
-		}
-	}
-	if (fileio == NULL) {
+		error = errno;
 		log_error("[%s] Unable to open file '%s': %s",
-		    conn_name(ctx->conn), filename, strerror(errno));
-		error = ENOENT;
-		goto out;
-	}
-
-	/* Opening directories is not allowed. */
-	if (attrs->is_directory) {
-		log_error("[%s] '%s': Opening directories is not permitted.",
-		    conn_name(ctx->conn), fileio_location(fileio));
-		error = EINVAL;
+		    conn_name(ctx->conn), filename, strerror(error));
 		goto out;
 	}
 
@@ -634,7 +645,6 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 		fileio = NULL;		/* file owns it now */
 		f->ops = &stext_fileops_fileio;
 	}
-	f->writable = want_write;
 
 	error = stext_file_insert(ctx, f, reqslot);
 	if (error != 0) {
@@ -669,6 +679,20 @@ stext_file_slot(struct stext_file *f)
 }
 
 /*
+ * stext_file_private --
+ *	Return the private data for a file.
+ */
+void *
+stext_file_private(struct stext_file *f)
+{
+	assert(f->context != NULL);
+	if (f->context->file_private_size != 0) {
+		return f + 1;
+	}
+	return NULL;
+}
+
+/*
  * stext_file_close --
  *	Close a file.  Must be unlinked from the stext_context.
  */
@@ -681,7 +705,7 @@ stext_file_close(struct stext_file *f)
 	if (f->linked) {
 		LIST_REMOVE(f, link);
 	}
-	free(f);
+	stext_file_free(f);
 }
 
 /*
@@ -701,8 +725,8 @@ stext_file_read(struct stext_file *f, void *vbuf, uint16_t *lengthp)
 int
 stext_file_write(struct stext_file *f, const void *vbuf, uint16_t length)
 {
-	if (! f->writable) {
-		return EBADF;
+	if (f->ops->file_write == NULL) {
+		return EROFS;
 	}
 	return (*f->ops->file_write)(f, vbuf, length);
 }
@@ -726,8 +750,8 @@ int
 stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
     uint16_t length)
 {
-	if (! f->writable) {
-		return EBADF;
+	if (f->ops->file_pwrite == NULL) {
+		return EROFS;
 	}
 	if (length > f->ops->max_length - offset) {
 		return EFBIG;
@@ -772,6 +796,10 @@ stext_file_seek(struct stext_file *f, int32_t *offsetp, int whence)
 int
 stext_file_truncate(struct stext_file *f, uint32_t size)
 {
+	if (f->ops->file_truncate == NULL) {
+		return EROFS;
+	}
+
 	if (size > f->ops->max_length) {
 		return EFBIG;
 	}

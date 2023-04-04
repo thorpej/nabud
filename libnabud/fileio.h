@@ -53,17 +53,22 @@ ssize_t		fileio_write(struct fileio *, const void *, size_t);
 ssize_t		fileio_pread(struct fileio *, void *, size_t, off_t);
 ssize_t		fileio_pwrite(struct fileio *, const void *, size_t, off_t);
 bool		fileio_getattr(struct fileio *, struct fileio_attrs *);
-bool		fileio_getattr_path(const char *, struct fileio_attrs *);
+bool		fileio_getattr_location(const char *, int, const char *,
+					struct fileio_attrs *);
 bool		fileio_truncate(struct fileio *, off_t);
 const char *	fileio_location(struct fileio *);
 
+#define	FILEIO_O_ACCMODE	0x0007	/* access mode mask */
 #define	FILEIO_O_RDONLY		0x0000
 #define	FILEIO_O_RDWR		0x0001
+#define	FILEIO_O_RDWP		0x0002	/* RDWR + lazy write-protect */
+#define	FILEIO_O_LOCAL_ROOT	0x0008	/* require a local root */
 #define	FILEIO_O_CREAT		0x0010
 #define	FILEIO_O_EXCL		0x0020
-#define	FILEIO_O_DIROK		0x0040
-#define	FILEIO_O_TEXT		0x0080	/* open as text; maybe CRLF xlation */
-#define	FILEIO_O_LOCAL_ROOT	0x0100	/* require a local root */
+#define	FILEIO_O_REGULAR	0x0040
+#define	FILEIO_O_DIRECTORY	0x0080
+#define	FILEIO_O_TEXT		0x0100	/* open as text; maybe CRLF xlation */
+#define	FILEIO_O_TRUNC		0x0200
 
 void	*fileio_load_file(struct fileio *, struct fileio_attrs *, size_t,
 			  size_t, size_t *filesizep);

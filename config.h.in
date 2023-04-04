@@ -6,6 +6,9 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define if your OS has EFTYPE in <errno.h> */
+#undef HAVE_EFTYPE
+
 /* Define to 1 if you have the `getprogname' function. */
 #undef HAVE_GETPROGNAME
 
@@ -16,14 +19,23 @@
    function on your OS */
 #undef HAVE_LIBEDIT_READLINE
 
+/* Define if struct termios2 exists in <linux/termios.h> */
+#undef HAVE_LINUX_TERMIOS2
+
 /* Define to 1 if you have OpenSSL. */
 #undef HAVE_OPENSSL
 
 /* Define if your OS has O_BINARY in <sys/fcntl.h> */
 #undef HAVE_O_BINARY
 
+/* Define if your OS has O_DIRECTORY in <sys/fcntl.h> */
+#undef HAVE_O_DIRECTORY
+
 /* Define if your OS has O_NOCTTY in <sys/fcntl.h> */
 #undef HAVE_O_NOCTTY
+
+/* Define if your OS has O_REGULAR in <sys/fcntl.h> */
+#undef HAVE_O_REGULAR
 
 /* Define if your OS has O_TEXT in <sys/fcntl.h> */
 #undef HAVE_O_TEXT
@@ -42,6 +54,9 @@
 
 /* Define if the struct sockaddr_un has a member sun_len on your OS */
 #undef HAVE_SOCKADDR_UN_SUN_LEN
+
+/* Define if your compiler supports _Static_assert() */
+#undef HAVE_STATIC_ASSERT
 
 /* Define if the struct stat has a member st_birthtime on your OS */
 #undef HAVE_STAT_ST_BIRTHTIME

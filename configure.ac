@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 #
 
-m4_define([nabud_VERSION], [1.2.1])
+m4_define([nabud_VERSION], [1.3])
 
 AC_INIT([nabud],
 	m4_defn([nabud_VERSION]),
@@ -258,6 +258,41 @@ AC_COMPILE_IFELSE([
 		AC_DEFINE(HAVE_O_NOCTTY, 1, [Define if your OS has O_NOCTTY in <sys/fcntl.h>])
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
+AC_MSG_CHECKING([for O_DIRECTORY in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_DIRECTORY;
+	]])],[
+		AC_DEFINE(HAVE_O_DIRECTORY, 1, [Define if your OS has O_DIRECTORY in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+AC_MSG_CHECKING([for O_REGULAR in <sys/fcntl.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <sys/types.h>
+		#include <sys/fcntl.h>
+	]],[[
+		int dummy = O_REGULAR;
+	]])],[
+		AC_DEFINE(HAVE_O_REGULAR, 1, [Define if your OS has O_REGULAR in <sys/fcntl.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
+# Check for some specific errno values that aren't universal.
+#
+AC_MSG_CHECKING([for EFTYPE in <errno.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <errno.h>
+	]],[[
+		int dummy = EFTYPE;
+	]])],[
+		AC_DEFINE(HAVE_EFTYPE, 1, [Define if your OS has EFTYPE in <errno.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
 
 # Check for struct stat::st_birthtime.  This extension is available
 # on macOS and some of the BSDs.
@@ -272,6 +307,34 @@ AC_COMPILE_IFELSE([
 		dummy.st_birthtime = 0;
 	]])],[
 		AC_DEFINE(HAVE_STAT_ST_BIRTHTIME, 1, [Define if the struct stat has a member st_birthtime on your OS])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
+# Check for termios2 in <linux/termios.h>.
+#
+AC_MSG_CHECKING([for termios2 in <linux/termios.h>])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <linux/termios.h>
+	]],[[
+		struct termios2 t2;
+		t2.c_cflag = BOTHER;
+	]])],[
+		AC_DEFINE(HAVE_LINUX_TERMIOS2, 1, [Define if struct termios2 exists in <linux/termios.h>])
+		AC_MSG_RESULT(yes)],[
+		AC_MSG_RESULT(no)])
+
+# Check for _Static_assert() in the compiler.
+#
+AC_MSG_CHECKING([for _Static_assert() support in the compiler])
+AC_COMPILE_IFELSE([
+	AC_LANG_PROGRAM([[
+		#include <assert.h>
+		#include <stddef.h>
+	]],[[
+		_Static_assert(sizeof(char) == 1, "My whole life has been a lie.");
+	]])],[
+		AC_DEFINE(HAVE_STATIC_ASSERT, 1, [Define if your compiler supports _Static_assert()])
 		AC_MSG_RESULT(yes)],[
 		AC_MSG_RESULT(no)])
 

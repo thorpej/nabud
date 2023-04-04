@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2023 Jason R. Thorpe.
+ * Copyright (c) 2022, 2023 Jason R. Thorpe.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,31 +24,14 @@
  * SUCH DAMAGE.
  */
 
-#ifndef missing_h_included
-#define	missing_h_included
+#ifndef crc16_genibus_h_included
+#define	crc16_genibus_h_included
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include <stddef.h>
+#include <stdint.h>
 
-/*
- * Elide some open(2) flags that might not exist on some systems.
- */
-#ifndef HAVE_O_TEXT
-#define	O_TEXT		0		/* this is a Windows thing */
-#endif /* ! HAVE_O_TEXT */
+uint16_t	crc16_genibus_init(void);
+uint16_t	crc16_genibus_update(const void *, size_t, uint16_t);
+uint16_t	crc16_genibus_fini(uint16_t);
 
-#ifndef HAVE_O_BINARY
-#define	O_BINARY	0		/* this is a Windows thing */
-#endif /* ! HAVE_O_BINARY */
-
-#ifndef HAVE_O_NOCTTY
-#define	O_NOCTTY	0
-#endif /* ! HAVE_O_NOCTTY */
-
-#ifndef HAVE_GETPROGNAME
-const char *	getprogname(void);
-void		setprogname(const char *);
-#endif /* ! HAVE_GETPROGNAME */
-
-#endif /* missing_h_included */
+#endif /* crc16_genibus_h_included */

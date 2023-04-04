@@ -31,6 +31,10 @@
  * or over a TCP socket to support NABU emulators.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -52,8 +56,12 @@
 
 #include "adaptor.h"
 #include "conn.h"
+#ifdef HAVE_LINUX_TERMIOS2
+#include "conn_linux.h"
+#endif
 #include "image.h"
 #include "retronet.h"
+#include "nhacp.h"
 
 static pthread_mutex_t conn_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t conn_list_enum_cv = PTHREAD_COND_INITIALIZER;
@@ -160,6 +168,7 @@ conn_create_common(char *name, int fd, const struct conn_add_args *args,
 	}
 
 	conn->type = type;
+	LIST_INIT(&conn->nhacp_sessions);
 
 	/* Not exactly "common", but hey, we allocate the conn here. */
 	if (conn->type == CONN_TYPE_SERIAL) {
@@ -246,6 +255,30 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 		t.c_cflag &= ~CRTSCTS;
 	}
 
+#ifdef HAVE_LINUX_TERMIOS2
+	/*
+	 * For Linux, we need to use a different API to set the speed,
+	 * but only after we use the standard termios API to set all
+	 * of the other parameters.  But we can't do it in-line here
+	 * because of course we can't (see conn_linux.c for details).
+	 *
+	 * Complicating matters, apparently Linux doesn't have termios2
+	 * on all architecture.  &shrug;
+	 */
+	if (tcsetattr(fd, TCSANOW, &t) < 0) {
+		log_error("[%s] Failed to set 8N%u%s: %s", args->port,
+		    args->stop_bits,
+		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
+		goto failed;
+	}
+
+	if (! conn_serial_setspeed_linux(fd, args)) {
+		/* Specific error message already logged. */
+		log_error("[%s] Failed to set %u baud.", args->port,
+		    args->baud);
+		goto failed;
+	}
+#else /* ! HAVE_LINUX_TERMIOS2 */
 	if (cfsetspeed(&t, (speed_t)args->baud) < 0) {
 		log_error("[%s] cfsetspeed(%u) failed: %s", args->port,
 		    args->baud, strerror(errno));
@@ -258,6 +291,7 @@ conn_serial_setparam(int fd, const struct conn_add_args *args)
 		    args->flow_control ? "+RTS/CTS" : "", strerror(errno));
 		goto failed;
 	}
+#endif /* HAVE_LINUX_TERMIOS2 */
 
 	return true;
  failed:
@@ -469,7 +503,7 @@ conn_destroy(struct nabu_connection *conn)
 	conn_remove(conn);
 
 	image_release(conn_set_last_image(conn, NULL));
-	retronet_conn_fini(conn);
+	conn_reboot(conn);
 
 	pthread_mutex_destroy(&conn->mutex);
 
@@ -477,6 +511,26 @@ conn_destroy(struct nabu_connection *conn)
 
 	free(conn->file_root);
 	free(conn);
+}
+
+/*
+ * conn_reboot --
+ *	Handle a the reboot of a client at the other end of the
+ *	connection.
+ */
+void
+conn_reboot(struct nabu_connection *conn)
+{
+	if (! LIST_EMPTY(&conn->nhacp_sessions)) {
+		log_info("[%s] Clearing previous NHACP state.",
+		    conn_name(conn));
+		nhacp_conn_fini(conn);
+	}
+	if (conn->retronet != NULL) {
+		log_info("[%s] Clearing previous RetroNet state.",
+		    conn_name(conn));
+		retronet_conn_fini(conn);
+	}
 }
 
 /*

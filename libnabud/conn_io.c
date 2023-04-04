@@ -371,7 +371,6 @@ conn_io_wait(struct conn_io *conn, const struct timespec *deadline,
 	}
 	if (pollret == 0) {
 		log_info("[%s] Connection (%s) timed out.", conn->name, which);
-		conn->state = CONN_STATE_ABORTED;
 		return false;
 	}
 	if (fds[1].revents) {
@@ -556,5 +555,36 @@ conn_io_cancel(struct conn_io *conn)
 	if (write(conn->cancel_fds[1], &conn->state, sizeof(conn->state)) < 0) {
 		log_error("[%s] Connection cancellation failed!",
 		    conn_io_name(conn));
+	}
+}
+
+/*
+ * conn_io_check_state --
+ *	Check a connection's state, returns true if it's OK
+ *	to keep going.
+ */
+bool
+conn_io_check_state(struct conn_io *conn)
+{
+	switch (conn_io_state(conn)) {
+	case CONN_STATE_OK:
+		return true;
+
+	case CONN_STATE_EOF:
+		log_info("[%s] Peer disconnected.", conn_io_name(conn));
+		return false;
+
+	case CONN_STATE_CANCELLED:
+		log_info("[%s] Received cancellation request.",
+		    conn_io_name(conn));
+		return false;
+
+	case CONN_STATE_ABORTED:
+		log_error("[%s] Connection aborted.", conn_io_name(conn));
+		return false;
+
+	default:
+		log_fatal("[%s] Invalid connection state: %d",
+		    conn_io_name(conn), (int)conn_io_state(conn));
 	}
 }

@@ -237,19 +237,8 @@ atom_recv(struct conn_io *conn)
 	struct nabuctl_atom_header hdr;
 
 	if (! conn_io_recv(conn, &hdr, sizeof(hdr))) {
-		if (conn_io_state(conn) == CONN_STATE_EOF) {
-			log_info("[%s] Peer disconnected.",
-			    conn_io_name(conn));
-		} else if (conn_io_state(conn) == CONN_STATE_CANCELLED) {
-			log_info("[%s] Received cancellation request.",
-			    conn_io_name(conn));
-		} else if (conn_io_state(conn) == CONN_STATE_ABORTED) {
-			log_error("[%s] Connection aborted.",
-			    conn_io_name(conn));
-		} else {
-			log_error("[%s] Failed to receive atom header.",
-			    conn_io_name(conn));
-		}
+		log_error("[%s] Failed to receive atom header.",
+		    conn_io_name(conn));
 		return NULL;
 	}
 	hdr.tag = ntohl(hdr.tag);
