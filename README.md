@@ -427,6 +427,11 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.3.1
+* Fix a bug in the NHACP STORAGE-GET-BLOCK handler reported by tergav17
+  where a request at or beyond EOF would return a block size buffer padded
+  with zeros, rather than a length of 0 (which is what the spec requires).
+
 ### nabud-1.3
 * Support for the NHACP protocol version 0.1 draft.  Compatibility with
   the original ("0.0") NHACP is maintained.  More information about NHACP

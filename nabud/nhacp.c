@@ -1012,7 +1012,7 @@ nhacp_req_storage_get_block(struct nhacp_context *ctx)
 		return;
 	}
 
-	const uint16_t save_blklen = blklen;
+	uint16_t save_blklen = blklen;
 
 	int error = stext_file_pread(f, ctx->reply.data_buffer.data,
 	    (uint32_t)offset, &blklen);
@@ -1020,7 +1020,14 @@ nhacp_req_storage_get_block(struct nhacp_context *ctx)
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 		return;
 	}
-	if (blklen != save_blklen) {
+	if (blklen == 0) {
+		/*
+		 * We got an EOF from the pread(2), so we should return
+		 * a length of 0 to the caller, not return a fully-padded
+		 * buffer.
+		 */
+		save_blklen = 0;
+	} else if (blklen != save_blklen) {
 		/* Partial read across EOF - zero-pad the result. */
 		assert(save_blklen > blklen);
 		memset(&ctx->reply.data_buffer.data[blklen], 0,
