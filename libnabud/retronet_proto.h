@@ -349,8 +349,37 @@ struct rn_fh_seek_repl {
 	uint8_t		offset[4];
 };
 
+/*
+ * NABU_MSG_RN_FH_LINE_COUNT
+ *	uint8_t		fileHandle
+ */
+#define	NABU_MSG_RN_FH_LINE_COUNT 0xdc
+struct rn_fh_line_count_req {
+	uint8_t		fileHandle;
+};
+
+struct rn_fh_line_count_repl {
+	uint8_t		line_count[2];
+};
+
+/*
+ * NABU_MSG_RN_FH_GET_LINE
+ *	uint8_t		fileHandle
+ *	uint16_t	lineNumber
+ */
+#define	NABU_MSG_RN_FH_GET_LINE	0xdd
+struct rn_fh_get_line_req {
+	uint8_t		fileHandle;
+	uint8_t		lineNumber[2];
+};
+
+struct rn_fh_get_line_repl {
+	uint8_t		byteCount[2];
+	/* followed by byteCount data bytes */
+};
+
 #define	NABU_MSG_RN_FIRST	NABU_MSG_RN_FILE_OPEN
-#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FH_SEEK
+#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FH_GET_LINE
 
 #define	NABU_MSG_IS_RETRONET(x)	((x) >= NABU_MSG_RN_FIRST &&	\
 				 (x) <= NABU_MSG_RN_LAST)
