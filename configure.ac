@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 #
 
-m4_define([nabud_VERSION], [1.3.1])
+m4_define([nabud_VERSION], [1.4])
 
 AC_INIT([nabud],
 	m4_defn([nabud_VERSION]),
