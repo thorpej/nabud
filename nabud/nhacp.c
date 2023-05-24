@@ -27,7 +27,7 @@
 /*
  * Support for the NABU HCCA Application Communication Protocol.
  *
- *    https://github.com/hanshuebner/nabu-figforth/blob/main/nabu-comms.md
+ *    https://github.com/NHACP-IF/NHACP-specification
  */
 
 #ifdef HAVE_CONFIG_H
