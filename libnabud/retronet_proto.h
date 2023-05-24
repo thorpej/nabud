@@ -434,6 +434,8 @@ union retronet_request {
 	struct rn_fh_details_req	fh_details;
 	struct rn_fh_readseq_req	fh_readseq;
 	struct rn_fh_seek_req		fh_seek;
+	struct rn_fh_line_count_req	fh_line_count;
+	struct rn_fh_get_line_req	fh_get_line;
 };
 
 union retronet_reply {
@@ -447,6 +449,8 @@ union retronet_reply {
 	struct rn_file_details		fh_details;
 	struct rn_fh_readseq_repl	fh_readseq;
 	struct rn_fh_seek_repl		fh_seek;
+	struct rn_fh_line_count_repl	fh_line_count;
+	struct rn_fh_get_line_repl	fh_get_line;
 };
 
 #endif /* retronet_proto_h_included */
