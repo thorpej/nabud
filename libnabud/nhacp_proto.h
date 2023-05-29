@@ -119,6 +119,9 @@
 #define	NHACP_O_EXCL		0x0020	/* fail create if file already exists */
 #define	NHACP_O_TRUNC		0x0040	/* truncate existing file to 0 */
 
+/* READ, WRITE flags */
+#define	IO_NONBLOCK		0x0001	/* perform non-blocking I/O this req */
+
 /* REMOVE-FILE flags */
 #define	NHACP_REMOVE_FILE	0x0000	/* remove a regular file */
 #define	NHACP_REMOVE_DIR	0x0001	/* remove a directory */
