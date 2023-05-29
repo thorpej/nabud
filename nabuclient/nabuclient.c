@@ -1847,7 +1847,7 @@ command_nhacp_get_dir_entry(int argc, char *argv[])
 }
 
 static bool
-command_nhacp_file_read(int argc, char *argv[])
+command_nhacp_read(int argc, char *argv[])
 {
 	if (argc < 3) {
 		printf("Args, bro.\n");
@@ -1857,20 +1857,20 @@ command_nhacp_file_read(int argc, char *argv[])
 	uint8_t slot = stext_parse_slot(argv[1]);
 	uint16_t length = nhacp_parse_length(argv[2]);
 
-	nhacp_buf.request.file_read.fdesc = slot;
-	nabu_set_uint16(nhacp_buf.request.file_read.flags, 0);
-	nabu_set_uint16(nhacp_buf.request.file_read.length, length);
+	nhacp_buf.request.read.fdesc = slot;
+	nabu_set_uint16(nhacp_buf.request.read.flags, 0);
+	nabu_set_uint16(nhacp_buf.request.read.length, length);
 
-	printf("Sending: NHACP_REQ_FILE_READ.\n");
-	nhacp_send(NHACP_REQ_FILE_READ,
-	    sizeof(nhacp_buf.request.file_read));
+	printf("Sending: NHACP_REQ_READ.\n");
+	nhacp_send(NHACP_REQ_READ,
+	    sizeof(nhacp_buf.request.read));
 
 	nhacp_decode_reply();
 	return false;
 }
 
 static bool
-command_nhacp_file_write(int argc, char *argv[])
+command_nhacp_write(int argc, char *argv[])
 {
 	if (argc < 3) {
 		printf("Args, bro.\n");
@@ -1880,14 +1880,14 @@ command_nhacp_file_write(int argc, char *argv[])
 	uint8_t slot = stext_parse_slot(argv[1]);
 	uint16_t length = strlen(argv[2]);
 
-	nhacp_buf.request.file_write.fdesc = slot;
-	nabu_set_uint16(nhacp_buf.request.file_read.flags, 0);
-	nabu_set_uint16(nhacp_buf.request.file_write.length, length);
-	memcpy(nhacp_buf.request.file_write.data, argv[2], length);
+	nhacp_buf.request.write.fdesc = slot;
+	nabu_set_uint16(nhacp_buf.request.read.flags, 0);
+	nabu_set_uint16(nhacp_buf.request.write.length, length);
+	memcpy(nhacp_buf.request.write.data, argv[2], length);
 
-	printf("Sending: NHACP_REQ_FILE_WRITE.\n");
-	nhacp_send(NHACP_REQ_FILE_WRITE,
-	    sizeof(nhacp_buf.request.file_write) + length);
+	printf("Sending: NHACP_REQ_WRITE.\n");
+	nhacp_send(NHACP_REQ_WRITE,
+	    sizeof(nhacp_buf.request.write) + length);
 
 	nhacp_decode_reply();
 	return false;
@@ -2124,8 +2124,8 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "nhacp-file-close",	.func = command_nhacp_file_close },
 	{ .name = "nhacp-get-error-details",
 				.func = command_nhacp_get_error_details },
-	{ .name = "nhacp-file-read",	.func = command_nhacp_file_read },
-	{ .name = "nhacp-file-write",	.func = command_nhacp_file_write },
+	{ .name = "nhacp-read",		.func = command_nhacp_read },
+	{ .name = "nhacp-write",	.func = command_nhacp_write },
 	{ .name = "nhacp-file-seek",	.func = command_nhacp_file_seek },
 	{ .name = "nhacp-file-get-info",.func = command_nhacp_file_get_info },
 	{ .name = "nhacp-file-set-size",.func = command_nhacp_file_set_size },

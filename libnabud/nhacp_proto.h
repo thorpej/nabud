@@ -96,8 +96,8 @@
 #define	NHACP_REQ_GET_ERROR_DETAILS	0x06
 #define	NHACP_REQ_STORAGE_GET_BLOCK	0x07
 #define	NHACP_REQ_STORAGE_PUT_BLOCK	0x08
-#define	NHACP_REQ_FILE_READ		0x09
-#define	NHACP_REQ_FILE_WRITE		0x0a
+#define	NHACP_REQ_READ			0x09
+#define	NHACP_REQ_WRITE			0x0a
 #define	NHACP_REQ_FILE_SEEK		0x0b
 #define	NHACP_REQ_FILE_GET_INFO		0x0c
 #define	NHACP_REQ_FILE_SET_SIZE		0x0d
@@ -216,19 +216,19 @@ struct nhacp_request {
 			uint8_t		block_length[2];/* u16 */
 			uint8_t		data[];
 		} storage_put_block;
-		struct nhacp_request_file_read {
+		struct nhacp_request_read {
 			uint8_t		type;
 			uint8_t		fdesc;
 			uint8_t		flags[2];	/* u16 */
 			uint8_t		length[2];	/* u16 */
-		} file_read;
-		struct nhacp_request_file_write {
+		} read;
+		struct nhacp_request_write {
 			uint8_t		type;
 			uint8_t		fdesc;
 			uint8_t		flags[2];	/* u16 */
 			uint8_t		length[2];	/* u16 */
 			uint8_t		data[];
-		} file_write;
+		} write;
 		struct nhacp_request_file_seek {
 			uint8_t		type;
 			uint8_t		fdesc;

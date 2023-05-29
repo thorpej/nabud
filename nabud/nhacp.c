@@ -1158,18 +1158,18 @@ nhacp_req_get_error_details(struct nhacp_context *ctx)
 }
 
 /*
- * nhacp_req_file_read --
- *	Handle the FILE-READ request.
+ * nhacp_req_read --
+ *	Handle the READ request.
  */
 static void
-nhacp_req_file_read(struct nhacp_context *ctx)
+nhacp_req_read(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_read.fdesc);
+	f = stext_file_find(&ctx->stext, ctx->request.read.fdesc);
 	if (f == NULL) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
-		    conn_name(ctx->stext.conn), ctx->request.file_read.fdesc);
+		    conn_name(ctx->stext.conn), ctx->request.read.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1179,11 +1179,11 @@ nhacp_req_file_read(struct nhacp_context *ctx)
 		return;
 	}
 
-	uint16_t flags = nabu_get_uint16(ctx->request.file_read.flags);
-	uint16_t length = nabu_get_uint16(ctx->request.file_read.length);
+	uint16_t flags = nabu_get_uint16(ctx->request.read.flags);
+	uint16_t length = nabu_get_uint16(ctx->request.read.length);
 
 	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u flags 0x%04x length %u",
-	    conn_name(ctx->stext.conn), ctx->request.file_read.fdesc,
+	    conn_name(ctx->stext.conn), ctx->request.read.fdesc,
 	    flags, length);
 
 	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_GET)) {
@@ -1205,18 +1205,18 @@ nhacp_req_file_read(struct nhacp_context *ctx)
 }
 
 /*
- * nhacp_req_file_write --
- *	Handle the FILE-WRITE request.
+ * nhacp_req_write --
+ *	Handle the WRITE request.
  */
 static void
-nhacp_req_file_write(struct nhacp_context *ctx)
+nhacp_req_write(struct nhacp_context *ctx)
 {
 	struct stext_file *f;
 
-	f = stext_file_find(&ctx->stext, ctx->request.file_write.fdesc);
+	f = stext_file_find(&ctx->stext, ctx->request.write.fdesc);
 	if (f == NULL) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] No file for fdesc %u.",
-		    conn_name(ctx->stext.conn), ctx->request.file_write.fdesc);
+		    conn_name(ctx->stext.conn), ctx->request.write.fdesc);
 		nhacp_send_error(ctx, NHACP_EBADF);
 		return;
 	}
@@ -1226,11 +1226,11 @@ nhacp_req_file_write(struct nhacp_context *ctx)
 		return;
 	}
 
-	uint16_t flags = nabu_get_uint16(ctx->request.file_write.flags);
-	uint16_t length = nabu_get_uint16(ctx->request.file_write.length);
+	uint16_t flags = nabu_get_uint16(ctx->request.write.flags);
+	uint16_t length = nabu_get_uint16(ctx->request.write.length);
 
 	log_debug(LOG_SUBSYS_NHACP, "[%s] fdesc %u flags 0x%04x length %u",
-	    conn_name(ctx->stext.conn), ctx->request.file_write.fdesc,
+	    conn_name(ctx->stext.conn), ctx->request.write.fdesc,
 	    flags, length);
 
 	if (length > nhacp_max_payload(ctx, NHACP_REQ_STORAGE_PUT)) {
@@ -1243,7 +1243,7 @@ nhacp_req_file_write(struct nhacp_context *ctx)
 		return;
 	}
 
-	int error = stext_file_write(f, ctx->request.file_write.data, length);
+	int error = stext_file_write(f, ctx->request.write.data, length);
 	if (error != 0) {
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
@@ -1702,8 +1702,8 @@ static const struct {
 	ENTRY_0_1(NHACP_REQ_GET_ERROR_DETAILS, get_error_details),
 	ENTRY_0_1(NHACP_REQ_STORAGE_GET_BLOCK, storage_get_block),
 	ENTRY_0_1(NHACP_REQ_STORAGE_PUT_BLOCK, storage_put_block),
-	ENTRY_0_1(NHACP_REQ_FILE_READ,         file_read),
-	ENTRY_0_1(NHACP_REQ_FILE_WRITE,        file_write),
+	ENTRY_0_1(NHACP_REQ_READ,              read),
+	ENTRY_0_1(NHACP_REQ_WRITE,             write),
 	ENTRY_0_1(NHACP_REQ_FILE_SEEK,         file_seek),
 	ENTRY_0_1(NHACP_REQ_FILE_GET_INFO,     file_get_info),
 	ENTRY_0_1(NHACP_REQ_FILE_SET_SIZE,     file_set_size),
