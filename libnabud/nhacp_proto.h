@@ -372,6 +372,10 @@ struct nhacp_response {
 #define	NHACP_ENSESS		19	/* Too many sessions */
 #define	NHACP_EAGAIN		20	/* Try again later */
 #define	NHACP_EROFS		21	/* Object is write-protected */
+#define	NHACP_ETIMEDOUT		22	/* Operation timed out */
+#define	NHACP_EUNREACH		23	/* Network peer is unreachable */
+#define	NHACP_ECONNREFUSED	24	/* Connection refused by peer */
+#define	NHACP_ECONNRESET	25	/* Connection reset by peer */
 
 /* FILE-SEEK whence values */
 #define	NHACP_SEEK_SET		0
