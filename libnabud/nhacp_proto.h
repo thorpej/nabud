@@ -106,6 +106,7 @@
 #define	NHACP_REQ_REMOVE		0x10
 #define	NHACP_REQ_RENAME		0x11
 #define	NHACP_REQ_MKDIR			0x12
+#define	NHACP_REQ_CONNECT		0x13
 #define	NHACP_REQ_END_PROTOCOL_0_0	0xef
 #define	NHACP_REQ_GOODBYE		0xef
 
@@ -271,6 +272,13 @@ struct nhacp_request {
 			uint8_t		type;
 			struct nhacp_string url;
 		} mkdir;
+		struct nhacp_request_connect {
+			uint8_t		type;
+			uint8_t		req_fdesc;
+			uint8_t		timeout[4];	/* u32 */
+			uint8_t		port[2];	/* u16 */
+			struct nhacp_string hostname;
+		} connect;
 		struct nhacp_request_goodbye {	/* END-PROTOCOL in 0.0 */
 			uint8_t		type;
 		} goodbye;
