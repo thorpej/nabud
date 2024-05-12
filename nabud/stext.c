@@ -759,6 +759,20 @@ stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
 	return (*f->ops->file_pwrite)(f, vbuf, offset, length);
 }
 
+static const char *
+whence_str(int whence)
+{
+	const char *rv;
+
+	switch (whence) {
+	case SEEK_CUR:	rv = "SEEK_CUR";	break;
+	case SEEK_SET:	rv = "SEEK_SET";	break;
+	case SEEK_END:	rv = "SEEK_END";	break;
+	default:	rv = "SEEK_???";	break;
+	}
+	return rv;
+}
+
 /*
  * stext_file_seek --
  *	Reposition the read/write cursor.
@@ -766,22 +780,38 @@ stext_file_pwrite(struct stext_file *f, const void *vbuf, uint32_t offset,
 int
 stext_file_seek(struct stext_file *f, int32_t *offsetp, int whence)
 {
+	struct stext_context *ctx = f->context;
 	off_t ooff, noff;
 
 	/* Get current position in case we have to unwind. */
 	ooff = (*f->ops->file_seek)(f, 0, SEEK_CUR);
 	if (ooff < 0) {
+		log_error("[%s] Unable to [ooff] SEEK_CUR 0 on slot %u: %s.",
+		    conn_name(ctx->conn), f->slot, strerror(errno));
 		return EIO;
 	}
 
 	/* Seek to the new position. */
 	noff = (*f->ops->file_seek)(f, *offsetp, whence);
 	if (noff < 0) {
+		log_error("[%s] Unable to [noff] %s %lld on slot %u: %s.",
+		    conn_name(ctx->conn), whence_str(whence),
+		    (long long)*offsetp, f->slot, strerror(errno));
 		return EINVAL;
 	}
 
 	if (noff >= f->ops->max_length) {
-		(*f->ops->file_seek)(f, ooff, SEEK_SET);
+		log_error("[%s] noff (%lld) >= f->ops->max_length (%lld) "
+			  "on slot %u -> EFBIG !!!", conn_name(ctx->conn),
+			  (long long)noff, (long long)f->ops->max_length,
+			  f->slot);
+		noff = (*f->ops->file_seek)(f, ooff, SEEK_SET);
+		if (noff < 0) {
+			log_error("[%s] Unable to [ooff] SEEK_SET %lld on "
+				  "slot %u: %s.", conn_name(ctx->conn),
+				  (long long)ooff, f->slot,
+				  strerror(errno));
+		}
 		return EFBIG;
 	}
 
