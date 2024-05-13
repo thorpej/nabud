@@ -1282,6 +1282,10 @@ nhacp_req_file_seek(struct nhacp_context *ctx)
 
 	int error = stext_file_seek(f, &offset, whence);
 	if (error != 0) {
+		log_error("[%s] Returning NHACP error %d (%s)",
+		    conn_name(ctx->stext.conn),
+		    nhacp_error_from_unix(error),
+		    strerror(error));
 		nhacp_send_error(ctx, nhacp_error_from_unix(error));
 	} else {
 		nhacp_send_uint32(ctx, offset);
