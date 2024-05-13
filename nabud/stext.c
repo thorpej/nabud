@@ -49,7 +49,7 @@
 #define	MAX_SHADOW_LENGTH	(10U * 1024 * 1024)
 
 /* 32-bit limit on fileio file length (due to wire protocol). */
-#define	MAX_FILEIO_LENGTH	UINT32_MAX
+#define	MAX_FILEIO_LENGTH	((uint32_t)UINT32_MAX)
 
 struct stext_file {
 	LIST_ENTRY(stext_file) link;
