@@ -49,7 +49,8 @@
 #define	MAX_SHADOW_LENGTH	(10U * 1024 * 1024)
 
 /* 32-bit limit on fileio file length (due to wire protocol). */
-#define	MAX_FILEIO_LENGTH	((uint32_t)UINT32_MAX)
+#define	MAX_FILEIO_LENGTH	(sizeof(off_t) > sizeof(uint32_t) ?	\
+				 (uint32_t)UINT32_MAX : INT32_MAX)
 
 struct stext_file {
 	LIST_ENTRY(stext_file) link;
@@ -381,11 +382,6 @@ stext_fileop_close_fileio(struct stext_file *f)
 		fileio_close(f->fileio.fileio);
 	}
 }
-
-#ifdef HAVE_STATIC_ASSERT
-_Static_assert(sizeof(off_t) > sizeof(uint32_t),
-    "off_t is too small to hold UINT32_MAX.");
-#endif /* HAVE_STATIC_ASSERT */
 
 static const struct stext_fileops stext_fileops_fileio = {
 	.max_length	= MAX_FILEIO_LENGTH,
