@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 #
 
-m4_define([nabud_VERSION], [1.3.1])
+m4_define([nabud_VERSION], [1.3.2])
 
 AC_INIT([nabud],
 	m4_defn([nabud_VERSION]),
@@ -91,6 +91,11 @@ AC_SUBST([EXTRAS_SUBDIRS])
 WARNCFLAGS="$WARNCFLAGS -Wno-deprecated-declarations"
 
 AC_SUBST([WARNCFLAGS])
+
+# Enable Large File Support on platforms where this extra step
+# is necessary.
+#
+AC_SYS_LARGEFILE
 
 # Check for some common system headers.
 #

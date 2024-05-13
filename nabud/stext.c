@@ -382,6 +382,11 @@ stext_fileop_close_fileio(struct stext_file *f)
 	}
 }
 
+#ifdef HAVE_STATIC_ASSERT
+_Static_assert(sizeof(off_t) > sizeof(uint32_t),
+    "off_t is too small to hold UINT32_MAX.");
+#endif /* HAVE_STATIC_ASSERT */
+
 static const struct stext_fileops stext_fileops_fileio = {
 	.max_length	= MAX_FILEIO_LENGTH,
 	.file_read	= stext_fileop_read_fileio,
