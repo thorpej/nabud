@@ -427,6 +427,13 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.3.2
+* Fix a bug in NHACP dealing with file offsets on 32-bit Linux platforms
+  and other platforms that do not have a 64-bit off_t type; seeks and
+  positional I/O would fail with a "FILE TOO BIG" error due to this bug.
+  Many thanks to SolderGirl for reporting the issue, helping to track it
+  down, and testing the fix.
+
 ### nabud-1.3.1
 * Fix a bug in the NHACP STORAGE-GET-BLOCK handler reported by tergav17
   where a request at or beyond EOF would return a block size buffer padded
