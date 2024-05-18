@@ -2075,7 +2075,7 @@ nhacp_request(struct nabu_connection *conn, uint8_t msg)
 		return false;
 	}
 
-	conn_start_watchdog(conn, 1);
+	conn_start_watchdog(conn, ctx->timo);
 
 	/* Get the session ID. */
 	if (! conn_recv_byte(conn, &session_id)) {
