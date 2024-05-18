@@ -2075,7 +2075,8 @@ nhacp_request(struct nabu_connection *conn, uint8_t msg)
 		return false;
 	}
 
-	conn_start_watchdog(conn, ctx->timo);
+	/* Assume 1 second timeout initially. */
+	conn_start_watchdog(conn, 1);
 
 	/* Get the session ID. */
 	if (! conn_recv_byte(conn, &session_id)) {
@@ -2112,6 +2113,9 @@ nhacp_request(struct nabu_connection *conn, uint8_t msg)
 		    "[%s] Found context for session ID %u.",
 		    conn_name(conn), session_id);
 	}
+
+	/* Now use context's calculated timeout. */
+	conn_start_watchdog(conn, ctx->timo);
 
 	/* Get the frame length. */
 	if (! conn_recv(conn, &ctx->request.length,
