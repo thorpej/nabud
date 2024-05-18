@@ -68,6 +68,7 @@ struct nhacp_context {
 	uint8_t                   session_id;
 	uint16_t                  nhacp_version;
 	uint16_t                  nhacp_options;
+	int                       timo;
 
 	union {
 		struct nhacp_request request;
@@ -189,8 +190,42 @@ nhacp_context_alloc(struct nabu_connection *conn, uint16_t version,
     uint8_t session_id)
 {
 	struct nhacp_context *ctx = calloc(1, sizeof(*ctx));
+	int bits_per_byte = 9;	/* always assume 1 start bit */
+	unsigned int mtu_bits, mtu_seconds, bps;
+
+	/*
+	 * NHACP specification says 1 second message transmission
+	 * timeout, but we make an affordance for non-NABU hardware
+	 * with slower transmission speeds.
+	 */
+
+	if (conn->stop_bits > 0) {
+		bits_per_byte += conn->stop_bits;
+	}
+
+	/* Calculate the number of bits in an MTU. */
+	mtu_bits = NHACP_MTU * bits_per_byte;
+
+	/*
+	 * Calculate the number of whole seconds needed to
+	 * send an MTU-sized message.
+	 *
+	 * Assume 115.2K bps unless we know differently.
+	 */
+	bps = conn->baud != 0 ? conn->baud : 115200;
+	mtu_seconds = mtu_bits / bps;
+	if ((mtu_bits % bps) != 0) {
+		mtu_seconds++;	/* round up */
+	}
+
+	/* 1 second floor (per NHACP specification) */
+	if (mtu_seconds < 1) {
+		mtu_seconds = 1;
+	}
+
 	ctx->session_id = session_id;
 	ctx->nhacp_version = version;
+	ctx->timo = mtu_seconds;
 	stext_context_init(&ctx->stext, conn,
 	    sizeof(struct nhacp_file_private),
 	    nhacp_file_private_init, nhacp_file_private_fini);
@@ -761,10 +796,12 @@ nhacp_req_hello(struct nhacp_context *ctx)
 	    "[%s] Sending proto version: 0x%04x server version: %s",
 	    conn_name(conn), NABUD_NHACP_VERSION,
 	    (char *)ctx->reply.session_started.adapter_id.bytes);
-	log_info("[%s] Established NHAP-%d.%d session %u.", conn_name(conn),
+	log_info(
+	    "[%s] Established NHAP-%d.%d session %u (%u second MTU timeout).",
+	    conn_name(conn),
 	    NHACP_VERS_MAJOR(ctx->nhacp_version),
 	    NHACP_VERS_MINOR(ctx->nhacp_version),
-	    ctx->session_id);
+	    ctx->session_id, ctx->timo);
 	if (ctx->nhacp_options & NHACP_OPTION_CRC8) {
 		log_info("[%s] session %u: CRC-8 FCS option enabled.",
 		    conn_name(conn), ctx->session_id);
@@ -1906,9 +1943,11 @@ nhacp_start_0_0(struct nabu_connection *conn)
 	 * Now enter NHACP mode until we are asked to exit or until
 	 * we detect something is awry with the NABU.
 	 */
-	log_info("[%s] Entering NHACP-%d.%d mode.", conn_name(conn),
+	log_info("[%s] Entering NHACP-%d.%d mode (%u second MTU timeout).",
+	    conn_name(conn),
 	    NHACP_VERS_MAJOR(ctx->nhacp_version),
-	    NHACP_VERS_MINOR(ctx->nhacp_version));
+	    NHACP_VERS_MINOR(ctx->nhacp_version),
+	    ctx->timo);
 
 	for (;;) {
 		/* We want to block "forever" waiting for requests. */
@@ -1935,9 +1974,11 @@ nhacp_start_0_0(struct nabu_connection *conn)
 		/*
 		 * Now that we have the first byte, enable the watchdog.
 		 * The protocol says that each individual message transfer
-		 * must complete within 1 second.
+		 * must complete within 1 second.  However, to allow for
+		 * non-NABU systems that have lower connection speeds, we
+		 * make an affordance based on that connection speed.
 		 */
-		conn_start_watchdog(conn, 1);
+		conn_start_watchdog(conn, ctx->timo);
 
 		/* Now receive the MSB of the length. */
 		if (! conn_recv_byte(conn, &ctx->request.length[1])) {
