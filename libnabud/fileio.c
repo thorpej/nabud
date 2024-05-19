@@ -809,9 +809,18 @@ fileio_ops_for_location(const char *location, size_t loclen)
 			continue;
 		}
 		if (strncmp(location, fso->scheme, schemelen) == 0) {
+			log_debug(LOG_SUBSYS_FILEIO,
+			    "location '%s' matched scheme '%s'.",
+			    location, fso->scheme);
 			break;
 		}
 	}
+	if (fso->scheme == NULL) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "location '%s' got default scheme.", location);
+	}
+	log_debug(LOG_SUBSYS_FILEIO, "location '%s' is %s\n",
+	    location, fso->ops == &fileio_local_ops ? "LOCAL" : "REMOTE");
 	return fso;
 }
 
