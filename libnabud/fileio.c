@@ -809,9 +809,18 @@ fileio_ops_for_location(const char *location, size_t loclen)
 			continue;
 		}
 		if (strncmp(location, fso->scheme, schemelen) == 0) {
+			log_debug(LOG_SUBSYS_FILEIO,
+			    "location '%s' matched scheme '%s'.",
+			    location, fso->scheme);
 			break;
 		}
 	}
+	if (fso->scheme == NULL) {
+		log_debug(LOG_SUBSYS_FILEIO,
+		    "location '%s' got default scheme.", location);
+	}
+	log_debug(LOG_SUBSYS_FILEIO, "location '%s' is %s.",
+	    location, fso->ops == &fileio_local_ops ? "LOCAL" : "REMOTE");
 	return fso;
 }
 
@@ -840,6 +849,16 @@ fileio_open(const char *location, int flags, const char *local_root,
 	if ((*f->ops->io_open)(f, location, local_root)) {
 		if (attrs == NULL ||
 		    (*f->ops->io_getattr)(f, attrs)) {
+			if (attrs != NULL) {
+				log_debug(LOG_SUBSYS_FILEIO,
+				    "size=%lld is_directory=%c "
+				    "is_writable=%c is_seekable=%c "
+				    "is_local=%c", (long long)attrs->size,
+				    attrs->is_directory ? 'T' : 'F',
+				    attrs->is_writable ? 'T' : 'F',
+				    attrs->is_seekable ? 'T' : 'F',
+				    attrs->is_local ? 'T' : 'F');
+			}
 			return f;
 		}
 		(*f->ops->io_close)(f);
