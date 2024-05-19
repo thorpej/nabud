@@ -427,6 +427,15 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.3.3
+* Added support for flexibile transmission timeouts in NHACP.  The spec
+  says 1 second, but there are systems out in the wild with slower
+  transmission speeds that are now using NHACP.  We now calculate the
+  timeout based on how long it would take to transmit an MTU-sized frame
+  at the connection's baud rate, rounding up to the next whole second.
+* Fix a source code management mistake in nabud-1.3.2's off_t changes that
+  caused odd behavior on platforms that required the change.
+
 ### nabud-1.3.2
 * Fix a bug in NHACP dealing with file offsets on 32-bit Linux platforms
   and other platforms that do not have a 64-bit off_t type; seeks and
