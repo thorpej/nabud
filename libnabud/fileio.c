@@ -819,7 +819,7 @@ fileio_ops_for_location(const char *location, size_t loclen)
 		log_debug(LOG_SUBSYS_FILEIO,
 		    "location '%s' got default scheme.", location);
 	}
-	log_debug(LOG_SUBSYS_FILEIO, "location '%s' is %s\n",
+	log_debug(LOG_SUBSYS_FILEIO, "location '%s' is %s.",
 	    location, fso->ops == &fileio_local_ops ? "LOCAL" : "REMOTE");
 	return fso;
 }
