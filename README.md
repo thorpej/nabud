@@ -427,6 +427,9 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.3.4
+* Added "BaudRate" as an alias for "Baud" for Connection objects.
+
 ### nabud-1.3.3
 * Added support for flexibile transmission timeouts in NHACP.  The spec
   says 1 second, but there are systems out in the wild with slower
