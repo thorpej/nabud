@@ -244,8 +244,8 @@ static void
 config_load_connection(mj_t *atom)
 {
 	mj_t *type_atom, *port_atom, *channel_atom, *file_root_atom,
-	    *baud_atom, *flow_control_atom;
-	char *type = NULL, *channel = NULL, *baud = NULL;
+	    *baud_atom, *flow_control_atom, *stop_bits_atom;
+	char *type = NULL, *channel = NULL, *baud = NULL, *stop_bits = NULL;
 	struct conn_add_args args = { };
 	long val;
 
@@ -289,8 +289,7 @@ config_load_connection(mj_t *atom)
 		mj_asprint(&baud, baud_atom, MJ_HUMAN);
 		val = strtol(baud, NULL, 10);
 		if (val < 1) {
-			config_error("Baud must be at least 1 %u",
-			    atom);
+			config_error("Baud must be at least 1", atom);
 			goto out;
 		}
 	} else {
@@ -303,6 +302,22 @@ config_load_connection(mj_t *atom)
 	if (VALID_ATOM(flow_control_atom, MJ_TRUE)) {
 		args.flow_control = true;
 	}
+
+	/*
+	 * StopBits is optional.
+	 */
+	stop_bits_atom = mj_get_atom(atom, "StopBits");
+	if (VALID_ATOM(baud_atom, MJ_NUMBER)) {
+		mj_asprint(&stop_bits, stop_bits_atom, MJ_HUMAN);
+		val = strtol(stop_bits, NULL, 10);
+		if (val != 1 && val != 2) {
+			config_error("StopBits must be 1 or 2", atom);
+			goto out;
+		}
+	} else {
+		val = 0;
+	}
+	args.stop_bits = (unsigned int)val;
 
 	/*
 	 * StorageArea is optional, and we also check for the old
@@ -349,6 +364,9 @@ config_load_connection(mj_t *atom)
 	}
 	if (baud != NULL) {
 		free(baud);
+	}
+	if (stop_bits != NULL) {
+		free(stop_bits);
 	}
 	if (args.file_root != NULL) {
 		free(args.file_root);

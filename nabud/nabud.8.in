@@ -382,6 +382,12 @@ The default is
 .Dq false .
 This option is really only useful if you have modified your NABU's HCCA
 port to support RTS/CTS flow control.
+.It StopBits
+An optional number with a value of 1 or 2 that specifies the number of
+stop bits to use for this connection.
+Stop bits is only applicable to serial connections.
+If the number of stop bits is unspecified, then the connection will default
+to 2.
 .It Channel
 An optional number between 1 and 255 that specifies the connection's
 default channel.

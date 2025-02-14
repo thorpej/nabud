@@ -320,8 +320,12 @@ conn_add_serial(struct conn_add_args *args)
 	 * more reliable if we use 2 stop bits.  Otherwise, the NABU
 	 * can get out of sync when receiving a stream of bytes in
 	 * a packet.
+	 *
+	 * Configuration can override the default.
 	 */
-	args->stop_bits = 2;	/* Configure this, eventually. */
+	if (args->stop_bits == 0) {
+		args->stop_bits = 2;
+	}
 
 	if (args->baud != 0) {
 		if (! conn_serial_setparam(fd, args)) {
@@ -339,12 +343,7 @@ conn_add_serial(struct conn_add_args *args)
 		if (! conn_serial_setparam(fd, args)) {
 			log_error("[%s] Failed to set NABU-native baud rate; "
 			    "falling back...", args->port);
-			/*
-			 * If we're falling back, definitely make sure
-			 * we're using 2 stop bits.
-			 */
 			args->baud = NABU_FALLBACK_BPS;
-			args->stop_bits = 2;
 			if (! conn_serial_setparam(fd, args)) {
 				log_error("[%s] Failed to set fallback "
 				    "baud rate.", args->port);
