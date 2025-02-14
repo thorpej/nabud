@@ -361,6 +361,14 @@ to the NABU native baud rate of 111860, and will fall back to 115200
 if the native baud rate is not supported by the serial interface.
 This option is really only useful if you have modified your NABU's HCCA
 port to use a different baud rate clock.
+.It BaudRate
+This is an alias for
+.Dq Baud .
+If the
+.Dq Baud
+property is not present,
+.Dq BaudRate
+will be consulted.
 .It FlowControl
 An optional boolean value
 .Po

@@ -277,8 +277,14 @@ config_load_connection(mj_t *atom)
 	}
 	args.channel = (unsigned int)val;
 
-	/* Baud is optional. */
+	/*
+	 * Baud is optional.  If it's not present, also check for
+	 * BaudRate (which is equally optional).
+	 */
 	baud_atom = mj_get_atom(atom, "Baud");
+	if (! VALID_ATOM(baud_atom, MJ_NUMBER)) {
+		baud_atom = mj_get_atom(atom, "BaudRate");
+	}
 	if (VALID_ATOM(baud_atom, MJ_NUMBER)) {
 		mj_asprint(&baud, baud_atom, MJ_HUMAN);
 		val = strtol(baud, NULL, 10);
