@@ -622,6 +622,17 @@ stext_parse_length(const char *cp, size_t maxlen)
 	return (uint16_t)val;
 }
 
+static uint16_t
+stext_parse_line(const char *cp)
+{
+	long val = strtol(cp, NULL, 0);
+	if (val < 0 || val > UINT16_MAX) {
+		printf("'%s' invalid length\n", cp);
+		cli_throw();
+	}
+	return (uint16_t)val;
+}
+
 static union {
 	union retronet_request request;
 	union retronet_reply reply;
@@ -1203,6 +1214,65 @@ command_rn_fh_seek(int argc, char *argv[])
 
 	printf("--> New offset: %u <--\n",
 	    nabu_get_uint32(rn_buf.reply.fh_seek.offset));
+
+	return false;
+}
+
+static bool
+command_rn_fh_line_count(int argc, char *argv[])
+{
+	if (argc < 2) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+
+	rn_set_uint8(slot);
+
+	printf("Sending: NABU_MSG_RN_FH_LINE_COUNT.\n");
+	rn_send(NABU_MSG_RN_FH_LINE_COUNT);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_line_count));
+
+	printf("--> Lines: %u <--\n",
+	    nabu_get_uint16(rn_buf.reply.fh_line_count.lineCount));
+
+	return false;
+}
+
+static bool
+command_rn_fh_get_line(int argc, char *argv[])
+{
+	if (argc < 3) {
+		printf("Args, bro.\n");
+		cli_throw();
+	}
+
+	rn_reset_cursor();
+
+	uint8_t slot = stext_parse_slot(argv[1]);
+	uint16_t line = stext_parse_line(argv[2]);
+
+	rn_set_uint8(slot);
+	rn_set_uint16(line);
+
+	printf("Sending: NABU_MSG_RN_FH_GET_LINE.\n");
+	rn_send(NABU_MSG_RN_FH_GET_LINE);
+
+	rn_reset_cursor();
+	rn_recv(sizeof(rn_buf.reply.fh_get_line.lineLength));
+
+	uint16_t retlen = nabu_get_uint16(rn_buf.reply.fh_get_line.lineLength);
+	printf("--> Line length %u <--\n", retlen);
+
+	if (retlen != 0) {
+		rn_recv(retlen);
+		printf("%*s\n", (int)retlen, rn_buf.reply.fh_get_line.data);
+	}
 
 	return false;
 }
@@ -2110,6 +2180,8 @@ static const struct cmdtab cmdtab[] = {
 	{ .name = "rn-fh-details",	.func = command_rn_fh_details },
 	{ .name = "rn-fh-readseq",	.func = command_rn_fh_readseq },
 	{ .name = "rn-fh-seek",		.func = command_rn_fh_seek },
+	{ .name = "rn-fh-line-count",	.func = command_rn_fh_line_count },
+	{ .name = "rn-fh-get-line",	.func = command_rn_fh_get_line },
 
 	{ .name = "nhacp-start-0-0",	.func = command_nhacp_start_0_0 },
 	{ .name = "nhacp-hello",	.func = command_nhacp_hello },

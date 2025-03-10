@@ -1446,6 +1446,163 @@ rn_req_fh_seek(struct retronet_context *ctx)
 	conn_send(conn, &ctx->reply.fh_seek, sizeof(ctx->reply.fh_seek));
 }
 
+/*
+ * rn_req_fh_line_count --
+ *	Handle the FH-LINE_COUNT request.
+ */
+static void
+rn_req_fh_line_count(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_line_count,
+			sizeof(ctx->request.fh_line_count))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_line_count.fileHandle);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_line_count.fileHandle);
+		return;
+	}
+
+	/*
+	 * First, get the current state of the file and figure out
+	 * the boundaries of the deleted range.
+	 */
+	struct fileio_attrs attrs;
+
+	error = stext_file_getattr(f, &attrs);
+	if (error) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		return;
+	}
+
+	uint16_t lines = 0;
+	uint32_t offset = 0;
+	/*
+	 * Now, we just read the whole file and count newlines
+	 */
+	for (;;) {
+		uint16_t iolen = COPY_BUFSIZE;
+
+		error = stext_file_pread(f, COPY_BUF, offset, &iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pread() failed: %s",
+			    conn_name(conn), strerror(error));
+			break;
+		}
+		if (iolen == 0) {
+			/* EOF! */
+			break;
+		}
+		for (ssize_t i = 0; i < iolen; i++) {
+			if (COPY_BUF[i] == '\n')
+				lines++;
+		}
+		offset += iolen;
+	}
+
+	nabu_set_uint16(ctx->reply.fh_line_count.lineCount, lines);
+	conn_send(conn, &ctx->reply.fh_line_count, sizeof(ctx->reply.fh_line_count));
+}
+
+/*
+ * rn_req_fh_line_count --
+ *	Handle the FH-LINE_COUNT request.
+ */
+static void
+rn_req_fh_get_line(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_get_line,
+			sizeof(ctx->request.fh_get_line))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_get_line.fileHandle);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_get_line.fileHandle);
+		return;
+	}
+
+	uint16_t line = nabu_get_uint16(ctx->request.fh_get_line.lineNumber);
+
+	/*
+	 * First, get the current state of the file and figure out
+	 * the boundaries of the deleted range.
+	 */
+	struct fileio_attrs attrs;
+
+	error = stext_file_getattr(f, &attrs);
+	if (error) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		return;
+	}
+
+	uint16_t lines = 0;
+	uint32_t offset = 0;
+	uint16_t lineLength = 0;
+	bool copying = (line == 0);
+	bool done = false;
+	/*
+	 * Now, we just read the whole file and count newlines
+	 */
+	while (!done) {
+		uint16_t iolen = COPY_BUFSIZE;
+
+		error = stext_file_pread(f, COPY_BUF, offset, &iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pread() failed: %s",
+			    conn_name(conn), strerror(error));
+			break;
+		}
+		if (iolen == 0) {
+			/* EOF! */
+			break;
+		}
+		for (ssize_t i = 0; i < iolen; i++) {
+			if (copying) {
+				if (COPY_BUF[i] == '\r' || COPY_BUF[i] == '\n') {
+					done = true;
+					break;
+				}
+				else {
+					ctx->reply.fh_get_line.data[lineLength++] = COPY_BUF[i];
+				}
+			}
+			else {
+				if (COPY_BUF[i] == '\n') {
+					lines++;
+					if (lines == line)
+						copying = true;
+				}
+			}
+		}
+		offset += iolen;
+	}
+
+	nabu_set_uint16(ctx->reply.fh_get_line.lineLength, lineLength);
+	conn_send(conn, &ctx->reply.fh_get_line, offsetof(struct rn_fh_get_line_repl, data) + lineLength);
+}
+
 #define	HANDLER_INDEX(v)	((v) - NABU_MSG_RN_FIRST)
 #define	HANDLER_ENTRY(v, n)						\
 	[HANDLER_INDEX(v)] = {						\
@@ -1476,6 +1633,8 @@ static const struct {
 	HANDLER_ENTRY(NABU_MSG_RN_FH_DETAILS,      fh_details),
 	HANDLER_ENTRY(NABU_MSG_RN_FH_READSEQ,      fh_readseq),
 	HANDLER_ENTRY(NABU_MSG_RN_FH_SEEK,         fh_seek),
+	HANDLER_ENTRY(NABU_MSG_RN_FH_LINE_COUNT,   fh_line_count),
+	HANDLER_ENTRY(NABU_MSG_RN_FH_GET_LINE,     fh_get_line),
 };
 static const unsigned int retronet_request_type_count =
     sizeof(retronet_request_types) / sizeof(retronet_request_types[0]);

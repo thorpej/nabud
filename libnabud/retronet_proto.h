@@ -349,8 +349,37 @@ struct rn_fh_seek_repl {
 	uint8_t		offset[4];
 };
 
+/*
+ * NSBU_MSG_RN_FH_LINE_COUNT	0xdc
+ *	uint8_t			fileHandle
+ */
+#define NABU_MSG_RN_FH_LINE_COUNT	0xdc
+struct rn_fh_line_count_req {
+	uint8_t		fileHandle;
+};
+
+struct rn_fh_line_count_repl {
+	uint8_t		lineCount[2];
+};
+
+/*
+ * NSBU_MSG_RN_FH_GET_LINE	0xdd
+ *	uint8_t			fileHandle
+ * 	uint16_t		lineNumber
+ */
+#define NABU_MSG_RN_FH_GET_LINE		0xdd
+struct rn_fh_get_line_req {
+	uint8_t		fileHandle;
+	uint8_t		lineNumber[2];
+};
+
+struct rn_fh_get_line_repl {
+	uint8_t		lineLength[2];
+	uint8_t		data[65535];
+};
+
 #define	NABU_MSG_RN_FIRST	NABU_MSG_RN_FILE_OPEN
-#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FH_SEEK
+#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FH_GET_LINE
 
 #define	NABU_MSG_IS_RETRONET(x)	((x) >= NABU_MSG_RN_FIRST &&	\
 				 (x) <= NABU_MSG_RN_LAST)
@@ -405,6 +434,8 @@ union retronet_request {
 	struct rn_fh_details_req	fh_details;
 	struct rn_fh_readseq_req	fh_readseq;
 	struct rn_fh_seek_req		fh_seek;
+	struct rn_fh_line_count_req	fh_line_count;
+	struct rn_fh_get_line_req	fh_get_line;
 };
 
 union retronet_reply {
@@ -418,6 +449,8 @@ union retronet_reply {
 	struct rn_file_details		fh_details;
 	struct rn_fh_readseq_repl	fh_readseq;
 	struct rn_fh_seek_repl		fh_seek;
+	struct rn_fh_line_count_repl	fh_line_count;
+	struct rn_fh_get_line_repl	fh_get_line;
 };
 
 #endif /* retronet_proto_h_included */
