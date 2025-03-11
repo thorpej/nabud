@@ -427,6 +427,11 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.4
+* Added support for RetroNet FH-LINE_COUNT and FH-GET_LINE messages,
+  from RealDeuce.
+* Added support for RetroNet TCP client API, from RealDeuce.
+
 ### nabud-1.3.4
 * Added "BaudRate" as an alias for "Baud" for Connection objects.
 * Added "StopBits" configuration property for Connection objects.
