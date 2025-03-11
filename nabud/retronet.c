@@ -32,12 +32,18 @@
 #include "config.h"
 #endif
 
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <glob.h>
 #include <limits.h>
+#include <netdb.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -65,10 +71,18 @@ struct rn_file_list_entry {
 	struct rn_file_details details;
 };
 
+struct rn_tcp_conn_list_entry {
+	STAILQ_ENTRY(rn_tcp_conn_list_entry) link;
+	struct rn_tcp_conn_details details;
+	uint8_t slot;
+};
+
 struct retronet_context {
 	struct stext_context stext;
 	STAILQ_HEAD(, rn_file_list_entry) file_list;
+	STAILQ_HEAD(, rn_tcp_conn_list_entry) tcp_conn_list;
 	unsigned int file_list_count;
+	unsigned int tcp_conn_list_count;
 	struct rn_file_list_entry *cached_entry;
 
 	union {
@@ -76,6 +90,27 @@ struct retronet_context {
 		union retronet_reply reply;
 	};
 };
+
+static struct rn_tcp_conn_list_entry *
+tcp_conn_find(struct retronet_context *ctx, uint8_t slot)
+{
+	struct rn_tcp_conn_list_entry *t;
+
+	if (slot == 0xff) {
+		return NULL;
+	}
+
+	STAILQ_FOREACH(t, &ctx->tcp_conn_list, link) {
+		/* The list is sorted. */
+		if (t->slot > slot) {
+			break;
+		}
+		if (t->slot == slot) {
+			return t;
+		}
+	}
+	return NULL;
+}
 
 		/* note reference to local variable */
 #define	COPY_BUFSIZE	sizeof(ctx->reply.fh_read.data)
@@ -1113,6 +1148,21 @@ rn_file_list_free(struct retronet_context *ctx)
 	ctx->cached_entry = NULL;
 }
 
+static void
+rn_tcp_conn_list_free(struct retronet_context *ctx)
+{
+	struct rn_tcp_conn_list_entry *e;
+
+	while ((e = STAILQ_FIRST(&ctx->tcp_conn_list)) != NULL) {
+		STAILQ_REMOVE_HEAD(&ctx->tcp_conn_list, link);
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] Closing socket %d slot %hhu.",
+		    conn_name(ctx->stext.conn), e->details.sock, e->slot);
+		close(e->details.sock);
+		free(e);
+	}
+	ctx->tcp_conn_list_count = 0;
+}
+
 /*
  * rn_req_file_list --
  *	Handle the FILE-LIST request.
@@ -1446,6 +1496,454 @@ rn_req_fh_seek(struct retronet_context *ctx)
 	conn_send(conn, &ctx->reply.fh_seek, sizeof(ctx->reply.fh_seek));
 }
 
+/*
+ * rn_req_fh_line_count --
+ *	Handle the FH-LINE_COUNT request.
+ */
+static void
+rn_req_fh_line_count(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_line_count,
+			sizeof(ctx->request.fh_line_count))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_line_count.fileHandle);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_line_count.fileHandle);
+		return;
+	}
+
+	/*
+	 * First, get the current state of the file and figure out
+	 * the boundaries of the deleted range.
+	 */
+	struct fileio_attrs attrs;
+
+	error = stext_file_getattr(f, &attrs);
+	if (error) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		return;
+	}
+
+	uint16_t lines = 0;
+	uint32_t offset = 0;
+	/*
+	 * Now, we just read the whole file and count newlines
+	 */
+	for (;;) {
+		uint16_t iolen = COPY_BUFSIZE;
+
+		error = stext_file_pread(f, COPY_BUF, offset, &iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pread() failed: %s",
+			    conn_name(conn), strerror(error));
+			break;
+		}
+		if (iolen == 0) {
+			/* EOF! */
+			break;
+		}
+		for (ssize_t i = 0; i < iolen; i++) {
+			if (COPY_BUF[i] == '\n')
+				lines++;
+		}
+		offset += iolen;
+	}
+
+	nabu_set_uint16(ctx->reply.fh_line_count.lineCount, lines);
+	conn_send(conn, &ctx->reply.fh_line_count, sizeof(ctx->reply.fh_line_count));
+}
+
+/*
+ * rn_req_fh_line_count --
+ *	Handle the FH-LINE_COUNT request.
+ */
+static void
+rn_req_fh_get_line(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct stext_file *f;
+	int error;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.fh_get_line,
+			sizeof(ctx->request.fh_get_line))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	f = stext_file_find(&ctx->stext, ctx->request.fh_get_line.fileHandle);
+	if (f == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No file for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.fh_get_line.fileHandle);
+		return;
+	}
+
+	uint16_t line = nabu_get_uint16(ctx->request.fh_get_line.lineNumber);
+
+	/*
+	 * First, get the current state of the file and figure out
+	 * the boundaries of the deleted range.
+	 */
+	struct fileio_attrs attrs;
+
+	error = stext_file_getattr(f, &attrs);
+	if (error) {
+		log_error("[%s] stext_file_getattr() failed: %s",
+		    conn_name(conn), strerror(error));
+		return;
+	}
+
+	uint16_t lines = 0;
+	uint32_t offset = 0;
+	uint16_t lineLength = 0;
+	bool copying = (line == 0);
+	bool done = false;
+	/*
+	 * Now, we just read the whole file and count newlines
+	 */
+	while (!done) {
+		uint16_t iolen = COPY_BUFSIZE;
+
+		error = stext_file_pread(f, COPY_BUF, offset, &iolen);
+		if (error != 0) {
+			log_error("[%s] stext_file_pread() failed: %s",
+			    conn_name(conn), strerror(error));
+			break;
+		}
+		if (iolen == 0) {
+			/* EOF! */
+			break;
+		}
+		for (ssize_t i = 0; i < iolen; i++) {
+			if (copying) {
+				if (COPY_BUF[i] == '\r' || COPY_BUF[i] == '\n') {
+					done = true;
+					break;
+				}
+				else {
+					ctx->reply.fh_get_line.data[lineLength++] = COPY_BUF[i];
+				}
+			}
+			else {
+				if (COPY_BUF[i] == '\n') {
+					lines++;
+					if (lines == line)
+						copying = true;
+				}
+			}
+		}
+		offset += iolen;
+	}
+
+	nabu_set_uint16(ctx->reply.fh_get_line.lineLength, lineLength);
+	conn_send(conn, &ctx->reply.fh_get_line, offsetof(struct rn_fh_get_line_repl, data) + lineLength);
+}
+
+/*
+ * rn_req_tcp_open --
+ *	Handle the TCP_OPEN request.
+ */
+static void
+rn_req_tcp_open(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.tcp_open.hostNameLen, 1)) {
+		log_error("[%s] Failed to receive hostNameLength.",
+		    conn_name(conn));
+		return;
+	}
+	if (! conn_recv(conn, &ctx->request.tcp_open.hostName, ctx->request.tcp_open.hostNameLen)) {
+		log_error("[%s] Failed to receive hostName.",
+		    conn_name(conn));
+		return;
+	}
+	if (! conn_recv(conn, &ctx->request.tcp_open.port, 3)) {
+		log_error("[%s] Failed to receive port.",
+		    conn_name(conn));
+		return;
+	}
+	uint8_t slot = ctx->request.tcp_open.tcpHandle;
+
+	// Check if tcpHandle is already in use (and find insertion point)
+	struct rn_tcp_conn_list_entry *prevt = NULL;
+	struct rn_tcp_conn_list_entry *lt = NULL;
+	STAILQ_FOREACH(lt, &ctx->tcp_conn_list, link) {
+		if (slot == 255) {
+			if (prevt == NULL && lt->slot != 0) {
+				slot = 0;
+			}
+			else if (prevt != NULL && prevt->slot != lt->slot - 1) {
+				slot = prevt->slot + 1;
+			}
+		}
+		if (slot > lt->slot) {
+			prevt = lt;
+			continue;
+		}
+		if (slot == lt->slot) {
+			log_error("[%s] TCP slot %hhu already in use.",
+			    conn_name(conn), slot);
+		}
+		if (slot < lt->slot) {
+			break;
+		}
+	}
+	if (slot == 255) {
+		if (prevt == NULL)
+			slot = 0;
+		else {
+			if (prevt->slot == 254) {
+				log_error("[%s] All slots full.",
+				    conn_name(conn));
+				goto fail;
+			}
+			slot = prevt->slot + 1;
+		}
+	}
+
+	// NULL terminate hostName
+	ctx->request.tcp_open.hostName[ctx->request.tcp_open.hostNameLen] = 0;
+
+	// Connect
+	struct addrinfo hints = {
+		.ai_family = PF_UNSPEC,
+		.ai_socktype = SOCK_STREAM,
+		.ai_protocol = IPPROTO_TCP,
+		.ai_flags = AI_NUMERICSERV
+#ifdef AI_ADDRCONFIG
+			| AI_ADDRCONFIG
+#endif
+	};
+	struct addrinfo *res = NULL;
+	struct addrinfo *cur;
+	char portnum[6];
+	uint16_t port = nabu_get_uint16(ctx->request.tcp_open.port);
+	int sock = -1;
+	sprintf(portnum, "%hu", port);
+	if (getaddrinfo((const char *)ctx->request.tcp_open.hostName, portnum, &hints, &res) != 0) {
+		goto fail;
+	}
+	for (cur = res; cur && sock == -1; cur = cur->ai_next) {
+		sock = socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
+		if (sock == -1)
+			continue;
+		if (connect(sock, cur->ai_addr, cur->ai_addrlen)) {
+			close(sock);
+			sock = -1;
+			continue;
+		}
+	}
+	freeaddrinfo(res);
+	if (sock == -1)
+		goto fail;
+	int intval = 1;
+	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &intval, sizeof(intval))) {
+		log_info("[%s] Failed to disable Nagle.", conn_name(conn));
+	}
+	if (ioctl(sock, FIONBIO, &intval) == -1) {
+		log_info("[%s] Failed to set socket nonblocking.", conn_name(conn));
+	}
+
+	struct rn_tcp_conn_list_entry *le = calloc(1, sizeof(struct rn_tcp_conn_list_entry));
+	if (le == NULL) {
+		close(sock);
+		goto fail;
+	}
+	le->details.sock = sock;
+	strlcpy((char *)le->details.hostname, (const char *)ctx->request.tcp_open.hostName, sizeof(le->details.hostname));
+	le->details.port = port;
+	le->details.hostname_length = ctx->request.tcp_open.hostNameLen;
+	if (prevt == NULL)
+		STAILQ_INSERT_HEAD(&ctx->tcp_conn_list, le, link);
+	else
+		STAILQ_INSERT_AFTER(&ctx->tcp_conn_list, prevt, le, link);
+	ctx->reply.tcp_open.tcpHandle = slot;
+	conn_send(conn, &ctx->reply.tcp_open, sizeof(ctx->reply.tcp_open));
+
+	log_debug(LOG_SUBSYS_RETRONET,
+	    "[%s] Opened connection to %s as socket %d slot %hhu", conn_name(conn), le->details.hostname, sock, slot);
+	return;
+
+fail:
+	ctx->reply.tcp_open.tcpHandle = 0xff;
+	conn_send(conn, &ctx->reply.tcp_open, sizeof(ctx->reply.tcp_open));
+}
+
+/*
+ * rn_req_th_close --
+ *	Handle the TH-CLOSE request.
+ */
+static void
+rn_req_th_close(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct rn_tcp_conn_list_entry *t = NULL;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.th_close,
+			sizeof(ctx->request.th_close))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	t = tcp_conn_find(ctx, ctx->request.th_close.tcpHandle);
+	if (t == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.th_close.tcpHandle);
+		return;
+	}
+	log_debug(LOG_SUBSYS_RETRONET,
+	    "[%s] Closing TCP connection at slot %u.", conn_name(conn),
+	    t->slot);
+	STAILQ_REMOVE(&ctx->tcp_conn_list, t, rn_tcp_conn_list_entry, link);
+	close(t->details.sock);
+	free(t);
+}
+
+/*
+ * rn_req_th_close --
+ *	Handle the TH-CLOSE request.
+ */
+static void
+rn_req_th_size(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct rn_tcp_conn_list_entry *t = NULL;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.th_close,
+			sizeof(ctx->request.th_close))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	t = tcp_conn_find(ctx, ctx->request.th_close.tcpHandle);
+	if (t == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.th_close.tcpHandle);
+		return;
+	}
+	int avail;
+	if (ioctl(t->details.sock, FIONREAD, &avail) == -1) {
+		log_error("[%s] FIONREAD failed (%d).",
+		    conn_name(conn), errno);
+		avail = 0;
+	}
+	nabu_set_uint32(ctx->reply.th_size.size, (uint32_t)avail);
+	conn_send(conn, &ctx->reply.th_size, sizeof(ctx->reply.th_size));
+}
+
+/*
+ * rn_req_th_read --
+ *	Handle the TH-READ request.
+ */
+static void
+rn_req_th_read(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct rn_tcp_conn_list_entry *t = NULL;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.th_read,
+			sizeof(ctx->request.th_read))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+	uint8_t slot = ctx->request.th_close.tcpHandle;
+	uint16_t get = nabu_get_uint16(ctx->request.th_read.readLength);
+
+	t = tcp_conn_find(ctx, slot);
+	if (t == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		    conn_name(ctx->stext.conn), slot);
+		return;
+	}
+	int sock = t->details.sock;
+	memset(ctx->reply.th_read.data, 0, get);
+	ssize_t toRead = recv(sock, ctx->reply.th_read.data, get, 0);
+	if (toRead == -1) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+			toRead = 0;
+		else {
+			log_error("[%s] Reading %hu bytes from TCP slot %hhu (%d) failed (%d).",
+			    conn_name(ctx->stext.conn), get, slot, sock, errno);
+		}
+	}
+	log_debug(LOG_SUBSYS_RETRONET, "[%s] Reading %hu bytes from TCP slot %u (%d) returned %zd.",
+	    conn_name(ctx->stext.conn), get, slot, sock, toRead);
+	nabu_set_uint32(ctx->reply.th_read.toRead, (uint32_t)toRead);
+	conn_send(conn, &ctx->reply.th_read, offsetof(struct rn_th_read_repl, data) + (toRead > 0 ? toRead : 0));
+}
+
+/*
+ * rn_req_th_read --
+ *	Handle the TH-READ request.
+ */
+static void
+rn_req_th_write(struct retronet_context *ctx)
+{
+	struct nabu_connection *conn = ctx->stext.conn;
+	struct rn_tcp_conn_list_entry *t = NULL;
+
+	/* Receive the request. */
+	if (! conn_recv(conn, &ctx->request.th_write,
+			offsetof(struct rn_th_write_req, data))) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+	uint16_t size = nabu_get_uint16(ctx->request.th_write.dataLength);
+	if (! conn_recv(conn, ctx->request.th_write.data,
+			size)) {
+		log_error("[%s] Failed to receive request.",
+		    conn_name(conn));
+		return;
+	}
+
+	t = tcp_conn_find(ctx, ctx->request.th_close.tcpHandle);
+	if (t == NULL) {
+		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		    conn_name(ctx->stext.conn),
+		    ctx->request.th_write.tcpHandle);
+		return;
+	}
+	int sock = t->details.sock;
+
+	// It appears they want the raw send() return?
+	ssize_t ret = send(sock, ctx->request.th_write.data, size, 0);
+	if (ret == -1) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR || errno == ENOBUFS)
+			ret = 0;
+		else {
+			log_error("[%s] Writing %hu bytes from TCP slot %hhu (%d) failed (%d).",
+			    conn_name(ctx->stext.conn), size, t->slot, sock, errno);
+		}
+	}
+	nabu_set_uint32(ctx->reply.th_write.wrote, (uint32_t)ret);
+	conn_send(conn, &ctx->reply.th_write, sizeof(ctx->reply.th_write));
+}
+
 #define	HANDLER_INDEX(v)	((v) - NABU_MSG_RN_FIRST)
 #define	HANDLER_ENTRY(v, n)						\
 	[HANDLER_INDEX(v)] = {						\
@@ -1476,6 +1974,13 @@ static const struct {
 	HANDLER_ENTRY(NABU_MSG_RN_FH_DETAILS,      fh_details),
 	HANDLER_ENTRY(NABU_MSG_RN_FH_READSEQ,      fh_readseq),
 	HANDLER_ENTRY(NABU_MSG_RN_FH_SEEK,         fh_seek),
+	HANDLER_ENTRY(NABU_MSG_RN_FH_LINE_COUNT,   fh_line_count),
+	HANDLER_ENTRY(NABU_MSG_RN_FH_GET_LINE,     fh_get_line),
+	HANDLER_ENTRY(NABU_MSG_RN_TCP_OPEN,        tcp_open),
+	HANDLER_ENTRY(NABU_MSG_RN_TH_CLOSE,        th_close),
+	HANDLER_ENTRY(NABU_MSG_RN_TH_SIZE,         th_size),
+	HANDLER_ENTRY(NABU_MSG_RN_TH_READ,         th_read),
+	HANDLER_ENTRY(NABU_MSG_RN_TH_WRITE,        th_write),
 };
 static const unsigned int retronet_request_type_count =
     sizeof(retronet_request_types) / sizeof(retronet_request_types[0]);
@@ -1494,6 +1999,7 @@ retronet_context_alloc(struct nabu_connection *conn)
 	if (ctx != NULL) {
 		stext_context_init(&ctx->stext, conn, 0, NULL, NULL);
 		STAILQ_INIT(&ctx->file_list);
+		STAILQ_INIT(&ctx->tcp_conn_list);
 		conn->retronet = ctx;
 	}
 	return ctx;
@@ -1510,6 +2016,7 @@ retronet_context_free(struct retronet_context *ctx)
 	ctx->stext.conn->retronet = NULL;
 	stext_context_fini(&ctx->stext);
 	rn_file_list_free(ctx);
+	rn_tcp_conn_list_free(ctx);
 	free(ctx);
 }
 

@@ -349,8 +349,111 @@ struct rn_fh_seek_repl {
 	uint8_t		offset[4];
 };
 
+/*
+ * NABU_MSG_RN_FH_LINE_COUNT	0xdc
+ *	uint8_t			fileHandle
+ */
+#define NABU_MSG_RN_FH_LINE_COUNT	0xdc
+struct rn_fh_line_count_req {
+	uint8_t		fileHandle;
+};
+
+struct rn_fh_line_count_repl {
+	uint8_t		lineCount[2];
+};
+
+/*
+ * NABU_MSG_RN_FH_GET_LINE	0xdd
+ *	uint8_t			fileHandle
+ * 	uint16_t		lineNumber
+ */
+#define NABU_MSG_RN_FH_GET_LINE		0xdd
+struct rn_fh_get_line_req {
+	uint8_t		fileHandle;
+	uint8_t		lineNumber[2];
+};
+
+struct rn_fh_get_line_repl {
+	uint8_t		lineLength[2];
+	uint8_t		data[65535];
+};
+
+/*
+ * NABU_MSG_RN_TCP_OPEN		0xd0
+ * 	uint8_t			hostNameLen
+ * 	uint8_t[]		hostName
+ * 	uint16_t		port
+ * 	uint8_t			tcpHandle
+ */
+#define NABU_MSG_RN_TCP_OPEN		0xd0
+struct rn_tcp_open_req {
+	uint8_t		hostNameLen;
+	uint8_t		hostName[256];
+	uint8_t		port[2];
+	uint8_t		tcpHandle;
+};
+
+struct rn_tcp_open_repl {
+	uint8_t		tcpHandle;
+};
+
+/*
+ * NABU_MSG_RN_TCP_CLOSE	0xd1
+ * 	uint8_t			tcpHandle
+ */
+#define NABU_MSG_RN_TH_CLOSE		0xd1
+struct rn_th_close_req {
+	uint8_t		tcpHandle;
+};
+
+/*
+ * NABU_MSG_RN_TH_SIZE		0xd2
+ * 	uint8_t			tcpHandle
+ */
+#define NABU_MSG_RN_TH_SIZE		0xd2
+struct rn_th_size_req {
+	uint8_t		tcpHandle;
+};
+
+struct rn_th_size_repl {
+	uint8_t		size[4];
+};
+
+/*
+ * NABU_MSG_RN_TH_READ		0xd3
+ * 	uint8_t			tcpHandle
+ * 	uint16_t		readLength
+ */
+#define NABU_MSG_RN_TH_READ		0xd3
+struct rn_th_read_req {
+	uint8_t		tcpHandle;
+	uint8_t		readLength[2];
+};
+
+struct rn_th_read_repl {
+	uint8_t		toRead[4];
+	uint8_t		data[65535];
+};
+
+/*
+ * NABU_MSG_RN_TH_WRITE		0xd4
+ * 	uint8_t			tcpHandle
+ * 	uint16_t		dataLen
+ *	[data bytes]
+ */
+#define NABU_MSG_RN_TH_WRITE		0xd4
+struct rn_th_write_req {
+	uint8_t		tcpHandle;
+	uint8_t		dataLength[2];
+	uint8_t		data[65535];
+};
+
+struct rn_th_write_repl {
+	uint8_t		wrote[4];
+};
+
 #define	NABU_MSG_RN_FIRST	NABU_MSG_RN_FILE_OPEN
-#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FH_SEEK
+#define	NABU_MSG_RN_LAST	NABU_MSG_RN_FH_GET_LINE
 
 #define	NABU_MSG_IS_RETRONET(x)	((x) >= NABU_MSG_RN_FIRST &&	\
 				 (x) <= NABU_MSG_RN_LAST)
@@ -382,6 +485,16 @@ struct rn_file_details {
 };
 
 /*
+ * NabuRetroNet TCP connection details structure
+ */
+struct rn_tcp_conn_details {
+	int		sock;
+	uint8_t		hostname[256];
+	uint16_t	port;
+	uint8_t		hostname_length;
+};
+
+/*
  * Aggregated request / reply structures, for convenience.
  */
 
@@ -405,6 +518,13 @@ union retronet_request {
 	struct rn_fh_details_req	fh_details;
 	struct rn_fh_readseq_req	fh_readseq;
 	struct rn_fh_seek_req		fh_seek;
+	struct rn_fh_line_count_req	fh_line_count;
+	struct rn_fh_get_line_req	fh_get_line;
+	struct rn_tcp_open_req		tcp_open;
+	struct rn_th_close_req		th_close;
+	struct rn_th_size_req		th_size;
+	struct rn_th_read_req		th_read;
+	struct rn_th_write_req		th_write;
 };
 
 union retronet_reply {
@@ -418,6 +538,12 @@ union retronet_reply {
 	struct rn_file_details		fh_details;
 	struct rn_fh_readseq_repl	fh_readseq;
 	struct rn_fh_seek_repl		fh_seek;
+	struct rn_fh_line_count_repl	fh_line_count;
+	struct rn_fh_get_line_repl	fh_get_line;
+	struct rn_tcp_open_repl		tcp_open;
+	struct rn_th_size_repl		th_size;
+	struct rn_th_read_repl		th_read;
+	struct rn_th_write_repl		th_write;
 };
 
 #endif /* retronet_proto_h_included */
