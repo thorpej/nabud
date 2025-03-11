@@ -1524,23 +1524,10 @@ rn_req_fh_line_count(struct retronet_context *ctx)
 	}
 
 	/*
-	 * First, get the current state of the file and figure out
-	 * the boundaries of the deleted range.
+	 * We just read the whole file and count newlines.
 	 */
-	struct fileio_attrs attrs;
-
-	error = stext_file_getattr(f, &attrs);
-	if (error) {
-		log_error("[%s] stext_file_getattr() failed: %s",
-		    conn_name(conn), strerror(error));
-		return;
-	}
-
 	uint16_t lines = 0;
 	uint32_t offset = 0;
-	/*
-	 * Now, we just read the whole file and count newlines
-	 */
 	for (;;) {
 		uint16_t iolen = COPY_BUFSIZE;
 
@@ -1562,12 +1549,13 @@ rn_req_fh_line_count(struct retronet_context *ctx)
 	}
 
 	nabu_set_uint16(ctx->reply.fh_line_count.lineCount, lines);
-	conn_send(conn, &ctx->reply.fh_line_count, sizeof(ctx->reply.fh_line_count));
+	conn_send(conn, &ctx->reply.fh_line_count,
+	    sizeof(ctx->reply.fh_line_count));
 }
 
 /*
- * rn_req_fh_line_count --
- *	Handle the FH-LINE_COUNT request.
+ * rn_req_fh_get_line --
+ *	Handle the FH-GET_LINE request.
  */
 static void
 rn_req_fh_get_line(struct retronet_context *ctx)
@@ -1595,26 +1583,14 @@ rn_req_fh_get_line(struct retronet_context *ctx)
 	uint16_t line = nabu_get_uint16(ctx->request.fh_get_line.lineNumber);
 
 	/*
-	 * First, get the current state of the file and figure out
-	 * the boundaries of the deleted range.
+	 * We read file, counting newlines until we get to the line we want,
+	 * and copy that one out.
 	 */
-	struct fileio_attrs attrs;
-
-	error = stext_file_getattr(f, &attrs);
-	if (error) {
-		log_error("[%s] stext_file_getattr() failed: %s",
-		    conn_name(conn), strerror(error));
-		return;
-	}
-
 	uint16_t lines = 0;
 	uint32_t offset = 0;
 	uint16_t lineLength = 0;
 	bool copying = (line == 0);
 	bool done = false;
-	/*
-	 * Now, we just read the whole file and count newlines
-	 */
 	while (!done) {
 		uint16_t iolen = COPY_BUFSIZE;
 
@@ -1630,19 +1606,18 @@ rn_req_fh_get_line(struct retronet_context *ctx)
 		}
 		for (ssize_t i = 0; i < iolen; i++) {
 			if (copying) {
-				if (COPY_BUF[i] == '\r' || COPY_BUF[i] == '\n') {
+				if (COPY_BUF[i] == '\r' ||
+				    COPY_BUF[i] == '\n') {
 					done = true;
 					break;
+				} else {
+					ctx->reply.fh_get_line.data[
+					    lineLength++] = COPY_BUF[i];
 				}
-				else {
-					ctx->reply.fh_get_line.data[lineLength++] = COPY_BUF[i];
-				}
-			}
-			else {
+			} else {
 				if (COPY_BUF[i] == '\n') {
 					lines++;
-					if (lines == line)
-						copying = true;
+					copying = (lines == line);
 				}
 			}
 		}
@@ -1650,7 +1625,8 @@ rn_req_fh_get_line(struct retronet_context *ctx)
 	}
 
 	nabu_set_uint16(ctx->reply.fh_get_line.lineLength, lineLength);
-	conn_send(conn, &ctx->reply.fh_get_line, offsetof(struct rn_fh_get_line_repl, data) + lineLength);
+	conn_send(conn, &ctx->reply.fh_get_line,
+	    offsetof(struct rn_fh_get_line_repl, data) + lineLength);
 }
 
 /*
@@ -1668,7 +1644,8 @@ rn_req_tcp_open(struct retronet_context *ctx)
 		    conn_name(conn));
 		return;
 	}
-	if (! conn_recv(conn, &ctx->request.tcp_open.hostName, ctx->request.tcp_open.hostNameLen)) {
+	if (! conn_recv(conn, &ctx->request.tcp_open.hostName,
+			ctx->request.tcp_open.hostNameLen)) {
 		log_error("[%s] Failed to receive hostName.",
 		    conn_name(conn));
 		return;
@@ -1680,15 +1657,15 @@ rn_req_tcp_open(struct retronet_context *ctx)
 	}
 	uint8_t slot = ctx->request.tcp_open.tcpHandle;
 
-	// Check if tcpHandle is already in use (and find insertion point)
+	/* Check if tcpHandle is already in use (and find insertion point). */
 	struct rn_tcp_conn_list_entry *prevt = NULL;
 	struct rn_tcp_conn_list_entry *lt = NULL;
 	STAILQ_FOREACH(lt, &ctx->tcp_conn_list, link) {
 		if (slot == 255) {
 			if (prevt == NULL && lt->slot != 0) {
 				slot = 0;
-			}
-			else if (prevt != NULL && prevt->slot != lt->slot - 1) {
+			} else if (prevt != NULL &&
+				   prevt->slot != lt->slot - 1) {
 				slot = prevt->slot + 1;
 			}
 		}
@@ -1717,10 +1694,10 @@ rn_req_tcp_open(struct retronet_context *ctx)
 		}
 	}
 
-	// NULL terminate hostName
+	/* NULL terminate hostName */
 	ctx->request.tcp_open.hostName[ctx->request.tcp_open.hostNameLen] = 0;
 
-	// Connect
+	/* Connect */
 	struct addrinfo hints = {
 		.ai_family = PF_UNSPEC,
 		.ai_socktype = SOCK_STREAM,
@@ -1736,13 +1713,16 @@ rn_req_tcp_open(struct retronet_context *ctx)
 	uint16_t port = nabu_get_uint16(ctx->request.tcp_open.port);
 	int sock = -1;
 	sprintf(portnum, "%hu", port);
-	if (getaddrinfo((const char *)ctx->request.tcp_open.hostName, portnum, &hints, &res) != 0) {
+	if (getaddrinfo((const char *)ctx->request.tcp_open.hostName, portnum,
+			&hints, &res) != 0) {
 		goto fail;
 	}
 	for (cur = res; cur && sock == -1; cur = cur->ai_next) {
-		sock = socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
-		if (sock == -1)
+		sock = socket(cur->ai_family, cur->ai_socktype,
+			      cur->ai_protocol);
+		if (sock == -1) {
 			continue;
+		}
 		if (connect(sock, cur->ai_addr, cur->ai_addrlen)) {
 			close(sock);
 			sock = -1;
@@ -1750,34 +1730,42 @@ rn_req_tcp_open(struct retronet_context *ctx)
 		}
 	}
 	freeaddrinfo(res);
-	if (sock == -1)
+	if (sock == -1) {
 		goto fail;
+	}
 	int intval = 1;
-	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &intval, sizeof(intval))) {
+	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &intval,
+		       sizeof(intval))) {
 		log_info("[%s] Failed to disable Nagle.", conn_name(conn));
 	}
 	if (ioctl(sock, FIONBIO, &intval) == -1) {
-		log_info("[%s] Failed to set socket nonblocking.", conn_name(conn));
+		log_info("[%s] Failed to set socket nonblocking.",
+		    conn_name(conn));
 	}
 
-	struct rn_tcp_conn_list_entry *le = calloc(1, sizeof(struct rn_tcp_conn_list_entry));
+	struct rn_tcp_conn_list_entry *le =
+	    calloc(1, sizeof(struct rn_tcp_conn_list_entry));
 	if (le == NULL) {
 		close(sock);
 		goto fail;
 	}
 	le->details.sock = sock;
-	strlcpy((char *)le->details.hostname, (const char *)ctx->request.tcp_open.hostName, sizeof(le->details.hostname));
+	strlcpy((char *)le->details.hostname,
+		(const char *)ctx->request.tcp_open.hostName,
+		sizeof(le->details.hostname));
 	le->details.port = port;
 	le->details.hostname_length = ctx->request.tcp_open.hostNameLen;
-	if (prevt == NULL)
+	if (prevt == NULL) {
 		STAILQ_INSERT_HEAD(&ctx->tcp_conn_list, le, link);
-	else
+	} else {
 		STAILQ_INSERT_AFTER(&ctx->tcp_conn_list, prevt, le, link);
+	}
 	ctx->reply.tcp_open.tcpHandle = slot;
 	conn_send(conn, &ctx->reply.tcp_open, sizeof(ctx->reply.tcp_open));
 
 	log_debug(LOG_SUBSYS_RETRONET,
-	    "[%s] Opened connection to %s as socket %d slot %hhu", conn_name(conn), le->details.hostname, sock, slot);
+	    "[%s] Opened connection to %s as socket %d slot %hhu",
+	    conn_name(conn), le->details.hostname, sock, slot);
 	return;
 
 fail:
@@ -1805,7 +1793,8 @@ rn_req_th_close(struct retronet_context *ctx)
 
 	t = tcp_conn_find(ctx, ctx->request.th_close.tcpHandle);
 	if (t == NULL) {
-		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] No TCP connection for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.th_close.tcpHandle);
 		return;
@@ -1819,8 +1808,8 @@ rn_req_th_close(struct retronet_context *ctx)
 }
 
 /*
- * rn_req_th_close --
- *	Handle the TH-CLOSE request.
+ * rn_req_th_size --
+ *	Handle the TH-SIZE request.
  */
 static void
 rn_req_th_size(struct retronet_context *ctx)
@@ -1838,7 +1827,8 @@ rn_req_th_size(struct retronet_context *ctx)
 
 	t = tcp_conn_find(ctx, ctx->request.th_close.tcpHandle);
 	if (t == NULL) {
-		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] No TCP connection for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.th_close.tcpHandle);
 		return;
@@ -1875,7 +1865,8 @@ rn_req_th_read(struct retronet_context *ctx)
 
 	t = tcp_conn_find(ctx, slot);
 	if (t == NULL) {
-		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] No TCP connection for slot %u.",
 		    conn_name(ctx->stext.conn), slot);
 		return;
 	}
@@ -1883,22 +1874,25 @@ rn_req_th_read(struct retronet_context *ctx)
 	memset(ctx->reply.th_read.data, 0, get);
 	ssize_t toRead = recv(sock, ctx->reply.th_read.data, get, 0);
 	if (toRead == -1) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+		if (errno == EAGAIN || errno == EWOULDBLOCK ||
+		    errno == EINTR) {
 			toRead = 0;
-		else {
+		} else {
 			log_error("[%s] Reading %hu bytes from TCP slot %hhu (%d) failed (%d).",
 			    conn_name(ctx->stext.conn), get, slot, sock, errno);
 		}
 	}
-	log_debug(LOG_SUBSYS_RETRONET, "[%s] Reading %hu bytes from TCP slot %u (%d) returned %zd.",
+	log_debug(LOG_SUBSYS_RETRONET,
+	    "[%s] Reading %hu bytes from TCP slot %u (%d) returned %zd.",
 	    conn_name(ctx->stext.conn), get, slot, sock, toRead);
 	nabu_set_uint32(ctx->reply.th_read.toRead, (uint32_t)toRead);
-	conn_send(conn, &ctx->reply.th_read, offsetof(struct rn_th_read_repl, data) + (toRead > 0 ? toRead : 0));
+	conn_send(conn, &ctx->reply.th_read, offsetof(struct rn_th_read_repl,
+	    data) + (toRead > 0 ? toRead : 0));
 }
 
 /*
- * rn_req_th_read --
- *	Handle the TH-READ request.
+ * rn_req_th_write --
+ *	Handle the TH-WRITE request.
  */
 static void
 rn_req_th_write(struct retronet_context *ctx)
@@ -1923,21 +1917,24 @@ rn_req_th_write(struct retronet_context *ctx)
 
 	t = tcp_conn_find(ctx, ctx->request.th_close.tcpHandle);
 	if (t == NULL) {
-		log_debug(LOG_SUBSYS_RETRONET, "[%s] No TCP connection for slot %u.",
+		log_debug(LOG_SUBSYS_RETRONET,
+		    "[%s] No TCP connection for slot %u.",
 		    conn_name(ctx->stext.conn),
 		    ctx->request.th_write.tcpHandle);
 		return;
 	}
 	int sock = t->details.sock;
 
-	// It appears they want the raw send() return?
+	/* It appears they want the raw send() return? */
 	ssize_t ret = send(sock, ctx->request.th_write.data, size, 0);
 	if (ret == -1) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR || errno == ENOBUFS)
+		if (errno == EAGAIN || errno == EWOULDBLOCK ||
+		    errno == EINTR || errno == ENOBUFS) {
 			ret = 0;
-		else {
+		} else {
 			log_error("[%s] Writing %hu bytes from TCP slot %hhu (%d) failed (%d).",
-			    conn_name(ctx->stext.conn), size, t->slot, sock, errno);
+			    conn_name(ctx->stext.conn), size, t->slot, sock,
+			    errno);
 		}
 	}
 	nabu_set_uint32(ctx->reply.th_write.wrote, (uint32_t)ret);
