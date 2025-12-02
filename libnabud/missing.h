@@ -51,4 +51,8 @@ const char *	getprogname(void);
 void		setprogname(const char *);
 #endif /* ! HAVE_GETPROGNAME */
 
+#ifndef HAVE_STRLCPY
+size_t		strlcpy(char *, const char *, size_t);
+#endif /* ! HAVE_STRLCPY */
+
 #endif /* missing_h_included */

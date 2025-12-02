@@ -391,6 +391,7 @@ AC_SUBST(CLI_INCLUDES)
 # Check for some useful BSD functions that, sadly, are not universal.
 #
 AC_CHECK_FUNCS(getprogname)
+AC_CHECK_FUNCS(strlcpy)
 
 # Generate the Makefiles
 #

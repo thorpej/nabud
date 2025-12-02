@@ -109,7 +109,7 @@ am_libnabud_la_OBJECTS = libnabud_la-atom.lo libnabud_la-cli.lo \
 	libnabud_la-conn_io.lo libnabud_la-crc16_genibus.lo \
 	libnabud_la-crc8_cdma2000.lo libnabud_la-fileio.lo \
 	libnabud_la-getprogname.lo libnabud_la-listing.lo \
-	libnabud_la-log.lo
+	libnabud_la-log.lo libnabud_la-strlcpy.lo
 libnabud_la_OBJECTS = $(am_libnabud_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -138,7 +138,8 @@ am__depfiles_remade = ./$(DEPDIR)/libnabud_la-atom.Plo \
 	./$(DEPDIR)/libnabud_la-fileio.Plo \
 	./$(DEPDIR)/libnabud_la-getprogname.Plo \
 	./$(DEPDIR)/libnabud_la-listing.Plo \
-	./$(DEPDIR)/libnabud_la-log.Plo
+	./$(DEPDIR)/libnabud_la-log.Plo \
+	./$(DEPDIR)/libnabud_la-strlcpy.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -335,7 +336,7 @@ noinst_LTLIBRARIES = libnabud.la
 libnabud_la_CPPFLAGS = $(CLI_INCLUDES)
 libnabud_la_SOURCES = atom.c cli.c conn_io.c crc16_genibus.c \
 			  crc8_cdma2000.c fileio.c getprogname.c \
-			  listing.c log.c
+			  listing.c log.c strlcpy.c
 
 all: all-am
 
@@ -400,6 +401,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-getprogname.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-listing.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-log.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libnabud_la-strlcpy.Plo@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -490,6 +492,13 @@ libnabud_la-log.lo: log.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='log.c' object='libnabud_la-log.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnabud_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnabud_la-log.lo `test -f 'log.c' || echo '$(srcdir)/'`log.c
+
+libnabud_la-strlcpy.lo: strlcpy.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnabud_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libnabud_la-strlcpy.lo -MD -MP -MF $(DEPDIR)/libnabud_la-strlcpy.Tpo -c -o libnabud_la-strlcpy.lo `test -f 'strlcpy.c' || echo '$(srcdir)/'`strlcpy.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libnabud_la-strlcpy.Tpo $(DEPDIR)/libnabud_la-strlcpy.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='strlcpy.c' object='libnabud_la-strlcpy.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libnabud_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libnabud_la-strlcpy.lo `test -f 'strlcpy.c' || echo '$(srcdir)/'`strlcpy.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -630,6 +639,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/libnabud_la-getprogname.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-listing.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-log.Plo
+	-rm -f ./$(DEPDIR)/libnabud_la-strlcpy.Plo
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -684,6 +694,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/libnabud_la-getprogname.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-listing.Plo
 	-rm -f ./$(DEPDIR)/libnabud_la-log.Plo
+	-rm -f ./$(DEPDIR)/libnabud_la-strlcpy.Plo
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
