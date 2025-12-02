@@ -31,6 +31,8 @@
 #include "config.h"
 #endif
 
+#include <stddef.h>
+
 /*
  * Elide some open(2) flags that might not exist on some systems.
  */
