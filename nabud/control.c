@@ -169,7 +169,7 @@ control_serialize_connection(struct nabu_connection *conn, void *ctx)
 	if (conn->l_selected_file != NULL) {
 		strncpy(selected_file, conn->l_selected_file,
 		    sizeof(selected_file) - 1);
-	} else {
+	} else if (chan != NULL) {
 		default_000001_file(chan, "from channel", selected_file,
 		    sizeof(selected_file));
 	}
