@@ -427,6 +427,14 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.4.1
+* Added a local copy of strlcpy(3) for platforms that do not include it
+  (some Linux systems, for example).
+* Fixed a nabud crash when a connection has a Baud directive but no
+  StopBits directive.
+* Fixed a nabud crash when a connection has a Channel directive that
+  does not match any confiugured channel.
+
 ### nabud-1.4
 * Added support for RetroNet FH-LINE_COUNT and FH-GET_LINE messages,
   from RealDeuce.
