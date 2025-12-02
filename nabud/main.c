@@ -307,7 +307,7 @@ config_load_connection(mj_t *atom)
 	 * StopBits is optional.
 	 */
 	stop_bits_atom = mj_get_atom(atom, "StopBits");
-	if (VALID_ATOM(baud_atom, MJ_NUMBER)) {
+	if (VALID_ATOM(stop_bits_atom, MJ_NUMBER)) {
 		mj_asprint(&stop_bits, stop_bits_atom, MJ_HUMAN);
 		val = strtol(stop_bits, NULL, 10);
 		if (val != 1 && val != 2) {
