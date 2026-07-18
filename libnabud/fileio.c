@@ -713,11 +713,13 @@ fileio_remote_io_open(struct fileio *f, const char *location,
 
 	f->remote.fio = fetchXGetURL(f->location, &f->remote.ust, "");
 	if (f->remote.fio == NULL) {
+		errno = ENOENT;
 		return false;
 	}
 
 	if (f->remote.ust.size < 0) {	/* XXX */
 		fetchIO_close(f->remote.fio);
+		errno = ENOENT;
 		return false;
 	}
 

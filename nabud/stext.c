@@ -598,7 +598,7 @@ stext_file_open(struct stext_context *ctx, const char *filename,
 	fileio = fileio_open(filename, FILEIO_O_LOCAL_ROOT | oflags,
 	    ctx->conn->file_root, attrs);
 	if (fileio == NULL) {
-		error = errno;
+		error = ENOENT;
 		log_error("[%s] Unable to open file '%s': %s",
 		    conn_name(ctx->conn), filename, strerror(error));
 		goto out;
