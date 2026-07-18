@@ -1395,7 +1395,12 @@ nhacp_req_list_dir(struct nhacp_context *ctx)
 	if (globret != 0) {
 		log_debug(LOG_SUBSYS_NHACP, "[%s] glob() returned %d.",
 		    conn_name(conn), globret);
-		nhacp_err = NHACP_EIO;
+		if (globret == GLOB_NOMATCH) {
+			nhacp_err = NHACP_ENOENT;
+		}
+		else {
+			nhacp_err = NHACP_EIO;
+		}
 		goto bad;
 	}
 	log_debug(LOG_SUBSYS_NHACP, "[%s] glob() returned %zd matches.",
