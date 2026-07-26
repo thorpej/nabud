@@ -41,6 +41,7 @@
 #define FTP_DEFAULT_PROXY_PORT	21
 #define HTTP_DEFAULT_PROXY_PORT	3128
 
+#if defined(HAVE_SSL_SUPPORT)
 #if defined(HAVE_SECURETRANSPORT)
 #include <Security/SecureTransport.h>
 #elif defined(HAVE_OPENSSL)
@@ -50,6 +51,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif
+#endif /* HAVE_SSL_SUPPORT */
 
 /* Connection */
 typedef struct fetchconn conn_t;
@@ -62,9 +64,10 @@ struct fetchconn {
 	char		*next_buf;	/* pending buffer, e.g. after getln */
 	size_t		 next_len;	/* size of pending buffer */
 	int		 err;		/* last protocol reply code */
-#if defined(HAVE_SECURETRANSPORT)
+#if defined(HAVE_SSL_SUPPORT)
+# if defined(HAVE_SECURETRANSPORT)
 	SSLContextRef	ssl;		/* SSL context */
-#elif defined(HAVE_OPENSSL)
+# elif defined(HAVE_OPENSSL)
 	SSL		*ssl;		/* SSL handle */
 	SSL_CTX		*ssl_ctx;	/* SSL context */
 	X509		*ssl_cert;	/* server certificate */
@@ -73,7 +76,8 @@ struct fetchconn {
 #  else
 	const SSL_METHOD *ssl_meth;	/* SSL method */
 #  endif
-#endif
+# endif
+#endif /* HAVE_SSL_SUPPORT */
 
 	char		*ftp_home;
 

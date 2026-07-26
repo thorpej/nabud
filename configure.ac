@@ -103,7 +103,21 @@ AC_CHECK_HEADERS([inttypes.h sys/ucred.h])
 
 # Deal with the crypto libraries we need.
 #
-WITH_SSL=no
+AC_ARG_WITH([ssl],
+	[AS_HELP_STRING([--with-ssl=yes|no|maybe],
+	 [build with SSL/TLS support])],
+	[WITH_SSL="$withval"],
+	[WITH_SSL=maybe])
+case "${WITH_SSL}" in
+	yes)
+		;;
+	no)
+		;;
+	maybe)
+		;;
+	*)
+		AC_MSG_ERROR([invalid --with-ssl argument: '$WITH_SSL'])
+esac
 
 AC_ARG_WITH([pak],
 	[AS_HELP_STRING([--with-pak=yes|no|maybe],
@@ -146,16 +160,25 @@ AX_CHECK_OPENSSL([AC_DEFINE([HAVE_OPENSSL], [1],
 
 # Check for which SSL implementation to use.
 #
-if test x$WITH_SECURETRANSPORT != x; then
-	WITH_SSL="$WITH_SECURETRANSPORT"
-	SSL_LIBS="-framework Security -framework CoreFoundation"
-elif test x$WITH_OPENSSL != x; then
-	WITH_SSL="$WITH_OPENSSL"
-	SSL_LDFLAGS="$OPENSSL_LDFLAGS"
-	SSL_LIBS="$OPENSSL_LIBS"
-	SSL_INCLUDES="$OPENSSL_INCLUDES"
-else
-	AC_MSG_WARN([Building without SSL support])
+if test x$WITH_SSL != xno; then
+	if test x$WITH_SECURETRANSPORT != x; then
+		WITH_SSL="$WITH_SECURETRANSPORT"
+		SSL_LIBS="-framework Security -framework CoreFoundation"
+	elif test x$WITH_OPENSSL != x; then
+		WITH_SSL="$WITH_OPENSSL"
+		SSL_LDFLAGS="$OPENSSL_LDFLAGS"
+		SSL_LIBS="$OPENSSL_LIBS"
+		SSL_INCLUDES="$OPENSSL_INCLUDES"
+	elif test x$WITH_SSL = xyes; then
+		AC_MSG_ERROR([No SSL/TLS library found])
+	else
+		AC_MSG_WARN([Building without SSL support])
+		WITH_SSL=no
+	fi
+fi
+if test x$WITH_SSL != xno; then
+	AC_DEFINE([HAVE_SSL_SUPPORT], [],
+		  [Defined if SSL/TLS support is included])
 fi
 AC_SUBST([SSL_LDFLAGS])
 AC_SUBST([SSL_LIBS])
@@ -175,10 +198,12 @@ if test x$WITH_PAK != xno; then
 		AC_MSG_ERROR([No crypto library found for PAK file support])
 	else
 		AC_MSG_WARN([Building without PAK file support])
+		WITH_PAK=no
 	fi
 fi
-if test x$WITH_PAK = xyes; then
-	AC_DEFINE([HAVE_PAK_SUPPORT], [], [Defined if PAK support is included])
+if test x$WITH_PAK != xno; then
+	AC_DEFINE([HAVE_PAK_SUPPORT], [],
+		  [Defined if PAK support is included])
 fi
 AC_SUBST([PAK_LDFLAGS])
 AC_SUBST([PAK_LIBS])

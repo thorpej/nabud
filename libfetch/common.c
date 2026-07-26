@@ -516,7 +516,7 @@ fetch_SSLWriteFunc(SSLConnectionRef connection, const void *data,
 int
 fetch_ssl(conn_t *conn, int verbose)
 {
-#if defined(HAVE_SECURETRANSPORT)
+#if defined(HAVE_SSL_SUPPORT) && defined(HAVE_SECURETRANSPORT)
 	SSLContextRef ssl;
 	OSStatus status;
 	char errstr[64];
@@ -597,7 +597,7 @@ fetch_ssl(conn_t *conn, int verbose)
 	CFRelease(ssl);
 	return (-1);
 
-#elif defined(HAVE_OPENSSL)
+#elif defined(HAVE_SSL_SUPPORT) && defined(HAVE_OPENSSL)
 
 	/* Init the SSL library and context */
 	if (!SSL_library_init()){
@@ -706,7 +706,7 @@ fetch_read(conn_t *conn, char *buf, size_t len)
 				return (-1);
 			}
 		}
-#if defined(HAVE_SECURETRANSPORT)
+#if defined(HAVE_SSL_SUPPORT) && defined(HAVE_SECURETRANSPORT)
 		if (conn->ssl != NULL) {
 			size_t actual;
 
@@ -716,7 +716,7 @@ fetch_read(conn_t *conn, char *buf, size_t len)
 				rlen = (ssize_t)actual;
 			}
 		} else
-#elif defined(HAVE_OPENSSL)
+#elif defined(HAVE_SSL_SUPPORT) && defined(HAVE_OPENSSL)
 		if (conn->ssl != NULL)
 			rlen = SSL_read(conn->ssl, buf, (int)len);
 		else
@@ -851,7 +851,7 @@ fetch_write(conn_t *conn, const void *buf, size_t len)
 			}
 		}
 		errno = 0;
-#if defined(HAVE_SECURETRANSPORT)
+#if defined(HAVE_SSL_SUPPORT) && defined(HAVE_SECURETRANSPORT)
 		if (conn->ssl != NULL) {
 			size_t actual;
 
@@ -861,7 +861,7 @@ fetch_write(conn_t *conn, const void *buf, size_t len)
 				wlen = (ssize_t)actual;
 			}
 		} else
-#elif defined(HAVE_OPENSSL)
+#elif defined(HAVE_SSL_SUPPORT) && defined(HAVE_OPENSSL)
 		if (conn->ssl != NULL)
 			wlen = SSL_write(conn->ssl, buf, (int)len);
 		else
@@ -898,13 +898,13 @@ fetch_close(conn_t *conn)
 {
 	int ret;
 
-#if defined(HAVE_SECURETRANSPORT)
+#if defined(HAVE_SSL_SUPPORT) && defined(HAVE_SECURETRANSPORT)
 	if (conn->ssl != NULL) {
 		SSLClose(conn->ssl);
 		CFRelease(conn->ssl);
 		conn->ssl = NULL;
 	}
-#elif defined(HAVE_OPENSSL)
+#elif defined(HAVE_SSL_SUPPORT) && defined(HAVE_OPENSSL)
 	if (conn->ssl) {
 		SSL_shutdown(conn->ssl);
 		SSL_set_connect_state(conn->ssl);

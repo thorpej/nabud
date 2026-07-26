@@ -58,6 +58,9 @@
 /* Define if the struct sockaddr_un has a member sun_len on your OS */
 #undef HAVE_SOCKADDR_UN_SUN_LEN
 
+/* Defined if SSL/TLS support is included */
+#undef HAVE_SSL_SUPPORT
+
 /* Define if your compiler supports _Static_assert() */
 #undef HAVE_STATIC_ASSERT
 
@@ -79,7 +82,7 @@
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
 
-/* Define to 1 if you have the `strlcpy' function. */
+/* Define to 1 if you have the 'strlcpy' function. */
 #undef HAVE_STRLCPY
 
 /* Define if <sys/socket.h> has struct sockpeercred */

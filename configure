@@ -817,6 +817,7 @@ with_gnu_ld
 with_sysroot
 enable_libtool_lock
 enable_largefile
+with_ssl
 with_pak
 with_openssl
 enable_year2038
@@ -1487,6 +1488,7 @@ Optional Packages:
   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
   --with-sysroot[=DIR]    Search for dependent libraries within DIR (or the
                           compiler's sysroot if not specified).
+  --with-ssl=yes|no|maybe build with SSL/TLS support
   --with-pak=yes|no|maybe build with encrypted PAK support
   --with-openssl=DIR      root of the OpenSSL directory
 
@@ -13211,7 +13213,26 @@ fi
 
 # Deal with the crypto libraries we need.
 #
-WITH_SSL=no
+
+# Check whether --with-ssl was given.
+if test ${with_ssl+y}
+then :
+  withval=$with_ssl; WITH_SSL="$withval"
+else case e in #(
+  e) WITH_SSL=maybe ;;
+esac
+fi
+
+case "${WITH_SSL}" in
+	yes)
+		;;
+	no)
+		;;
+	maybe)
+		;;
+	*)
+		as_fn_error $? "invalid --with-ssl argument: '$WITH_SSL'" "$LINENO" 5
+esac
 
 
 # Check whether --with-pak was given.
@@ -13546,17 +13567,27 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam \
 
 # Check for which SSL implementation to use.
 #
-if test x$WITH_SECURETRANSPORT != x; then
-	WITH_SSL="$WITH_SECURETRANSPORT"
-	SSL_LIBS="-framework Security -framework CoreFoundation"
-elif test x$WITH_OPENSSL != x; then
-	WITH_SSL="$WITH_OPENSSL"
-	SSL_LDFLAGS="$OPENSSL_LDFLAGS"
-	SSL_LIBS="$OPENSSL_LIBS"
-	SSL_INCLUDES="$OPENSSL_INCLUDES"
-else
-	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Building without SSL support" >&5
+if test x$WITH_SSL != xno; then
+	if test x$WITH_SECURETRANSPORT != x; then
+		WITH_SSL="$WITH_SECURETRANSPORT"
+		SSL_LIBS="-framework Security -framework CoreFoundation"
+	elif test x$WITH_OPENSSL != x; then
+		WITH_SSL="$WITH_OPENSSL"
+		SSL_LDFLAGS="$OPENSSL_LDFLAGS"
+		SSL_LIBS="$OPENSSL_LIBS"
+		SSL_INCLUDES="$OPENSSL_INCLUDES"
+	elif test x$WITH_SSL = xyes; then
+		as_fn_error $? "No SSL/TLS library found" "$LINENO" 5
+	else
+		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Building without SSL support" >&5
 printf "%s\n" "$as_me: WARNING: Building without SSL support" >&2;}
+		WITH_SSL=no
+	fi
+fi
+if test x$WITH_SSL != xno; then
+
+printf "%s\n" "#define HAVE_SSL_SUPPORT /**/" >>confdefs.h
+
 fi
 
 
@@ -13577,9 +13608,10 @@ if test x$WITH_PAK != xno; then
 	else
 		{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Building without PAK file support" >&5
 printf "%s\n" "$as_me: WARNING: Building without PAK file support" >&2;}
+		WITH_PAK=no
 	fi
 fi
-if test x$WITH_PAK = xyes; then
+if test x$WITH_PAK != xno; then
 
 printf "%s\n" "#define HAVE_PAK_SUPPORT /**/" >>confdefs.h
 
