@@ -427,6 +427,10 @@ And you can select a file to loaded when the NABU boots and requests image
 
 ## Changes
 
+### nabud-1.4.3
+* Add --with-pak=yes|no|maybe configure option, allowing encrypted
+  PAK support to be disabled.
+
 ### nabud-1.4.2
 * Return ENOENT, not EIO, for NHACP's LIST-DIR on an empty directory.
 * Fix an assertion in the storage extension layer when attempting to

@@ -104,7 +104,22 @@ AC_CHECK_HEADERS([inttypes.h sys/ucred.h])
 # Deal with the crypto libraries we need.
 #
 WITH_SSL=no
-WITH_PAK=no
+
+AC_ARG_WITH([pak],
+	[AS_HELP_STRING([--with-pak=yes|no|maybe],
+	 [build with encrypted PAK support])],
+	[WITH_PAK="$withval"],
+	[WITH_PAK=maybe])
+case "${WITH_PAK}" in
+	yes)
+		;;
+	no)
+		;;
+	maybe)
+		;;
+	*)
+		AC_MSG_ERROR([invalid --with-pak argument: '$WITH_PAK'])
+esac
 
 # Check for CommonCrypto (the native crypto library on macOS).
 #
@@ -148,15 +163,22 @@ AC_SUBST([SSL_INCLUDES])
 
 # Check for which crypto (md5 + des) library to use for PAK files.
 #
-if test x$WITH_COMMONCRYPTO != x; then
-	WITH_PAK="$WITH_COMMONCRYPTO"
-elif test x$WITH_OPENSSL != x; then
-	WITH_PAK="$WITH_OPENSSL"
-	PAK_LDFLAGS="$OPENSSL_LDFLAGS"
-	PAK_LIBS="-lcrypto"
-	PAK_INCLUDES="$OPENSSL_INCLUDES"
-else
-	AC_MSG_WARN([Building without PAK file support])
+if test x$WITH_PAK != xno; then
+	if test x$WITH_COMMONCRYPTO != x; then
+		WITH_PAK="$WITH_COMMONCRYPTO"
+	elif test x$WITH_OPENSSL != x; then
+		WITH_PAK="$WITH_OPENSSL"
+		PAK_LDFLAGS="$OPENSSL_LDFLAGS"
+		PAK_LIBS="-lcrypto"
+		PAK_INCLUDES="$OPENSSL_INCLUDES"
+	elif test x$WITH_PAK = xyes; then
+		AC_MSG_ERROR([No crypto library found for PAK file support])
+	else
+		AC_MSG_WARN([Building without PAK file support])
+	fi
+fi
+if test x$WITH_PAK = xyes; then
+	AC_DEFINE([HAVE_PAK_SUPPORT], [], [Defined if PAK support is included])
 fi
 AC_SUBST([PAK_LDFLAGS])
 AC_SUBST([PAK_LIBS])

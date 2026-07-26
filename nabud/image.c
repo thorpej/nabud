@@ -44,6 +44,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#if defined(HAVE_PAK_SUPPORT)
 #if defined(HAVE_COMMONCRYPTO_H)
 #define	COMMON_DIGEST_FOR_OPENSSL
 #include <CommonCrypto/CommonCrypto.h>
@@ -51,6 +52,7 @@
 #include <openssl/des.h>
 #include <openssl/md5.h>
 #endif
+#endif /* HAVE_PAK_SUPPORT */
 
 #include "libnabud/fileio.h"
 #include "libnabud/log.h"
@@ -564,7 +566,7 @@ image_nabu_name(uint32_t image)
 static char *
 image_encrypted_pak_name(uint32_t image)
 {
-#if defined(HAVE_COMMONCRYPTO_H) || defined(HAVE_OPENSSL)
+#if defined(HAVE_PAK_SUPPORT)
 	char namestr[sizeof("000001nabu")];
 	char pakname[ENCRYPTED_PAK_NAME_SIZE];
 
@@ -647,7 +649,7 @@ image_from_nabu(struct image_channel *chan, uint32_t image,
 static bool
 image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
 {
-#if defined(HAVE_COMMONCRYPTO_H)
+#if defined(HAVE_PAK_SUPPORT) && defined(HAVE_COMMONCRYPTO_H)
 	uint8_t iv[] = NABU_PAK_IV;
 	uint8_t key[] = NABU_PAK_KEY;
 	CCCryptorStatus status;
@@ -673,7 +675,7 @@ image_decrypt_pak(const uint8_t *src, uint8_t *dst, size_t len)
 	}
 
 	return status == kCCSuccess;
-#elif defined(HAVE_OPENSSL)
+#elif defined(HAVE_PAK_SUPPORT) && defined(HAVE_OPENSSL)
 	DES_cblock iv = NABU_PAK_IV;
 	DES_cblock key = NABU_PAK_KEY;
 	DES_key_schedule ks;
