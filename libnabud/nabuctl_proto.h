@@ -30,6 +30,10 @@
 /* Default path to the nabud control channel. */
 #define	NABUCTL_PATH_DEFAULT	"/tmp/nabuctl.sock"
 
+#ifdef __CYGWIN__
+#define	NABUCTL_PATH_DEFAULT_WIN	"c:/tmp/nabuctl.sock"
+#endif
+
 /*
  * Each nabuctl message and each field within each message is prefixed with
  * this header.  When there are no more fields or objects to return, then

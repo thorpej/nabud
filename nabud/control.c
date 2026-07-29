@@ -708,7 +708,15 @@ control_init(const char *path)
 	int sock = -1;
 
 	if (path == NULL) {
+#ifdef __CYGWIN__
+		if (access("c:/tmp", F_OK) == 0) {
+			path = NABUCTL_PATH_DEFAULT_WIN;
+		} else {
+			path = "nabuctl.sock";
+		}
+#else
 		path = NABUCTL_PATH_DEFAULT;
+#endif
 	}
 	nabuctl_sock_path = path;
 

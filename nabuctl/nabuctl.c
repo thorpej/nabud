@@ -1475,9 +1475,19 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	const char *path = NABUCTL_PATH_DEFAULT;
+	const char *path;
 	unsigned int logopts = 0;
 	int ch, sock;
+
+#ifdef __CYGWIN__
+		if (access("c:/tmp", F_OK) == 0) {
+			path = NABUCTL_PATH_DEFAULT_WIN;
+		} else {
+			path = "nabuctl.sock";
+		}
+#else
+		path = NABUCTL_PATH_DEFAULT;
+#endif
 
 	setprogname(argv[0]);
 
