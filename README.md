@@ -98,6 +98,9 @@ toolchain (gcc-core, binutils, make), you need to ensure you've installed the
 libssl-devel and libreadline-devel packages (make sure they match the
 versions of the run-time packages that are installed).
 
+The executables produced will run within the Cygwin environment as well
+as on native Windows (see [startup details](#cygwin) below).
+
 ## Configuring and running nabud
 
 nabud understands the following command line options:
@@ -215,8 +218,9 @@ The next step is to set up your nabud configuration file in
 _$(prefix)/etc/nabud.conf_.  nabud's configuration is held in a JSON-format
 file.  You can start with the example configuration file provided
 [here](examples/nabud.conf).  Note that the example has a lot of things
-in it that you may not need.  The configuration file is documented in
-the nabud(8) man page.
+in it that you may not need.  An example configuration file for Windows can
+also be found [here](examples/nabud_windows.conf).  The configuration file
+is documented in the nabud(8) man page.
 
 The next step is to install the appropriate start-up "extra" for your
 system.  If you are interested in providing extras for your favorite
@@ -268,6 +272,41 @@ run it like so:
     % sudo systemctl daemon-reload
     % sudo systemctl enable nabud.service
     % sudo systemctl start nabud.service
+
+### Cygwin
+
+After installing with 'make install', the nabud and nabuctl executables can be
+manually launched within the Cygwin environment from the command line, by using
+scripts, or by using a tool such as cygrunsrv.
+
+Note that the executables produced, along with a few requisite dll's, can simply
+be copied to any Windows directory and run directly from a Windows terminal in
+the foreground.  And as Cygwin generally handles background daemons by wrapping them
+as native Windows services, Nabud can also be launched as a Windows background task
+(without the -f command line option). In either case, Cygwin is not required to
+run nabud or nabuctl.
+
+After building, nabud.exe can be found in the nabud/.libs subdirectory and
+nabuctl.exe in the nabuctl/.libs subdirectory in the nabud source root.
+
+The required dll's are found in the /cygwin64/bin directory, and at the time
+of writing are as follows:
+
+* nabud:
+	- cygwin1.dll
+	- cygssl-3.dll
+	- cygcrypto-3.dll
+	- cygz.dll
+
+* nabuctl:
+	- cygwin1.dll
+	- cygreadline8.dll
+	- cygncursesw-10.dll
+
+Should you wish to run nabuctl and nabud from separate Windows directories, you
+will need to create a c:\tmp directory.  This is the default directory where the
+nabud control channel file is written, and this file is used by both nabuctl and
+nabud to communicate.  This isn't necessary if running both from a single directory.
 
 ## Using network serial adapters
 
