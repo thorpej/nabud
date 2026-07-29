@@ -32,6 +32,10 @@
 #include "config.h"
 #endif
 
+#ifdef __CYGWIN__
+#include <windows.h>
+#endif
+
 #include <sys/stat.h>
 #include <err.h>
 #include <errno.h>
@@ -668,5 +672,9 @@ main(int argc, char *argv[])
 	log_info("Exiting. Thank you, come again!");
 	log_fini();
 
+#ifdef __CYGWIN__
+	ExitProcess(0);
+#else
 	exit(0);
+#endif
 }
