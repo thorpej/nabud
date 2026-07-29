@@ -336,6 +336,8 @@ fileio_local_resolve_path(const char *location, const char *local_root,
     int flags, char **fnamep)
 {
 	char *fname;
+	char *normalized_root;
+	char *normalized_loc;
 
 	if ((flags & FILEIO_O_LOCAL_ROOT) != 0 && local_root == NULL) {
 		log_debug(LOG_SUBSYS_FILEIO,
@@ -353,44 +355,67 @@ fileio_local_resolve_path(const char *location, const char *local_root,
 		location += strlen(FILE_PREFIX) - 1;
 	}
 
-	/*
-	 * If we have an absolute path, strip off any extra / characters.
-	 */
-	if (location[0] == '/') {
-		while (location[1] == '/') {
-			location++;
-		}
+	normalized_loc = strdup(location);
+	if (normalized_loc == NULL) {
+		return ENOMEM;
 	}
 
-	if (strlen(location) == 0) {
-		log_debug(LOG_SUBSYS_FILEIO,
-		    "zero-length file location??");
-		return EINVAL;
+	/* Convert all backslashes to forward slashes in the location path */
+	for (char *p = normalized_loc; *p; p++) {
+		if (*p == '\\') *p = '/';
 	}
 
 	if (local_root != NULL) {
-		/* The local root must be an absolute path. */
-		if (*local_root != '/') {
+		normalized_root = strdup(local_root);
+		if (normalized_root == NULL) {
+			free(normalized_loc);
+			return ENOMEM;
+		}
+		
+		/* Convert all backslashes to forward slashes in the local_root */
+		for (char *p = normalized_root; *p; p++) {
+			if (*p == '\\') *p = '/';
+		}
+
+		/* Check for absolute path (accepts '/', or Windows 'C:') */
+		bool is_abs = (*normalized_root == '/' || (strlen(normalized_root) > 1 && normalized_root[1] == ':'));
+		if (!is_abs) {
 			log_debug(LOG_SUBSYS_FILEIO,
 			    "LOCAL-ROOT '%s' is not an absolute path.",
 			    local_root);
+			free(normalized_root);
+			free(normalized_loc);
 			return EINVAL;
 		}
-		if (check_local_root_escape(location)) {
+
+		if (check_local_root_escape(normalized_loc)) {
+			free(normalized_root);
+			free(normalized_loc);
 			return EPERM;
 		}
-		/* local_root/location\0 */
-		fname = malloc(strlen(local_root) + 1 +
-		    strlen(location) + 1);
-		if (fname != NULL) {
-			sprintf(fname, "%s/%s", local_root, location);
+
+		/* Strip leading '/' if found, it'll be added to full path */
+		const char *loc_p = normalized_loc;
+		while (*loc_p == '/') {
+			loc_p++;
 		}
+
+		/* Now construct the full path */
+		fname = malloc(strlen(normalized_root) + 1 + strlen(loc_p) + 1);
+		if (fname != NULL) {
+			sprintf(fname, "%s/%s", normalized_root, loc_p);
+		}
+		free(normalized_root);
 	} else {
 		if (flags & FILEIO_O_LOCAL_ROOT) {
+			free(normalized_loc);
 			return EPERM;
 		}
-		fname = strdup(location);
+		fname = strdup(normalized_loc);
 	}
+
+	free(normalized_loc);
+
 	if (fname == NULL) {
 		return ENOMEM;
 	}
